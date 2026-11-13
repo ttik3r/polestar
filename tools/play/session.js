@@ -448,6 +448,7 @@ end`);
 			case 'goal': return 'return play.doGoal()';
 			case 'step': return 'return play.playStep()';
 			case 'guide': return 'return play.playGuide()';
+			case 'walk': return `return play.walkTick(${luaValue({ strides: n(a.strides, 3), every: n(a.every, 0), seed: n(a.seed, 1), xp: a.xp !== false, restart: !!a.restart })})`;
 			case 'gotoStep': return `Polestar.Engine.Goto(${n(a.step, 1)})`;
 			case 'prevStep': return 'Polestar.Engine.Prev()';
 			case 'nextStep': return 'Polestar.Engine.Next()';
@@ -501,9 +502,7 @@ if not g then return "noguide" end
 local to = g.next or (g.nextChoices and g.nextChoices[1]) or G.Suggest()
 if to == g.id then to = nil end
 Polestar.Fire("GUIDE_OUTLEVELED", g.id, to)`;
-			case 'train': return `local E = Polestar.Engine
-local t = E.NearestClassTrainer and E.NearestClassTrainer()
-Polestar.Fire("TRAIN_DUE", stub.world.level, t or { npcName = "your class trainer" })`;
+			case 'train': return 'play.trainDue()';
 			case 'clearBanners': return 'Polestar.Fire("CLASS_TRAINED"); local GF = Polestar.UI.GuideFrame; if GF.notices then GF.notices.outlevel = nil end; GF.Layout()';
 			case 'doneStep': return `local E = Polestar.Engine
 local i = E.GetStepIndex()
