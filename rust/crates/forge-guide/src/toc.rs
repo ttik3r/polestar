@@ -403,6 +403,21 @@ static TEXT: &[(&str, [&str; 9], [&str; 9])] = &[
 			"Polestar 的玻璃與光澤：帶斜面的半透明面板，每個按鈕和標籤上的光澤，橫過玻璃的光，職業顏色漸入強調色。",
 		],
 	),
+	(
+		"Polestar_Skin_Atlas",
+		["Polestar-Design: Atlas", "Polestar, tema: Atlas", "Polestar, tema: Atlas", "Polestar, habillage : Atlas", "Polestar 스킨: Atlas", "Polestar, tema: Atlas", "Polestar, оформление: Atlas", "Polestar 皮肤：Atlas", "Polestar 皮膚：Atlas"],
+		[
+			"Die Farben von Atlas für Polestar: ein warmer Goldakzent und keine Trennlinien. Für das Atlas-Layout gemacht, zu jedem Layout passend.",
+			"Los colores de Atlas para Polestar: un acento dorado cálido y sin líneas de sección. Hecho para el diseño Atlas, válido con cualquier diseño.",
+			"Los colores de Atlas para Polestar: un acento dorado cálido y sin líneas de sección. Hecho para el diseño Atlas, válido con cualquier diseño.",
+			"Les couleurs d'Atlas pour Polestar : un accent doré chaud et aucune ligne de section. Fait pour la disposition Atlas, valable avec toute disposition.",
+			"Polestar용 Atlas 색상: 따뜻한 금색 강조색, 구분선 없음. Atlas 레이아웃용으로 만들었고 어떤 레이아웃에도 어울립니다.",
+			"As cores do Atlas para o Polestar: um destaque dourado quente e sem linhas de seção. Feito para o layout Atlas, combina com qualquer layout.",
+			"Цвета Atlas для Polestar: тёплый золотой акцент и никаких разделительных линий. Сделано для макета Atlas, подходит к любому макету.",
+			"Polestar 的 Atlas 配色：温暖的金色强调色，没有分隔线。为 Atlas 布局而做，也适用于任何布局。",
+			"Polestar 的 Atlas 配色：溫暖的金色強調色，沒有分隔線。為 Atlas 版面而做，也適用於任何版面。",
+		],
+	),
 ];
 
 /// The per-language folders: (prefix, [(title, notes)] in LOCALE_CODES order), %1 the locale code, %2 the
