@@ -224,7 +224,7 @@ A layout is the guide window's structure apart from its look (capability
 
 | Field | Type | Meaning |
 |---|---|---|
-| `hooks` | table | Structure hooks only: `guideLayout`, `guideRender`, `guidePlace`, `guideAnchor`, `guideTakes`, `guidePerson`, `guideInset`, `guideUpRow`, `guideShows` ([The guide window](#the-guide-window)). Same arguments and answers as a skin's. |
+| `hooks` | table | Structure hooks only: `guideLayout`, `guideRender`, `guidePlace`, `guideAnchor`, `guideTakes`, `guidePerson`, `guideInset`, `guideUpRow`, `guideShows`, and `guideTitle` (which title bar parts show), `guideRow` (a goal row's lines and columns) and `guideProgress` (where the progress shows) ([The guide window](#the-guide-window)). Same arguments and answers as a skin's. A colour a layout's hook sets is a token of the skin in use (`Theme.Color`, `Theme.Accent`). |
 | `onApply`, `onLeave` | function(id) | Run when the layout comes into use and when it leaves. |
 
 The refusals, beside the common ones: `a layout carries no tokens or

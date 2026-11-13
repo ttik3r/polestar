@@ -1699,7 +1699,7 @@ fn a_layout_registers_with_structure_hooks_only_and_a_skin_s_fields_are_refused(
 		out.tokens = try("l1", spec({ tokens = { bg = "#000000" } }))
 		out.paint = try("l2", spec({ paint = {} }))
 		out.typo = try("l3", spec({ hookz = {} }))
-		out.skinHook = try("l4", spec({ hooks = { guideRow = function() end } }))
+		out.skinHook = try("l4", spec({ hooks = { toast = function() end } }))
 		out.unknownHook = try("l5", spec({ hooks = { minimap = function() end } }))
 		out.notFn = try("l6", spec({ hooks = { guideInset = 4 } }))
 		out.onApply = try("l7", spec({ onApply = true }))
@@ -1720,7 +1720,7 @@ fn a_layout_registers_with_structure_hooks_only_and_a_skin_s_fields_are_refused(
 	assert_eq!(msg("tokens"), "a layout carries no tokens or colours (tokens is a skin's field)");
 	assert_eq!(msg("paint"), "a layout carries no tokens or colours (paint is a skin's field)");
 	assert_eq!(msg("typo"), "unknown field \"hookz\"");
-	assert_eq!(msg("skinHook"), "hooks.guideRow is a skin's (a layout hooks the guide window's structure only)");
+	assert_eq!(msg("skinHook"), "hooks.toast is a skin's (a layout hooks the guide window's structure only)");
 	assert_eq!(msg("unknownHook"), "unknown hooks \"minimap\"");
 	assert_eq!(msg("notFn"), "hooks.guideInset has the wrong type");
 	assert_eq!(msg("onApply"), "onApply must be a function");
@@ -1888,4 +1888,67 @@ emit(out)"##
 	assert_eq!(out["off"], json!([false, "DISABLED"]));
 	assert_eq!(out["skinsNot"], 0, "a layout addon is not a skin addon");
 	assert_eq!(out["stale"], "", "the install check leaves layout addons alone: {out}");
+}
+
+// A layout may also lay out the title bar (guideTitle: which of its parts show), a goal row (guideRow: its lines
+// and columns) and where the progress shows (guideProgress), the skin's tokens colouring them: under a skin, each
+// runs as the layout's, the skin's accent still the one in use, and the skin's own hooks there answer again once
+// the layout leaves. The other skin hooks (toast, card, the tabs, the menu) stay a skin's.
+#[test]
+fn a_layout_lays_out_the_title_bar_goal_rows_and_progress_in_the_skin_s_tokens() {
+	let out = run_ui(
+		r##"
+		local T = Polestar.Theme
+		local by = { title = {}, row = {}, progress = {} }
+		local function mark(kind, who) by[kind][who] = (by[kind][who] or 0) + 1 end
+		assert(T.RegisterSkin("rail", { name = "Rail", addon = "Test_Rail", base = "polestar", tokens = { accent = "#ff8800" },
+			hooks = {
+				guideTitle = function() mark("title", "skin") end,
+				guideRow = function() mark("row", "skin") end,
+				guideProgress = function() mark("progress", "skin") end,
+			} }))
+		local seen
+		local ok, why = T.RegisterLayout("ledger", { api = 2, name = "Ledger", addon = "Polestar_Layout_Ledger",
+			hooks = {
+				guideTitle = function(nav, parts) mark("title", "layout"); if parts.rule then parts.rule:Hide() end end,
+				guideRow = function(row) mark("row", "layout"); row.Text:SetMaxLines(1); seen = { T.Accent() } end,
+				guideProgress = function() mark("progress", "layout") end,
+			} })
+		local refused = {}
+		for _, h in ipairs({ "toast", "card", "guideTab", "guideMenu" }) do
+			local okH, msg = T.RegisterLayout("x" .. h:lower(), { api = 2, name = "X", addon = "X", hooks = { [h] = function() end } })
+			refused[#refused + 1] = (not okH) and msg or false
+		end
+		Polestar.Set("ui.skin", "rail")
+		uistub.openTabs(TABS, 1)
+		stub.advance(1)
+		local function draw()
+			by = { title = {}, row = {}, progress = {} }
+			GF.ApplyStyle()
+			GF.Render()
+			stub.advance(1)
+			local copy = {}
+			for k, t in pairs(by) do copy[k] = { skin = t.skin, layout = t.layout } end
+			return copy
+		end
+		local out = { ok = ok, why = why or false, refused = refused }
+		out.skin = draw()
+		T.SetLayout("ledger")
+		out.layout = draw()
+		out.accent = seen and string.format("%02x%02x%02x", math.floor(seen[1] * 255 + 0.5), math.floor(seen[2] * 255 + 0.5), math.floor(seen[3] * 255 + 0.5)) or false
+		T.SetLayout()
+		out.back = draw()
+		emit(out)"##,
+	);
+	assert_eq!(out["ok"], true, "registered: {}", out["why"]);
+	for (i, h) in ["toast", "card", "guideTab", "guideMenu"].iter().enumerate() {
+		assert_eq!(out["refused"][i], format!("hooks.{h} is a skin's (a layout hooks the guide window's structure only)"));
+	}
+	for k in ["title", "row", "progress"] {
+		assert!(out["skin"][k]["skin"].as_f64().unwrap_or(0.0) > 0.0, "no layout: the skin's {k}: {out}");
+		assert!(out["layout"][k]["layout"].as_f64().unwrap_or(0.0) > 0.0, "the layout's {k}: {out}");
+		assert!(out["layout"][k]["skin"].is_null(), "the layout's {k} answers in the skin's place: {out}");
+		assert!(out["back"][k]["skin"].as_f64().unwrap_or(0.0) > 0.0, "the skin's {k} again: {out}");
+	}
+	assert_eq!(out["accent"], "ff8800", "the skin's accent colours the layout's row");
 }

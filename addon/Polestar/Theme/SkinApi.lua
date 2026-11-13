@@ -56,9 +56,12 @@ local HOOKS = { arrow = true, pin = true, guideTitle = true, guideRow = true, gu
 	guideInset = true, guideUpRow = true, guideShows = true, card = true, toast = true,
 	actionButton = true }
 -- The hooks a layout may set: the guide window's structure (where its parts
--- sit, which show, how tall the step's header is), never its colours.
+-- sit, which show, how tall the step's header is, how the title bar and a
+-- goal row are laid out, where the progress shows), never its colours: a
+-- layout's hook colours what it touches with the skin's tokens.
 local LAYOUT_HOOKS = { guideLayout = true, guideRender = true, guidePlace = true, guideAnchor = true, guideTakes = true,
-	guidePerson = true, guideInset = true, guideUpRow = true, guideShows = true }
+	guidePerson = true, guideInset = true, guideUpRow = true, guideShows = true, guideTitle = true, guideRow = true,
+	guideProgress = true }
 -- The registered layouts (Theme.RegisterLayout): id -> { id, name, addon,
 -- author, version, desc, api, hooks, onApply, onLeave }.
 local LAYOUTS, LAYOUT_FAILED = {}, {}
