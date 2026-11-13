@@ -1376,6 +1376,47 @@ on("guidePlace", function(name, part)
 end)
 
 ---------------------------------------------------------------------------
+-- The XP row: "Level 4 · 62% · " before Polestar's own line (its pace and
+-- the time to the next level), a star in the accent for its icon.
+---------------------------------------------------------------------------
+
+local function xpBack(xp)
+	local own = xp and stores[xp]
+	if not (own and own.atlas) then return end
+	own.atlas = nil
+	local line = Core.xpLine(xp)
+	if line then xp.Text:SetText(line) end
+	xp.Icon:SetTexture(Theme.Media("icon-level"))
+	xp.Icon:SetVertexColor(Theme.Color("textMuted"))
+end
+
+local function xpLook(xp)
+	if not (xp.Text and xp.Icon) then return end
+	store(xp).atlas = true
+	local head = {}
+	local level = UnitLevel and UnitLevel("player")
+	local cur, max = UnitXP and UnitXP("player"), UnitXPMax and UnitXPMax("player")
+	if type(level) == "number" and level > 0 then head[#head + 1] = string.format(tr("Level %d"), level) end
+	if type(cur) == "number" and type(max) == "number" and max > 0 then head[#head + 1] = math.floor(cur / max * 100) .. "%" end
+	local line = Core.xpLine(xp)
+	if line then head[#head + 1] = line end
+	xp.Text:SetText(table.concat(head, "  \194\183  "))
+	xp.Icon:SetTexture(Theme.Media("star"))
+	xp.Icon:SetVertexColor(Theme.Accent())
+end
+
+-- The XP row is handed over by name only (guidePlace): the layout leaving
+-- gives the one it last saw its own look back.
+local lastXp
+on("guidePlace", function(name, part)
+	if name == "xp" then
+		lastXp = part
+		xpLook(part)
+	end
+end)
+onLeave(function() xpBack(lastXp) end)
+
+---------------------------------------------------------------------------
 -- Registration
 ---------------------------------------------------------------------------
 
