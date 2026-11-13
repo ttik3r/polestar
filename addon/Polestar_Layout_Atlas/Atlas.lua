@@ -1417,6 +1417,24 @@ end)
 onLeave(function() xpBack(lastXp) end)
 
 ---------------------------------------------------------------------------
+-- Compact mode: dense. Polestar's own compact mode drops Up next, the tabs
+-- and the Journey; Atlas keeps the tip there (its strip at the card's foot)
+-- and leaves the XP row out too.
+---------------------------------------------------------------------------
+
+on("guideShows", function(what, shown)
+	if what == "tip" and compact() then return true end
+	return shown
+end)
+
+on("guidePlace", function(name, part)
+	if compact() and (name == "xp" or name == "upnext") then
+		part:Hide()
+		return true
+	end
+end)
+
+---------------------------------------------------------------------------
 -- Registration
 ---------------------------------------------------------------------------
 
