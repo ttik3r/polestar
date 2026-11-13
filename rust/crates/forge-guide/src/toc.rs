@@ -418,6 +418,21 @@ static TEXT: &[(&str, [&str; 9], [&str; 9])] = &[
 			"Polestar 的 Atlas 配色：溫暖的金色強調色，沒有分隔線。為 Atlas 版面而做，也適用於任何版面。",
 		],
 	),
+	(
+		"Polestar_Layout_Atlas",
+		["Polestar-Layout: Atlas", "Polestar, diseño: Atlas", "Polestar, diseño: Atlas", "Polestar, disposition : Atlas", "Polestar 레이아웃: Atlas", "Polestar, layout: Atlas", "Polestar, макет: Atlas", "Polestar 布局：Atlas", "Polestar 版面：Atlas"],
+		[
+			"Ein Zeitleisten-Layout für das Guide-Fenster von Polestar: der Schritt auf einer Schiene, die nächsten Schritte verblassen nach vorn, Karten über dem Fenster. Jedes Design gibt ihm die Farben.",
+			"Un diseño de línea de tiempo para la ventana de la guía de Polestar: el paso sobre un riel, los pasos siguientes cada vez más tenues, tarjetas sobre la ventana. Cualquier tema le da los colores.",
+			"Un diseño de línea de tiempo para la ventana de la guía de Polestar: el paso sobre un riel, los pasos siguientes cada vez más tenues, tarjetas sobre la ventana. Cualquier tema le da los colores.",
+			"Une disposition en frise pour la fenêtre du guide de Polestar : l'étape sur un rail, les étapes suivantes de plus en plus pâles, des cartes au-dessus de la fenêtre. Tout habillage lui donne ses couleurs.",
+			"Polestar 가이드 창의 타임라인 레이아웃: 레일 위의 단계, 갈수록 흐려지는 다음 단계, 창 위의 카드. 색은 어떤 스킨이든 입힙니다.",
+			"Um layout de linha do tempo para a janela do guia do Polestar: a etapa sobre um trilho, as próximas etapas cada vez mais claras, cartões acima da janela. Qualquer tema dá as cores.",
+			"Макет-лента для окна гайда Polestar: шаг на линии, следующие шаги всё бледнее, карточки над окном. Цвета даёт любое оформление.",
+			"Polestar 指南窗口的时间线布局：步骤在轨道上，后续步骤逐渐变淡，卡片位于窗口上方。任何皮肤都可为其配色。",
+			"Polestar 指南視窗的時間軸版面：步驟在軌道上，後續步驟逐漸變淡，卡片位於視窗上方。任何皮膚都可為其配色。",
+		],
+	),
 ];
 
 /// The per-language folders: (prefix, [(title, notes)] in LOCALE_CODES order), %1 the locale code, %2 the
