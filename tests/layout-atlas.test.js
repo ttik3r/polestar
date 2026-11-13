@@ -46,7 +46,28 @@ emit({ had = had })`,
 
 // Every hook the layout has, offered (all capabilities on), captured from a
 // stand-in RegisterLayout and run on the window's own parts.
-const RUN_HOOKS = (compact) => `
+// A guide of two steps on screen (a test pack, as forge-addontest's).
+const GUIDE = `
+w = stub.world
+w.addMap(1429, { name = "Elwynn Forest", c = 0, left = 1500, right = -1500, top = 500, bottom = -1500 })
+w.moveTo(1429, 48, 42)
+Polestar.RegisterPack({ addon = "Polestar_Test", id = "test", format = 1, title = "Test", author = "Test", version = "1", license = "MIT" })
+Polestar.Set("behavior.suggestFrom", "test")
+Polestar.RegisterGuide({
+	id = "test/atlas", pack = "test", title = "Atlas", minLevel = 1, maxLevel = 20,
+	steps = {
+		{ goals = {
+			{ t = "accept", quest = 7, title = "Kobold Camp Cleanup", npc = 197, npcName = "Marshal McBride" },
+			{ t = "note", text = "The kobolds are north of the abbey." },
+		} },
+		{ goals = { { t = "turnin", quest = 7, title = "Kobold Camp Cleanup", npc = 197, npcName = "Marshal McBride" } } },
+		{ goals = { { t = "accept", quest = 33, title = "Wolves Across the Border" } } },
+	},
+})
+stub.login()
+stub.fire("QUEST_LOG_UPDATE"); stub.advance(0.6)`;
+
+const RUN_HOOKS = (compact) => `${GUIDE}
 local T = Polestar.Theme
 local spec
 local register, capability = T.RegisterLayout, T.HasCapability
@@ -83,7 +104,7 @@ end
 run("guideShows", "upnextHead", true)
 run("guideInset", "card")
 if parts.person then run("guidePerson", parts.person, 300, 20) end
-for _, r in ipairs(parts.rows or {}) do run("guideRow", r, view.goals[1], {}) end
+for _, r in ipairs(parts.rows or {}) do run("guideRow", r, view.goals[1], { current = true }) end
 run("guideLayout", parts, 300, 200)
 run("guideProgress", parts.foot, 0.4)
 run("guideAnchor")
@@ -92,17 +113,18 @@ run("guideTitle", parts.nav, parts)
 spec.onLeave()
 Polestar.UI.GuideFrame.Layout()
 stub.advance(1)
-emit({ id = spec.id, api = spec.api, ran = #ran })`;
+emit({ id = spec.id, api = spec.api, ran = #ran, rows = #(parts.rows or {}), person = parts.person ~= nil })`;
 
 test('the Atlas layout hooks run on the window parts without raising', () => {
-	const [out] = runAddon({ stubs: ['stub_world.lua'], addons: ['Polestar', 'Polestar_Skin_Atlas'], login: true, script: RUN_HOOKS(false) }).emitted;
+	const [out] = runAddon({ stubs: ['stub_world.lua'], addons: ['Polestar', 'Polestar_Skin_Atlas'], script: RUN_HOOKS(false) }).emitted;
 	assert.equal(out.id, 'atlas');
 	assert.equal(out.api, 2);
 	assert.ok(out.ran > 5, `hooks ran: ${out.ran}`);
+	assert.ok(out.person && out.rows > 0, 'the window shows a step with its goals');
 });
 
 test('the Atlas layout hooks run in compact mode without raising', () => {
-	const [out] = runAddon({ stubs: ['stub_world.lua'], addons: ['Polestar', 'Polestar_Skin_Atlas'], login: true, script: RUN_HOOKS(true) }).emitted;
+	const [out] = runAddon({ stubs: ['stub_world.lua'], addons: ['Polestar', 'Polestar_Skin_Atlas'], script: RUN_HOOKS(true) }).emitted;
 	assert.ok(out.ran > 5, `hooks ran: ${out.ran}`);
 });
 

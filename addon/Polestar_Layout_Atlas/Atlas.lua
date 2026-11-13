@@ -837,6 +837,269 @@ on("guideShows", function(what, shown)
 end)
 
 ---------------------------------------------------------------------------
+-- The step as a node on the timeline: its title in semibold with its area on
+-- the right, one line per goal with its action icon, the live goal in
+-- semibold with its count in the accent, each quest's level after it, an
+-- objective's quest on the line under it, the counts in a column on the
+-- right. The window's top bar fills as the guide goes.
+---------------------------------------------------------------------------
+
+local TITLE_PAD = 10
+local TITLE_UP = 1 -- the step title over the goal lines, in px
+
+local function plainText(s) return ((s or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")) end
+
+-- The step's title (guidePerson): the heading's state before Atlas changed
+-- it is kept under _header, and given back when the layout leaves.
+local function headerBack(person)
+	local own = person and stores[person]
+	local was = own and own._header
+	if not was then return end
+	own._header = nil
+	person.Name:SetFont(was.font[1], was.font[2], was.font[3])
+	person.Name:SetWordWrap(was.wrap)
+	person.Name:ClearAllPoints()
+	person.Name:SetPoint(unpack(was.name))
+	person.Where:ClearAllPoints()
+	person.Where:SetPoint(unpack(was.where))
+	person.Where:SetJustifyH(was.justify)
+	person.Where:SetFont(was.whereFont[1], was.whereFont[2], was.whereFont[3])
+	person.Where:SetTextColor(Theme.Color("textDim"))
+	if person.Icon then person.Icon:SetAlpha(1) end
+end
+onLeave(function(parts) headerBack(parts.person) end)
+
+local function stepHeader(person, width)
+	if not (person.Name and person.Where and person.Why and person.Level) then return nil end
+	local own = store(person)
+	if not own._header then
+		own._header = {
+			font = { person.Name:GetFont() },
+			whereFont = { person.Where:GetFont() },
+			wrap = person.Name:CanWordWrap(),
+			name = { person.Name:GetPoint(1) },
+			where = { person.Where:GetPoint(1) },
+			justify = person.Where:GetJustifyH(),
+		}
+	end
+	local _, goalSize, flags = probe("goal")
+	local path = semibold() or own._header.font[1]
+	person.Name:SetFont(path, goalSize + TITLE_UP, flags)
+	Theme.Font(person.Where, "goal")
+	person.Where:SetTextColor(Theme.Color("textMuted"))
+	person.Name:SetWordWrap(false)
+	if person.Icon then person.Icon:SetAlpha(0) end
+	person.Level:Hide()
+	local pad = (not compact() and has("guideInset")) and 11 or 14
+	local whereW = 0
+	if person.Where:IsShown() then
+		whereW = math.min(person.Where:GetUnboundedStringWidth() + 1, math.floor(width * 0.45))
+		person.Where:SetWidth(whereW)
+		person.Where:SetJustifyH("RIGHT")
+	end
+	person.Name:ClearAllPoints()
+	person.Name:SetPoint("TOPLEFT", person, "TOPLEFT", pad, -TITLE_PAD)
+	person.Name:SetWidth(width - (whereW > 0 and whereW + 10 or 0))
+	-- The area sits on the title's row, at the right edge.
+	if whereW > 0 then
+		person.Where:ClearAllPoints()
+		person.Where:SetPoint("TOP", person.Name, "TOP", 0, 0)
+		person.Where:SetPoint("RIGHT", person, "RIGHT", -pad, 0)
+		person.Where:SetPoint("BOTTOM", person.Name, "BOTTOM", 0, 0)
+	end
+	local h = TITLE_PAD + person.Name:GetStringHeight()
+	if person.Why:IsShown() then
+		person.Why:SetWidth(width)
+		person.Why:ClearAllPoints()
+		person.Why:SetPoint("TOPLEFT", person.Name, "BOTTOMLEFT", 0, -3)
+		h = h + 3 + person.Why:GetStringHeight()
+	end
+	return h + 8
+end
+on("guidePerson", function(person, width) return stepHeader(person, width) end)
+
+-- A line under the step's title.
+local function underline(person)
+	if not person then return end
+	local own = store(person)
+	if not own.under then
+		own.under = person:CreateTexture(nil, "ARTWORK")
+		own.under:SetTexture(Theme.Media("white"))
+	end
+	local r, g, b = Theme.Color("textMuted")
+	own.under:ClearAllPoints()
+	own.under:SetPoint("BOTTOMLEFT", person, "BOTTOMLEFT", 12, 0)
+	own.under:SetPoint("BOTTOMRIGHT", person, "BOTTOMRIGHT", -12, 0)
+	own.under:SetHeight(pixel(person))
+	own.under:SetVertexColor(r, g, b, 0.35)
+	own.under:Show()
+end
+on("guideRender", function(view, parts) underline(parts.person) end)
+
+-- A goal row (guideRow; Polestar paints the row again at every fill, so a
+-- row keeps Atlas's look only while Atlas is the layout). The row's font
+-- before Atlas is kept under _font.
+local function rowBack(row)
+	local own = stores[row]
+	if not own then return end
+	if own._font then
+		row.Text:SetFont(own._font[1], own._font[2], own._font[3])
+		own._font = nil
+	end
+	if own.level then own.level:Hide() end
+	if own.count then own.count:Hide() end
+	row.psLevelWidth = nil
+	if own._single then
+		row.Text:SetWordWrap(true)
+		row.Text:SetMaxLines(2)
+		own._single = nil
+	end
+	if row.Check then
+		row.Check:SetAlpha(1)
+		row.Check:Enable()
+	end
+end
+onLeave(function(parts) for _, row in ipairs(parts.rows or {}) do rowBack(row) end end)
+
+local function goalRow(row, goal, info)
+	local own = store(row)
+	rowBack(row)
+	local text = row.Text:GetText() or ""
+	local live = info.current and not info.done and not info.skipped
+	own._single = true
+	row.Text:SetWordWrap(false)
+	row.Text:SetMaxLines(1)
+	local path, size, flags = row.Text:GetFont()
+	if path and size then
+		own._font = { path, size, flags }
+		row.Text:SetFont((live and semibold()) or path, math.max(8, size - 2), flags)
+	end
+	if live and goal.progress then
+		text = text:gsub("|c%x%x%x%x%x%x%x%x(%d+/%d+)|r", "|c" .. Theme.Hex("accent") .. "%1|r")
+	end
+	local muted = Theme.Hex("textMuted")
+	if info.skipped or not goal.quest then
+		row.Text:SetText(text)
+		return
+	end
+	local lvl = Core.questLevel(goal.quest)
+	if goal.t == "accept" or goal.t == "turnin" then
+		-- The line names the quest already: its level after it.
+		if lvl then
+			if not own.level then own.level = row:CreateFontString(nil, "OVERLAY") end
+			local label = own.level
+			Theme.Font(label, "small")
+			label:SetTextColor(Theme.Color("textMuted"))
+			label:SetText("[" .. lvl .. "]")
+			label:ClearAllPoints()
+			label:SetPoint("LEFT", row.Text, "RIGHT", 5, 0)
+			label:Show()
+			row.psLevelWidth = math.ceil(label:GetUnboundedStringWidth()) + 6
+		end
+		row.Text:SetText(text)
+		return
+	end
+	row.Text:SetText(text)
+	-- An objective: its quest and level on the line under it.
+	local title = Core.questTitle(goal.quest)
+	if not (title and row.Sub) then return end
+	local sub = row.Sub:IsShown() and row.Sub:GetText() or nil
+	if sub and plainText(sub):find(title, 1, true) then return end
+	local line = title .. (lvl and ("  |c" .. muted .. "[" .. lvl .. "]|r") or "")
+	row.Sub:SetText((sub and sub ~= "") and (line .. "\n" .. sub) or line)
+	row.Sub:Show()
+end
+
+-- The count in a column on the right. The tick stays laid out (its room
+-- keeps the column clear) but unseen and off.
+local COUNT = "|c%x%x%x%x%x%x%x%x(%d+/%d+)|r"
+local function countColumn(row, info)
+	local own = store(row)
+	if row.Check and row.Check:IsShown() then
+		row.Check:SetAlpha(0)
+		row.Check:Disable()
+	end
+	local text = row.Text:GetText() or ""
+	local count = text:match(COUNT) or text:match("%s(%d+/%d+)%s*$")
+	if not count then return end
+	text = text:gsub("%s*" .. COUNT, "", 1)
+	if text == row.Text:GetText() then text = text:gsub("%s+%d+/%d+%s*$", "", 1) end
+	row.Text:SetText(text)
+	if not own.count then
+		own.count = row:CreateFontString(nil, "OVERLAY")
+		own.count:SetJustifyH("RIGHT")
+	end
+	local path, size, flags = row.Text:GetFont()
+	own.count:SetFont(path, size, flags)
+	own.count:SetText(count)
+	if info.current and not info.done and not info.skipped then
+		own.count:SetTextColor(Theme.Accent())
+	else
+		own.count:SetTextColor(Theme.Color(info.done and "textMuted" or "textDim"))
+	end
+	own.count:ClearAllPoints()
+	own.count:SetPoint("TOPRIGHT", row, "TOPRIGHT", -14, -4)
+	own.count:Show()
+end
+
+on("guideRow", function(row, goal, info)
+	if not (row.Text and goal and info) then return end
+	goalRow(row, goal, info)
+	countColumn(row, info)
+end)
+
+-- After the rows are laid out: "Other" (the next spot) in the count's
+-- column, on the line under the count.
+on("guideLayout", function(parts)
+	for _, row in ipairs(parts.rows or {}) do
+		local own = stores[row]
+		local count = own and own.count
+		local alt = row.Alt
+		if row:IsShown() and alt and alt:IsShown() and alt.Icon then
+			local inset = (alt:GetWidth() - alt.Icon:GetWidth()) / 2
+			alt:ClearAllPoints()
+			if count and count:IsShown() then
+				alt:SetPoint("TOPRIGHT", count, "BOTTOMRIGHT", inset, -1)
+			else
+				alt:SetPoint("TOPRIGHT", row, "TOPRIGHT", -14 + inset, -2)
+			end
+		end
+	end
+end)
+
+-- The top bar fills as the guide goes: a soft wash in the accent, a 2px
+-- accent edge along its foot. The transparent window has no bar to fill.
+on("guideProgress", function(foot, frac)
+	local parts = Theme.GuideParts and Theme.GuideParts()
+	local nav = parts and parts.nav
+	if not (nav and parts.window and isUnder(foot, parts.window)) then return end
+	local own = store(nav)
+	if parts.window.psBare then
+		if own.fill then own.fill:Hide(); own.edge:Hide() end
+		return
+	end
+	if not own.fill then
+		own.fill = nav:CreateTexture(nil, "BACKGROUND", nil, 2)
+		own.fill:SetTexture(Theme.Media("white"))
+		own.edge = nav:CreateTexture(nil, "ARTWORK")
+		own.edge:SetTexture(Theme.Media("white"))
+	end
+	local w = math.max(0.01, (nav:GetWidth() or 0) * math.min(1, math.max(0, tonumber(frac) or 0)))
+	local r, g, b = Theme.Accent()
+	own.fill:ClearAllPoints()
+	own.fill:SetPoint("TOPLEFT", nav, "TOPLEFT", 0, 0)
+	own.fill:SetPoint("BOTTOMLEFT", nav, "BOTTOMLEFT", 0, 0)
+	own.fill:SetWidth(w)
+	own.fill:SetVertexColor(r, g, b, 0.10)
+	own.edge:ClearAllPoints()
+	own.edge:SetPoint("BOTTOMLEFT", nav, "BOTTOMLEFT", 0, 0)
+	own.edge:SetSize(w, 2 * pixel(nav))
+	own.edge:SetVertexColor(r, g, b, 1)
+	own.fill:Show()
+	own.edge:Show()
+end)
+
+---------------------------------------------------------------------------
 -- Registration
 ---------------------------------------------------------------------------
 
