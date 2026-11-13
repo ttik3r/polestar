@@ -285,7 +285,6 @@ local function header(parts)
 	nav.Title:SetWordWrap(false)
 	local text = nav.Title:GetText()
 	nav.Title:SetShown(text ~= nil and text ~= "")
-	if nav.Title.Hit then nav.Title.Hit:SetShown(nav.Title:IsShown()) end
 end
 on("guideLayout", function(parts) header(parts) end)
 -- The render shows Skip again after the layout: it stays in the menu.
@@ -294,6 +293,548 @@ on("guideRender", function(view, parts) if parts.nav and parts.nav.Skip then par
 -- With the foot bar off, room under the window's last part.
 on("guideLayout", function() return Core.setting("guideWindow.progress") == false and 8 or 0 end)
 
+---------------------------------------------------------------------------
+-- The cards above the window, bottom up: Training due, Optional, While
+-- you're here, the class quest card; 5 apart, each on the window's own
+-- ground (a frame painted as the guide window, so the skin in use colours
+-- it), each with a close ×. The class quest heads-up sits on top of them
+-- (guideAnchor). The Journey is a card joined to the window's foot.
+---------------------------------------------------------------------------
+
+local GAP = 5
+local OPT_ROW, OPT_PAD = 23, 14
+
+-- The step on screen (guideRender), per window: a card closed with its ×
+-- stays closed on that step.
+local stepOf = setmetatable({}, { __mode = "k" })
+local closedOn = {} -- card -> the step it was closed on
+
+-- The parts the window handed over at this layout (guidePlace), taken up by
+-- the cards at guideLayout.
+local slots = {}
+
+-- The window's own ground on a card of Atlas's, transparent with it.
+local function dress(card, window)
+	if card.psBare ~= window.psBare or card.psBgAlpha ~= window.psBgAlpha or card.psBgColor ~= window.psBgColor then
+		card.psBare, card.psBgAlpha, card.psBgColor = window.psBare, window.psBgAlpha, window.psBgColor
+		Theme.Repaint(card)
+	end
+end
+
+local function stackFrame(window)
+	local own = store(window)
+	if not own.stack then
+		own.stack = CreateFrame("Frame", nil, window)
+		own.stack:SetPoint("BOTTOMLEFT", window, "TOPLEFT", 0, GAP)
+		own.stack:SetPoint("BOTTOMRIGHT", window, "TOPRIGHT", 0, GAP)
+		own.stack:SetHeight(1)
+		own.stack.cards = {}
+	end
+	return own.stack
+end
+
+local function closeButton(parent)
+	local x = CreateFrame("Button", nil, parent)
+	x:SetSize(18, 18)
+	x.Icon = x:CreateTexture(nil, "ARTWORK")
+	x.Icon:SetTexture(Theme.Media("close"))
+	x.Icon:SetSize(10, 10)
+	x.Icon:SetPoint("CENTER")
+	x:SetScript("OnEnter", function(self) self.Icon:SetVertexColor(Theme.Color("text")) end)
+	x:SetScript("OnLeave", function(self) self.Icon:SetVertexColor(Theme.Color("textMuted")) end)
+	return x
+end
+
+-- Card i's backing, with its ×.
+local function backing(stack, i)
+	local b = stack.cards[i]
+	if not b then
+		b = CreateFrame("Frame", nil, stack)
+		b.psGuide = true
+		Theme.Skin(b, "guide")
+		b:SetFrameLevel(stack:GetFrameLevel())
+		b.Close = closeButton(b)
+		b.Close:SetPoint("TOPRIGHT", b, "TOPRIGHT", -4, -4)
+		b.Close:SetScript("OnClick", function(self) if self.psClose then self.psClose() end end)
+		stack.cards[i] = b
+	end
+	return b
+end
+
+-- A small circled "i" after a card's label, its tooltip saying what the card holds.
+local function infoIcon(owner, label, tip)
+	local own = store(owner)
+	local b = own.info
+	if not b then
+		b = CreateFrame("Button", nil, owner)
+		b:SetSize(12, 12)
+		b.Icon = b:CreateTexture(nil, "ARTWORK")
+		b.Icon:SetTexture(Theme.Media(Theme.Icon and Theme.Icon("info") or "info"))
+		b.Icon:SetSize(8, 8)
+		b.Icon:SetPoint("CENTER")
+		b:SetScript("OnEnter", function(self)
+			self.Icon:SetVertexColor(Theme.Color("textDim"))
+			if GameTooltip then
+				GameTooltip:SetOwner(self, "ANCHOR_TOP")
+				GameTooltip:SetText(self.psTip or "", 1, 1, 1, 1, true)
+				GameTooltip:Show()
+			end
+		end)
+		b:SetScript("OnLeave", function(self)
+			self.Icon:SetVertexColor(Theme.Color("textMuted"))
+			if GameTooltip then GameTooltip:Hide() end
+		end)
+		own.info = b
+	end
+	b.psTip = tip
+	b.Icon:SetVertexColor(Theme.Color("textMuted"))
+	b:ClearAllPoints()
+	b:SetPoint("LEFT", label, "RIGHT", 1, 0)
+	b:SetShown(label:IsShown())
+	return b
+end
+
+-- While you're here: on its card, its label in caps as the other cards'.
+-- Its panel and edge are Polestar's own textures (no hook hands them over),
+-- out of sight while Atlas holds the part.
+local function hereLook(here, on)
+	local own = store(here)
+	for _, t in ipairs({ here.Panel, here.Edge }) do
+		if t and t.SetAlpha then t:SetAlpha(on and 0 or 1) end
+	end
+	if not here.Label then return end
+	if on then
+		own._label = own._label or here.Label:GetText()
+		capsLabel(here.Label)
+		here.Label:SetText(string.upper(own._label or ""))
+		infoIcon(here, here.Label, tr("Get ahead, if possible"))
+	elseif own._label then
+		Theme.Font(here.Label, "small")
+		here.Label:SetText(own._label)
+		here.Label:SetTextColor(Theme.Accent())
+		own._label = nil
+		if own.info then own.info:Hide() end
+	end
+end
+onLeave(function(parts) if parts.here then hereLook(parts.here, false) end end)
+
+-- The training reminder as a card: "TRAINING DUE", the trainer line and the
+-- place on its right; × puts it off (Later), a click takes it up.
+local function trainCard(stack)
+	if stack.train then return stack.train end
+	local f = CreateFrame("Button", nil, stack)
+	f.Label = f:CreateFontString(nil, "OVERLAY")
+	f.Icon = f:CreateTexture(nil, "ARTWORK")
+	f.Icon:SetSize(15, 15)
+	f.Text = f:CreateFontString(nil, "OVERLAY")
+	f.Text:SetWordWrap(false)
+	f.Text:SetJustifyH("LEFT")
+	f.Place = f:CreateFontString(nil, "OVERLAY")
+	f.Place:SetJustifyH("RIGHT")
+	f.Place:SetWordWrap(false)
+	f:SetScript("OnClick", function(self) if self.psTrainer then Core.takeNotice() end end)
+	stack.train = f
+	return f
+end
+
+local function fillTrain(f, width)
+	local advice = Core.training()
+	local trainer = not advice.guide and advice.trainer or nil
+	local place = (advice.title and advice.title ~= "" and advice.title)
+		or (trainer and (trainer.npcName or (trainer.map and Core.mapName(trainer.map)))) or nil
+	f.psTrainer = trainer
+	capsLabel(f.Label)
+	f.Label:SetText(string.upper(tr("Training due")))
+	f.Label:ClearAllPoints()
+	f.Label:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -8)
+	Theme.Font(f.Text, "small")
+	f.Text:SetTextColor(Theme.Color("text"))
+	f.Text:SetText(tr("New spells at your class trainer"))
+	Theme.Font(f.Place, "small")
+	f.Place:SetTextColor(Theme.Color("textMuted"))
+	f.Place:SetText(place or "")
+	f.Place:SetShown(place ~= nil)
+	f.Icon:SetTexture(Theme.VerbIcon("talk"))
+	f.Icon:SetVertexColor(Theme.Color("npc"))
+	local rowY = -8 - f.Label:GetStringHeight() - 4
+	f.Icon:ClearAllPoints()
+	f.Icon:SetPoint("CENTER", f, "TOPLEFT", 14 + 7.5, rowY - 10)
+	f.Place:ClearAllPoints()
+	f.Place:SetPoint("RIGHT", f, "TOPRIGHT", -30, rowY - 10)
+	f.Place:SetWidth(math.min(f.Place:GetStringWidth() + 1, 120))
+	f.Text:ClearAllPoints()
+	f.Text:SetPoint("LEFT", f, "TOPLEFT", 39, rowY - 10)
+	f.Text:SetPoint("RIGHT", f.Place, "LEFT", -8, 0)
+	f:SetSize(width, math.floor(8 + f.Label:GetStringHeight() + 4 + 20 + 6 + 0.5))
+	return f
+end
+
+-- Optional: the step's optional goals and its notes, taken out of the goal
+-- list (guideTakes) onto a card of their own. A row aims the arrow, Skip
+-- puts the goal by, and the count and the distance sit on its right.
+local opt = setmetatable({}, { __mode = "k" }) -- window -> { step, goals, notes, sig }
+
+local function takesOut(goal)
+	return (goal.optional or goal.t == "note") and true or false
+end
+on("guideTakes", function(goal) return takesOut(goal) or nil end)
+
+local function optCard(stack)
+	if stack.opt then return stack.opt end
+	local c = CreateFrame("Frame", nil, stack)
+	c.Label = c:CreateFontString(nil, "OVERLAY")
+	c.Rows, c.Notes = {}, {}
+	stack.opt = c
+	return c
+end
+
+local function optMeta(r)
+	local goal = r._goal
+	local target = Core.target()
+	local active = not goal.previewOnly and not goal.dismissed and goal.status ~= "done" and goal.status ~= "skipped"
+	local aimed = active and target and ((target.stepIndex == r.psStep and target.goalIndex == goal.index) or r._point == target)
+	r.Mark:SetShown(aimed and true or false)
+	local yards
+	if active then
+		if aimed then yards = Core.distance() end
+		yards = yards or Core.yardsTo(goal)
+	end
+	local count = Core.goalProgress(goal)
+	local dist = yards and Core.distanceText(yards)
+	local meta = count and dist and (count .. "  \194\183  " .. dist) or count or dist
+	r.Meta:SetText(meta or "")
+	r.Meta:SetShown(meta ~= nil)
+	local right = r.psMetaRight + (meta and math.ceil(r.Meta:GetUnboundedStringWidth()) + 6 or 0)
+	r.Text:SetWidth(math.max(40, r.psWidth - (OPT_PAD + 12 + 6) - right - 2))
+end
+
+local function optRow(c, i)
+	local r = c.Rows[i]
+	if r then return r end
+	r = CreateFrame("Button", nil, c)
+	r.Mark = r:CreateTexture(nil, "ARTWORK")
+	r.Mark:SetTexture(Theme.Media("white"))
+	r.Mark:SetWidth(2)
+	r.Mark:SetPoint("TOPLEFT", r, "TOPLEFT", OPT_PAD - 5, -2)
+	r.Mark:SetPoint("BOTTOMLEFT", r, "BOTTOMLEFT", OPT_PAD - 5, 2)
+	r.Mark:Hide()
+	r:SetScript("OnClick", function(self)
+		local goal = self._goal
+		if not goal or goal.previewOnly or goal.dismissed or goal.status == "done" or goal.status == "skipped" then return end
+		self._point = Core.aim(goal)
+		optMeta(self)
+	end)
+	r:SetScript("OnUpdate", function(self, elapsed)
+		self.psElapsed = (self.psElapsed or 0) + elapsed
+		if self.psElapsed < 0.25 or not self._goal then return end
+		self.psElapsed = 0
+		optMeta(self)
+	end)
+	r.Icon = r:CreateTexture(nil, "ARTWORK")
+	r.Icon:SetSize(12, 12)
+	r.Icon:SetPoint("LEFT", r, "LEFT", OPT_PAD, 0)
+	r.Text = r:CreateFontString(nil, "OVERLAY")
+	Theme.Font(r.Text, "small")
+	r.Text:SetJustifyH("LEFT")
+	r.Text:SetWordWrap(false)
+	r.Meta = r:CreateFontString(nil, "OVERLAY")
+	Theme.Font(r.Meta, "small")
+	r.Meta:SetJustifyH("RIGHT")
+	r.Skip = CreateFrame("Button", nil, r)
+	r.Skip.Label = r.Skip:CreateFontString(nil, "OVERLAY")
+	Theme.Font(r.Skip.Label, "small")
+	r.Skip.Label:SetPoint("CENTER")
+	r.Skip:SetScript("OnClick", function() if r._goal then Core.skipGoal(r.psStep, r._goal.index) end end)
+	r.Skip:SetScript("OnEnter", function(b) b.Label:SetTextColor(Theme.Color("text")) end)
+	r.Skip:SetScript("OnLeave", function(b) b.Label:SetTextColor(Theme.Color("textDim")) end)
+	c.Rows[i] = r
+	return r
+end
+
+-- Filled from the step on screen (guideRender), laid out with the stack.
+local function fillOptional(view, parts)
+	local window = parts and parts.window
+	if not window then return end
+	local o = opt[window] or {}
+	opt[window] = o
+	o.goals, o.notes, o.step = {}, {}, view and view.index or nil
+	local sig = {}
+	for _, goal in ipairs(view and view.goals or {}) do
+		if goal.status ~= "na" and not goal.folded and takesOut(goal) then
+			local list = goal.t == "note" and o.notes or o.goals
+			list[#list + 1] = goal
+			sig[#sig + 1] = goal.index .. (goal.status or "") .. (goal.dismissed and "d" or "")
+		end
+	end
+	-- The render comes after the layout: lay out again when the card's content changed.
+	local now = (o.step or 0) .. ":" .. table.concat(sig, ",")
+	if now ~= o.sig then
+		o.sig = now
+		local live = Theme.GuideParts and Theme.GuideParts()
+		if live and live.window == window then Core.relayout() end
+	end
+end
+
+local function layoutOptional(stack, window, step)
+	local c = optCard(stack)
+	local o = opt[window]
+	local n, m = o and #o.goals or 0, o and #o.notes or 0
+	if n + m == 0 or closedOn.opt == step then
+		c:Hide()
+		return nil
+	end
+	local width = window:GetWidth() or 0
+	local lh = 9
+	for i = 1, m do
+		local fs = c.Notes[i]
+		if not fs then
+			fs = c:CreateFontString(nil, "OVERLAY")
+			Theme.Font(fs, "label")
+			fs:SetJustifyH("LEFT")
+			fs:SetJustifyV("TOP")
+			fs:SetWordWrap(true)
+			c.Notes[i] = fs
+		end
+		fs:SetTextColor(Theme.Color("quest"))
+		fs:SetText(Core.goalText(o.notes[i]))
+		fs:SetWidth(math.max(40, width - OPT_PAD * 2 - 18))
+		fs:ClearAllPoints()
+		fs:SetPoint("TOPLEFT", c, "TOPLEFT", OPT_PAD, -lh)
+		fs:Show()
+		lh = lh + math.floor(fs:GetStringHeight() + 0.5) + 3
+	end
+	for i = m + 1, #c.Notes do c.Notes[i]:Hide() end
+	c.Label:ClearAllPoints()
+	c.Label:SetPoint("TOPLEFT", c, "TOPLEFT", OPT_PAD, -lh)
+	capsLabel(c.Label)
+	c.Label:SetText(string.upper(tr("Optional")))
+	c.Label:SetShown(n > 0)
+	infoIcon(c, c.Label, tr("Optional objectives during this step"))
+	if n > 0 then lh = lh + math.ceil(c.Label:GetStringHeight()) + 3 end
+	for i = 1, n do
+		local goal = o.goals[i]
+		local r = optRow(c, i)
+		local done, dismissed = goal.status == "done", goal.dismissed
+		if not r._goal or r._goal.index ~= goal.index or r.psStep ~= o.step then r._point = nil end
+		r._goal, r.psStep = goal, o.step
+		r.Mark:SetVertexColor(Theme.Accent())
+		r:ClearAllPoints()
+		r:SetPoint("TOPLEFT", c, "TOPLEFT", 0, -lh)
+		r:SetPoint("TOPRIGHT", c, "TOPRIGHT", 0, -lh)
+		r:SetHeight(OPT_ROW)
+		r.Icon:SetTexture(done and Theme.Media("check") or (dismissed and Theme.Media("skip")) or Theme.VerbIcon(goal.t))
+		r.Icon:SetVertexColor(Theme.Color(done and "success" or "textDim"))
+		r.Text:SetText((done or dismissed) and Core.plainGoalText(goal) or Core.goalText(goal))
+		r.Text:SetTextColor(Theme.Color((done or dismissed) and "textMuted" or "text"))
+		r.Meta:SetTextColor(Theme.Color("textMuted"))
+		local right = OPT_PAD
+		r.Skip.Label:SetText(dismissed and tr("Undo") or tr("Skip"))
+		r.Skip.Label:SetTextColor(Theme.Color("textDim"))
+		local canSkip = not done and not goal.previewOnly and Core.canSkip()
+		r.Skip:SetShown(canSkip and true or false)
+		if canSkip then
+			r.Skip:SetSize(math.floor(r.Skip.Label:GetStringWidth() + 8 + 0.5), 14)
+			r.Skip:ClearAllPoints()
+			r.Skip:SetPoint("RIGHT", r, "RIGHT", -right, 0)
+			right = right + r.Skip:GetWidth() + 6
+		end
+		r.Meta:ClearAllPoints()
+		r.Meta:SetPoint("RIGHT", r, "RIGHT", -right, 0)
+		r.Text:ClearAllPoints()
+		r.Text:SetPoint("LEFT", r.Icon, "RIGHT", 6, 0)
+		r.psMetaRight, r.psWidth = right, width
+		optMeta(r)
+		r:Show()
+		lh = lh + OPT_ROW
+	end
+	for i = n + 1, #c.Rows do
+		c.Rows[i]:Hide()
+		c.Rows[i]._goal = nil
+	end
+	c:SetHeight(lh + 6)
+	return c
+end
+
+if has("guideTakes") then
+	on("guideRender", function(view, parts) fillOptional(view, parts) end)
+end
+on("guideRender", function(view, parts) if parts.window then stepOf[parts.window] = view and view.index or nil end end)
+
+-- The class guide on offer: the heads-up card above the window (×, Later),
+-- not a banner in it. Shown once per notice; its buttons are the banner's
+-- own (open the guide in a tab, Later).
+local headsUpFor
+local function classHeadsUp(n)
+	if headsUpFor == n then return true end
+	local shown = Core.showHeadsUp({
+		head = string.upper(tr("Class quest")),
+		title = n.title or "",
+		giver = n.heads, route = n.why,
+		icon = Theme.Media("icon-train"), iconColor = "accent",
+		act = { label = tr("Open in a tab"), run = function() Core.takeNotice(); Core.hideHeadsUp() end },
+		later = { label = tr("Later"), run = function() Core.laterNotice() end },
+	})
+	if shown then headsUpFor = n end
+	return shown
+end
+
+-- The class quest card (in the window under Polestar's own layout) as a
+-- card above it, its × putting the chain away for the session.
+local classShut = {}
+
+on("guidePlace", function(name, part, width, height)
+	if name == "here" then
+		hereLook(part, true)
+		part:SetHeight(height)
+		slots.here = part
+		return true
+	end
+	if name == "banner" and part.psKind == "classQuest" then
+		local _, n = Core.notice()
+		if n and classHeadsUp(n) then
+			part:Hide()
+			return true
+		end
+	elseif name == "banner" and part.psKind == "train" then
+		slots.train = part
+		part:Hide()
+		return true
+	end
+	if name == "classCard" then
+		local key = Core.classCardKey()
+		if key and classShut[key] then
+			part:Hide()
+			return true
+		end
+		part:SetHeight(height)
+		slots.class, slots.classKey = part, key
+		return true
+	end
+	if name == "journey" and not compact() then
+		part:SetHeight(height)
+		slots.journey = part
+		return true
+	end
+end)
+
+local function layoutStack(parts)
+	local window = parts.window
+	local stack = stackFrame(window)
+	local step = stepOf[window]
+	if closedOn.here and closedOn.here ~= step then closedOn.here = nil end
+	if closedOn.opt and closedOn.opt ~= step then closedOn.opt = nil end
+	local list = {}
+	local function add(f, close) list[#list + 1] = { f = f, close = close } end
+	local function relay() Core.relayout() end
+	local s = slots
+	if s.class and isUnder(s.class, window) then
+		local key = s.classKey
+		add(s.class, function() if key then classShut[key] = true end relay() end)
+	end
+	if s.here and isUnder(s.here, window) then
+		if closedOn.here == step then s.here:Hide() else add(s.here, function() closedOn.here = step relay() end) end
+	end
+	local optional = layoutOptional(stack, window, step)
+	if optional then add(optional, function() closedOn.opt = step relay() end) end
+	if s.train and isUnder(s.train, window) then
+		add(fillTrain(trainCard(stack), window:GetWidth() or 300), Core.laterNotice)
+	elseif stack.train then
+		stack.train:Hide()
+	end
+	slots = {}
+	local width = window:GetWidth() or 300
+	local y = 0
+	for i = #list, 1, -1 do
+		local f = list[i].f
+		local h = f:GetHeight() or 0
+		local b = backing(stack, i)
+		b:ClearAllPoints()
+		b:SetPoint("BOTTOMLEFT", stack, "BOTTOMLEFT", 0, y)
+		b:SetSize(width, h)
+		dress(b, window)
+		b:Show()
+		b.Close.psClose = list[i].close
+		b.Close.Icon:SetVertexColor(Theme.Color("textMuted"))
+		b.Close:SetFrameLevel(b:GetFrameLevel() + 5)
+		b.Close:Show()
+		f:SetParent(b)
+		f:SetFrameLevel(b:GetFrameLevel() + 1)
+		f:ClearAllPoints()
+		f:SetPoint("TOPLEFT", b, "TOPLEFT", 0, 0)
+		f:SetPoint("TOPRIGHT", b, "TOPRIGHT", 0, 0)
+		f:Show()
+		-- A badge on the class card steps left of the ×.
+		local badge = rawget(f, "Badge")
+		if type(badge) == "table" and badge:IsShown() then
+			badge:ClearAllPoints()
+			badge:SetPoint("TOPRIGHT", f, "TOPRIGHT", -26, -10)
+		end
+		y = y + h + GAP
+	end
+	for i = #list + 1, #stack.cards do stack.cards[i]:Hide() end
+	if #list > 0 then
+		stack:SetHeight(y - GAP)
+		stack:Show()
+	else
+		stack:Hide()
+	end
+end
+
+-- The Journey: collapsed on a card joined to the window's foot.
+local function layoutBottom(parts, journey)
+	local window = parts.window
+	local own = store(window)
+	if not journey and not own.bottom then return end
+	if not own.bottom then
+		local b = CreateFrame("Frame", nil, window)
+		b:SetPoint("TOPLEFT", window, "BOTTOMLEFT", 0, 0)
+		b:SetPoint("TOPRIGHT", window, "BOTTOMRIGHT", 0, 0)
+		b:SetHeight(1)
+		b.psGuide = true
+		Theme.Skin(b, "guide")
+		own.bottom = b
+	end
+	local b = own.bottom
+	if journey and isUnder(journey, window) then
+		journey:SetParent(b)
+		journey:ClearAllPoints()
+		journey:SetPoint("TOPLEFT", b, "TOPLEFT", 0, 0)
+		journey:SetPoint("TOPRIGHT", b, "TOPRIGHT", 0, 0)
+		dress(b, window)
+		b:SetHeight((journey:GetHeight() or 0) + 2)
+		b:Show()
+	else
+		b:Hide()
+	end
+end
+
+on("guideLayout", function(parts)
+	if not parts.window then return end
+	local journey = slots.journey
+	layoutStack(parts)
+	layoutBottom(parts, journey)
+end)
+
+-- The heads-up card stands on the stack, over the cards.
+on("guideAnchor", function()
+	local parts = Theme.GuideParts and Theme.GuideParts()
+	local own = parts and parts.window and stores[parts.window]
+	if own and own.stack and own.stack:IsShown() then return own.stack end
+end)
+
+-- The heads-up card's questions (where Polestar asks them): compact, 5 above
+-- the window, above it only, the class glyph on its reward.
+on("card", function(_, kind)
+	if kind == "headsupCompact" or kind == "hereCompact" or kind == "headsupAboveOnly" then return true end
+	if kind == "headsupGap" then return GAP end
+	if kind == "headsupRewardGlyph" then return Theme.Media("icon-train") end
+end)
+
+-- The class quest card's own "Later" row: the × does it.
+on("guideShows", function(what, shown)
+	if what == "classCardLater" then return false end
+	return shown
+end)
 
 ---------------------------------------------------------------------------
 -- Registration
