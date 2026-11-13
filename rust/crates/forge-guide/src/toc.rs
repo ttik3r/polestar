@@ -251,6 +251,22 @@ static TEXT: &[(&str, [&str; 9], [&str; 9])] = &[
 			"Polestar 的一部分：WoW Forever、Blizzard、Classic 和 Hearth 皮膚。選擇其中一個時載入。",
 		],
 	),
+	// The guide window's other tab styles (title menu, top edge, side strip): loaded the first time one is drawn.
+	(
+		"Polestar_TabStyles",
+		["Polestar: Tab-Stile", "Polestar: estilos de pestañas", "Polestar: estilos de pestañas", "Polestar : styles d'onglets", "Polestar 탭 스타일", "Polestar: estilos de abas", "Polestar: стили вкладок", "Polestar 标签样式", "Polestar 分頁樣式"],
+		[
+			"Teil von Polestar: die Tabs des Leitfadenfensters als Titelmenü, an der Oberkante und als Seitenleiste. Wird geladen, wenn du einen auswählst.",
+			"Parte de Polestar: las pestañas de la ventana de la guía como menú del título, en el borde superior y en una tira lateral. Se carga cuando eliges uno.",
+			"Parte de Polestar: las pestañas de la ventana de la guía como menú del título, en el borde superior y en una tira lateral. Se carga cuando eliges uno.",
+			"Fait partie de Polestar : les onglets de la fenêtre du guide en menu du titre, sur le bord supérieur et en bande latérale. Chargé quand vous en choisissez un.",
+			"Polestar의 일부: 가이드 창의 탭을 제목 메뉴, 위쪽 가장자리, 옆 띠로 표시합니다. 하나를 고를 때 불러옵니다.",
+			"Parte do Polestar: as abas da janela do guia como menu do título, na borda superior e numa faixa lateral. Carregado quando você escolhe um.",
+			"Часть Polestar: вкладки окна руководства в меню заголовка, по верхнему краю и на боковой полосе. Загружается, когда вы выбираете один из них.",
+			"Polestar 的组成部分：指南窗口的标签可显示为标题菜单、顶边标签或侧边栏。选择其中一个时加载。",
+			"Polestar 的一部分：指南視窗的分頁可顯示為標題選單、頂邊分頁或側邊欄。選擇其中一個時載入。",
+		],
+	),
 	// The Skin API's example (docs/SKINS-API.md): in the repository only, never in a release.
 	(
 		"Polestar_Skin_Example",

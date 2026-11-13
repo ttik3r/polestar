@@ -27,7 +27,7 @@ ns.UI.GuideFrame.Part(function(GF)
 	---------------------------------------------------------------------------
 
 	local function stripShown()
-		return strip.psHasTabs and not compact() and GF.On("tabs")
+		return strip.psHasTabs and not compact() and GF.On("tabs") and GF.TabStyle() == "underline"
 	end
 
 	-- A part a skin places itself (Skin API 2, hooks.guidePlace(name, frame,
@@ -393,6 +393,7 @@ ns.UI.GuideFrame.Part(function(GF)
 		local width = F:GetWidth()
 		local isCompact = compact()
 		local showStrip = stripShown()
+		GF.PlaceClose()
 		strip:SetShown(showStrip)
 		strip:SetHeight(showStrip and TAB_H or 0.01)
 		-- The guide's title sits in the navigator only when no tab names it.
@@ -402,7 +403,7 @@ ns.UI.GuideFrame.Part(function(GF)
 		local reportW = nav.Report:IsShown() and nav.Report:GetWidth() or 0
 		local nearbyW = nav.Nearby:IsShown() and nav.Nearby:GetWidth() or 0
 		local lookupW = nav.Lookup:GetWidth()
-		local titleW = width - PAD - (steps and nav.Steps:GetWidth() + 12 or 0) - 24 - 8 - 8 - (nav.Close:IsShown() and 18 or 0) - skipW - reportW - nearbyW - lookupW
+		local titleW = width - PAD - (steps and nav.Steps:GetWidth() + 12 or 0) - 24 - 8 - 8 - GF.CloseRoom() - skipW - reportW - nearbyW - lookupW
 		-- At the minimum width the controls take the row; the title must not sit
 		-- behind Skip (notably in compact mode, where the tab strip is hidden).
 		nav.Title:SetShown((not showStrip or not steps) and GF.On("guideTitle") and nav.Title:GetText() ~= nil and nav.Title:GetText() ~= "" and titleW >= 40)
@@ -498,7 +499,7 @@ ns.UI.GuideFrame.Part(function(GF)
 		local x0, x1, y0, y1 = Theme.BandCoords(width - 2, stripH + NAV_H, 30)
 		if barsBottom() then y0, y1 = y1, y0 end
 		band:SetTexCoord(x0, x1, y0, y1)
-		if showStrip then GF.RenderTabs() end
+		GF.RenderTabStyle()
 		GF.PaintProgress(false)
 		if GF.live and UI.NameTargets then UI.NameTargets.Refresh() end
 		GF.PaintShades()

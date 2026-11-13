@@ -25,7 +25,8 @@ pub fn readme(version: &str, names: &[String]) -> String {
 			"   (loaded when you open it); Polestar_SkinAPI the checks for skins",
 			"   from other addons (loaded when you use one); Polestar_Looks the",
 			"   WoW Forever, Blizzard, Classic and Hearth skins (loaded when you",
-			"   pick one); Polestar_Nav",
+			"   pick one); Polestar_TabStyles the guide window's other tab styles",
+			"   (loaded when you pick one); Polestar_Nav",
 			"   the arrow's walking routes",
 			"   (Shortest Path Forever's pathing, by Cillian Berragan, GPL-3.0 or",
 			"   later: see its LICENSE and CREDITS.md); the language folders",
@@ -136,7 +137,7 @@ mod tests {
 
 	#[test]
 	fn the_readme_names_every_folder_shipped_in_crlf_lines() {
-		let names: Vec<String> = ["Polestar", "Polestar_Guides", "Polestar_Nav", "Polestar_Options", "Polestar_SkinAPI", "Polestar_Looks", "Polestar_Codex"].iter().map(|s| s.to_string()).collect();
+		let names: Vec<String> = ["Polestar", "Polestar_Guides", "Polestar_Nav", "Polestar_Options", "Polestar_SkinAPI", "Polestar_Looks", "Polestar_TabStyles", "Polestar_Codex"].iter().map(|s| s.to_string()).collect();
 		let text = readme("0.2.0", &names);
 		assert!(text.starts_with("Polestar 0.2.0\r\n"));
 		assert!(text.contains("_forever_/Interface/AddOns/"));
@@ -149,6 +150,7 @@ mod tests {
 		assert!(text.contains("Polestar_Options the settings window\r\n   (loaded when you open it)"));
 		assert!(text.contains("Polestar_SkinAPI the checks for skins\r\n   from other addons (loaded when you use one)"));
 		assert!(text.contains("Polestar_Looks the\r\n   WoW Forever, Blizzard, Classic and Hearth skins (loaded when you\r\n   pick one)"));
+		assert!(text.contains("Polestar_TabStyles the guide window's other tab styles\r\n   (loaded when you pick one)"));
 		assert!(text.contains("\r\nPortions Copyright (C) 2026 Cillian Berragan (Shortest Path Forever),\r\n"));
 		assert!(!text.replace("\r\n", "").contains('\n'), "CRLF line endings throughout");
 	}

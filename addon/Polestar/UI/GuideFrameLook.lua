@@ -207,6 +207,8 @@ ns.UI.GuideFrame.Part(function(GF)
 		-- the bar's line (GF.PaintRule).
 		local title = GF.TitleParts(nav.TitleBar, nav.Close, nav.Rule, band)
 		if not clear then Theme.SkinHook("guideTitle", nav, title) end
+		-- The close and the menu are placed with the tab style (GF.PlaceClose, in GF.Layout).
+		nav.psSkinClose, nav.psMenuRight, nav.psClear = nav.Close:IsShown(), title.menuRight, clear
 		nav.Menu:ClearAllPoints()
 		nav.Menu:SetPoint("RIGHT", nav, "RIGHT", -(tonumber(title.menuRight) or 8), 0)
 		GF.PaintRule(nav.Rule)
@@ -250,7 +252,7 @@ ns.UI.GuideFrame.Part(function(GF)
 
 	-- A guideWindow.* setting changed (`key` without the section; nil: all of
 	-- them, a reset): only what it touches is redrawn.
-	GF.LOOK_STYLE = { outline = true, bgColor = true, bgOpacity = true, border = true, veil = true, shade = true, rules = true }
+	GF.LOOK_STYLE = { tabStyle = true, outline = true, bgColor = true, bgOpacity = true, border = true, veil = true, shade = true, rules = true }
 	GF.LOOK_PAINT = { targetBar = true, targetBarColor = true, targetBarWidth = true, progressColor = true }
 	GF.LOOK_LATER = { stepAnim = true, animSpeed = true, foldAnim = true } -- read when they play
 	function GF.ApplyLook(key)
