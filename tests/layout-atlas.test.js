@@ -152,6 +152,11 @@ out.switches = { skip(), report() }
 Polestar.Set("guideWindow.reportButton", true)
 draw()
 out.switches[3] = report()
+-- Atlas starts with tabs on, as the title switcher; the player's style wins.
+out.tabs = { Polestar.Get("guideWindow.tabs"), Polestar.Get("guideWindow.tabStyle") }
+Polestar.Set("guideWindow.tabStyle", "edge")
+out.tabs[3] = Polestar.Get("guideWindow.tabStyle")
+Polestar.Set("guideWindow.tabStyle", "switcher")
 Polestar.Set("guideWindow.rules", false)
 Polestar.Set("guideWindow.skipButton", false)
 Polestar.Set("guideWindow.reportButton", false)
@@ -188,6 +193,7 @@ emit(out)`,
 	assert.equal(out.back, false, "Polestar's own layout again");
 	assert.deepEqual(out.rule, [true, true], 'the header keeps its rule (guideWindow.rules) under Atlas and after');
 	assert.deepEqual(out.switches, [true, false, true], "Skip shows, Report starts off by Atlas's default, the player's choice turns it on");
+	assert.deepEqual(out.tabs, [true, 'switcher', 'edge'], "tabs on as the title switcher by Atlas's default, the player's style wins");
 	assert.deepEqual(out.off, [false, false, false], 'switched off, they stay off under Atlas');
 	assert.equal(out.skipLabel, false, 'Skip is its glyph alone under Atlas');
 });
