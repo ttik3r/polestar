@@ -144,6 +144,20 @@ out.inUse = { T.LayoutId() or false, T.SkinId(), hex(T.Palette().accent) == beac
 local nav = T.GuideParts().nav
 local function rule() return nav.Rule:IsShown() and true or false end
 out.rule = { rule() }
+-- The player's switches hold under Atlas: the rule, Skip and Report.
+local function skip() return nav.Skip:IsShown() and true or false end
+local function report() return nav.Report:IsShown() and true or false end
+out.switches = { skip(), report() }
+Polestar.Set("guideWindow.rules", false)
+Polestar.Set("guideWindow.skipButton", false)
+Polestar.Set("guideWindow.reportButton", false)
+draw()
+out.off = { rule(), skip(), report() }
+Polestar.Set("guideWindow.rules", true)
+Polestar.Set("guideWindow.skipButton", true)
+Polestar.Set("guideWindow.reportButton", true)
+draw()
+out.skipLabel = nav.Skip.Label:IsShown() and true or false
 Polestar.Set("ui.compact", true)
 draw()
 Polestar.Set("ui.compact", false)
@@ -168,7 +182,10 @@ emit(out)`,
 	assert.equal(out.atlasAccent, 'e6ba66', "the Atlas skin's own accent");
 	assert.equal(out.failed, false, 'no hook failed in normal or compact mode');
 	assert.equal(out.back, false, "Polestar's own layout again");
-	assert.deepEqual(out.rule, [false, true], 'the header has no rule under Atlas, its rule back after');
+	assert.deepEqual(out.rule, [true, true], 'the header keeps its rule (guideWindow.rules) under Atlas and after');
+	assert.deepEqual(out.switches, [true, true], 'Skip and Report show under Atlas, as the settings say');
+	assert.deepEqual(out.off, [false, false, false], 'switched off, they stay off under Atlas');
+	assert.equal(out.skipLabel, false, 'Skip is its glyph alone under Atlas');
 });
 
 // The layout's hooks, captured from a stand-in RegisterLayout, with the

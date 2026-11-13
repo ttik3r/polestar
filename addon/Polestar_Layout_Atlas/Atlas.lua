@@ -234,12 +234,13 @@ local function pixel(f) return Theme.Pixel and Theme.Pixel(f) or 1 end
 
 ---------------------------------------------------------------------------
 -- The header: no backdrop and no rule; the guide's emblem and title on the
--- left, the step count with its arrows and the menu on the right. Skip,
--- Report, Nearby and Lookup are in the menu.
+-- left, then the step count with its arrows, Skip as its glyph alone, and
+-- the menu on the right. The player's own switches (guideWindow.skipButton,
+-- .reportButton, .rules, nav.nearbyButton) say what shows; Atlas only sets
+-- it out. Lookup is in the menu.
 ---------------------------------------------------------------------------
 
 on("guideTitle", function(nav, parts)
-	if parts.rule then parts.rule:Hide() end
 	if parts.band then parts.band:Hide() end
 	if parts.bar then parts.bar:Hide() end
 end)
@@ -252,15 +253,39 @@ local function navBack(nav)
 	Theme.Font(nav.Steps.Count, "number")
 	nav.Steps:ClearAllPoints()
 	nav.Steps:SetPoint("LEFT", nav, "LEFT", 8, 0)
+	-- Polestar's own order right of the count: Skip, Nearby, Report, Lookup.
+	nav.Report:ClearAllPoints()
+	nav.Report:SetPoint("RIGHT", nav.Lookup, "LEFT", 0, 0)
+	nav.Nearby:ClearAllPoints()
+	nav.Nearby:SetPoint("RIGHT", nav.Report, "LEFT", 0, 0)
+	nav.Skip:ClearAllPoints()
+	nav.Skip:SetPoint("RIGHT", (nav.Nearby:IsShown() and nav.Nearby) or (nav.Report:IsShown() and nav.Report) or nav.Menu, "LEFT", -2, 0)
 	if nav.Skip.Label then
 		nav.Skip.Label:Show()
 		nav.Skip:SetWidth(math.floor(7 + 11 + 5 + nav.Skip.Label:GetStringWidth() + 8 + 0.5))
 	end
 	nav.Lookup:Show()
-	nav.Nearby:SetShown(Core.setting("nav.nearbyButton") ~= false)
 	Theme.Font(nav.Title, "small")
 end
 onLeave(function(parts) navBack(parts.nav) end)
+
+-- Right to left from the menu: Report and Nearby where the player shows
+-- them, Skip (its glyph alone), then the step count.
+local SKIP_W = 7 + 11 + 7
+local function navRow(nav)
+	local prev = nav.Menu
+	for _, b in ipairs({ nav.Report, nav.Nearby, nav.Skip }) do
+		if b == nav.Skip then
+			if b.Label then b.Label:Hide() end
+			b:SetWidth(SKIP_W)
+		end
+		b:ClearAllPoints()
+		b:SetPoint("RIGHT", prev, "LEFT", b == nav.Skip and -2 or 0, 0)
+		if b:IsShown() then prev = b end
+	end
+	nav.Steps:ClearAllPoints()
+	nav.Steps:SetPoint("RIGHT", prev, "LEFT", -2, 0)
+end
 
 local function header(parts)
 	local nav = parts.nav
@@ -275,17 +300,13 @@ local function header(parts)
 	own.emblem:ClearAllPoints()
 	own.emblem:SetPoint("LEFT", nav, "LEFT", 10, 0)
 	own.emblem:Show()
-	for _, b in ipairs({ nav.Report, nav.Nearby, nav.Lookup, nav.Skip }) do b:Hide() end
-	-- Polestar shows its rule again after guideTitle (guideWindow.rules); a
-	-- restyle on leaving shows it again.
-	if nav.Rule then nav.Rule:Hide() end
+	nav.Lookup:Hide()
 	local path, size, flags = probe("note")
 	nav.Steps.Count:SetFont(path, size + 2, flags)
 	local cw = math.max(40, math.ceil(nav.Steps.Count:GetUnboundedStringWidth()) + 1)
 	nav.Steps.Count:SetWidth(cw)
 	nav.Steps:SetWidth(24 + cw + 24)
-	nav.Steps:ClearAllPoints()
-	nav.Steps:SetPoint("RIGHT", nav.Menu, "LEFT", -2, 0)
+	navRow(nav)
 	Theme.Font(nav.Title, "goal")
 	nav.Title:SetTextColor(Theme.Color("textDim"))
 	nav.Title:ClearAllPoints()
@@ -297,8 +318,13 @@ local function header(parts)
 	nav.Title:SetShown(text ~= nil and text ~= "")
 end
 on("guideLayout", function(parts) header(parts) end)
--- The render shows Skip again after the layout: it stays in the menu.
-on("guideRender", function(view, parts) if parts.nav and parts.nav.Skip then parts.nav.Skip:Hide() end end)
+-- The render shows or hides Skip, Report and Nearby again and puts Skip
+-- back by them: set the row out again.
+on("guideRender", function(view, parts)
+	local nav = parts.nav
+	local own = nav and stores[nav]
+	if own and own.atlas and nav.Skip and nav.Steps and nav.Menu then navRow(nav) end
+end)
 
 -- With the foot bar off, room under the window's last part.
 on("guideLayout", function() return Core.setting("guideWindow.progress") == false and 8 or 0 end)
