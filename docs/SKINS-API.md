@@ -146,6 +146,15 @@ Polestar.Theme.RegisterLayout("ledger", {
   styles. The layout's answer wins when it is not nil; the skin's counts
   when the layout's is nil. For `guidePlace` the layout alone decides
   where a part goes.
+- **Settings defaults**: the player sets the guide window's parts in its
+  settings (`guideWindow.*`: the tabs, the step count, the buttons, the
+  target bar, the progress line...), so a layout never hides those parts
+  through a hook. It gives its own defaults instead:
+  `defaults = { ["guideWindow.tabs"] = false, ["guideWindow.targetBar"] = false }`.
+  A setting reads the player's value, else the layout's default, else
+  Polestar's. Switching layout changes only the settings the player never
+  set, the settings window shows the value in use, and a reset goes back
+  to the layout's default.
 - **The choice**: the setting `ui.layout`, unset for Polestar's own layout.
   `Polestar.Theme.SetLayout("ledger")` picks one (in chat: `/run
   Polestar.Theme.SetLayout("ledger")`), `Polestar.Theme.SetLayout()` goes

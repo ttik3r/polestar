@@ -197,7 +197,7 @@ local SKIN_FIELDS = { api = true, name = true, addon = true, author = true, vers
 	variants = true, defaultVariant = true, resolve = true, shadow = true, artTint = true }
 -- A layout's (Theme.RegisterLayout): the window's structure, no look.
 local LAYOUT_FIELDS = { api = true, name = true, addon = true, author = true, version = true, desc = true, hooks = true,
-	onApply = true, onLeave = true }
+	onApply = true, onLeave = true, defaults = true }
 -- A variant's own (spec.variants, Skin API 2): what it changes of the skin.
 local VARIANT_FIELDS = { id = true, name = true, desc = true, base = true, scheme = true, tokens = true, media = true,
 	arrow = true, preset = true, artTint = true, shadow = true }
@@ -615,6 +615,42 @@ local function registerSkin(id, spec)
 	return true, note
 end
 
+-- A layout's defaults for the guide window's settings: { ["guideWindow.tabs"]
+-- = false, ... }, each a guideWindow.* setting Polestar has, with a value of
+-- the type of Polestar's default (false: false, a colour for a *Color
+-- setting, a number otherwise). -> true, the defaults copied | false, why
+local function readLayoutDefaults(t)
+	if t == nil then return true, nil end
+	if type(t) ~= "table" then return false, "defaults must be a table of setting = value" end
+	local out = {}
+	local base = ns.GetBaseDefault or ns.GetDefault
+	for path, v in pairs(t) do
+		local key = type(path) == "string" and path:match("^guideWindow%.([%w_]+)$")
+		local d = key and base(path)
+		if d == nil or type(d) == "table" then
+			return false, format("defaults key %q is not a guide window setting (guideWindow.<name>)", tostring(path))
+		end
+		if d == false then
+			if v == false then
+				out[path] = false
+			elseif key:find("Color$") then
+				local c = specColor(v)
+				if not c then return false, format("defaults[%q] must be false or a colour", path) end
+				out[path] = c
+			elseif type(v) == "number" and v == v and v ~= math.huge and v ~= -math.huge then
+				out[path] = v
+			else
+				return false, format("defaults[%q] must be false or a number", path)
+			end
+		elseif type(v) ~= type(d) or (type(v) == "number" and (v ~= v or v == math.huge or v == -math.huge)) then
+			return false, format("defaults[%q] must be a %s, like Polestar's default", path, type(d))
+		else
+			out[path] = v
+		end
+	end
+	return true, out
+end
+
 -- Register layout `id`: its facts, its structure hooks and its onApply and
 -- onLeave, nothing of a look (a skin's tokens, colours, fonts or painters).
 local function registerLayout(id, spec)
@@ -645,10 +681,14 @@ local function registerLayout(id, spec)
 	for _, k in ipairs({ "onApply", "onLeave" }) do
 		if spec[k] ~= nil and type(spec[k]) ~= "function" then return false, k .. " must be a function" end
 	end
+	local defaults
+	ok, defaults = readLayoutDefaults(spec.defaults)
+	if not ok then return false, defaults end
 	local hooks = {}
 	for k, v in pairs(spec.hooks or {}) do hooks[k] = v end
 	LAYOUTS[id] = { id = id, name = spec.name, addon = spec.addon, author = spec.author, version = spec.version,
-		desc = spec.desc, api = spec.api or 1, hooks = hooks, onApply = spec.onApply, onLeave = spec.onLeave }
+		desc = spec.desc, api = spec.api or 1, hooks = hooks, onApply = spec.onApply, onLeave = spec.onLeave,
+		defaults = defaults }
 	-- A saved choice waiting for this layout (its addon loaded late) shows now.
 	if I.layoutRegistered then I.layoutRegistered(id) end
 	return true

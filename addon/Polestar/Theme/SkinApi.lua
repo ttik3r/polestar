@@ -63,7 +63,7 @@ local LAYOUT_HOOKS = { guideLayout = true, guideRender = true, guidePlace = true
 	guidePerson = true, guideInset = true, guideUpRow = true, guideShows = true, guideTitle = true, guideRow = true,
 	guideProgress = true }
 -- The registered layouts (Theme.RegisterLayout): id -> { id, name, addon,
--- author, version, desc, api, hooks, onApply, onLeave }.
+-- author, version, desc, api, hooks, onApply, onLeave, defaults }.
 local LAYOUTS, LAYOUT_FAILED = {}, {}
 -- The checks read them too (Polestar_SkinAPI/SkinCheck.lua).
 I.PAINT_KINDS, I.HOOKS, I.LAYOUT_HOOKS, I.LAYOUTS = PAINT_KINDS, HOOKS, LAYOUT_HOOKS, LAYOUTS
@@ -230,6 +230,25 @@ end
 -- the saved layout (ui.layout) changes: nil is Polestar's own layout.
 local layoutId, layoutHooks
 
+-- The layout's defaults for the guide window's settings (spec.defaults) in
+-- place of Polestar's, under the player's own: each setting whose value
+-- changes with them is announced (SETTING_CHANGED), so the window and the
+-- settings show it. A setting the player set keeps its value.
+local liveDefaults
+local function applyDefaults(defs)
+	if not ns.SetLayoutDefaults then return end
+	local paths, old = {}, {}
+	for p in pairs(liveDefaults or {}) do paths[p] = true end
+	for p in pairs(defs or {}) do paths[p] = true end
+	for p in pairs(paths) do old[p] = ns.Get(p) end
+	ns.SetLayoutDefaults(defs)
+	liveDefaults = defs
+	for p in pairs(paths) do
+		local v = ns.Get(p)
+		if v ~= old[p] and ns.Fire then ns.Fire("SETTING_CHANGED", p, v) end
+	end
+end
+
 -- A layout's hook or its onApply or onLeave failed: noted, and the layout is
 -- off for the session (Polestar's own layout, or the skin's hooks, stand in
 -- from the next draw).
@@ -240,6 +259,7 @@ local function failLayout(id, err)
 	if ns.NoteError then ns.NoteError(format("layout %s (%s): %s", tostring(id), l and tostring(l.addon) or "?", tostring(err))) end
 	if layoutId == id then
 		layoutId, layoutHooks = nil, nil
+		applyDefaults(nil)
 		if ns.After then ns.After(0, function() Theme.Refresh() end) end
 	end
 end
@@ -496,6 +516,7 @@ local function switchLayout()
 	if id == layoutId then return false end
 	local was = layoutId and LAYOUTS[layoutId]
 	layoutId, layoutHooks = id, l and l.hooks or nil
+	applyDefaults(l and l.defaults or nil)
 	for _, step in ipairs({ { was, "onLeave" }, { l, "onApply" } }) do
 		local s, name = step[1], step[2]
 		if s and type(s[name]) == "function" then
@@ -548,15 +569,18 @@ function Theme.Layouts()
 end
 
 -- A registered layout's public facts (name, addon, author, version, desc,
--- api, hooks: the surfaces it hooks, sorted), or nil.
+-- api, hooks: the surfaces it hooks, sorted; defaults: its settings'
+-- defaults, a copy), or nil.
 function Theme.LayoutInfo(id)
 	local l = LAYOUTS[id]
 	if not l then return nil end
 	local hooks = {}
 	for k in pairs(l.hooks or {}) do hooks[#hooks + 1] = k end
 	table.sort(hooks)
+	local defaults = {}
+	for k, v in pairs(l.defaults or {}) do defaults[k] = v end
 	return { id = id, name = l.name, addon = l.addon, author = l.author, version = l.version, desc = l.desc, api = l.api,
-		hooks = hooks, failed = LAYOUT_FAILED[id] }
+		hooks = hooks, defaults = defaults, failed = LAYOUT_FAILED[id] }
 end
 
 -- The built-in schemes and skins (their tokens are Theme.lua's tables;

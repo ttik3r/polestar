@@ -15,3 +15,9 @@ section: contributors
   is Polestar's own layout). A `Polestar_Layout_<Name>` addon names its
   layouts with `## X-Polestar-Layout`, may load on demand, and is left out
   of the install check's version warning. Capability `layouts`.
+- Skin API 2: a layout gives defaults for the guide window's settings
+  (`defaults = { ["guideWindow.tabs"] = false, ... }`) instead of hiding
+  parts the player can set. A setting reads the player's value, then the
+  layout's default, then Polestar's; switching layout changes only the
+  settings the player never set, and a reset goes back to the layout's
+  default.

@@ -226,11 +226,34 @@ A layout is the guide window's structure apart from its look (capability
 |---|---|---|
 | `hooks` | table | Structure hooks only: `guideLayout`, `guideRender`, `guidePlace`, `guideAnchor`, `guideTakes`, `guidePerson`, `guideInset`, `guideUpRow`, `guideShows`, and `guideTitle` (which title bar parts show), `guideRow` (a goal row's lines and columns) and `guideProgress` (where the progress shows) ([The guide window](#the-guide-window)). Same arguments and answers as a skin's. A colour a layout's hook sets is a token of the skin in use (`Theme.Color`, `Theme.Accent`). |
 | `onApply`, `onLeave` | function(id) | Run when the layout comes into use and when it leaves. |
+| `defaults` | table | The layout's defaults for the guide window's settings: `{ ["guideWindow.tabs"] = false, ... }`. Each key is a `guideWindow.*` setting Polestar has; each value has the type of Polestar's default (a boolean for a switch, a number for a size, a string for a choice). A setting whose default is `false` takes `false`, a colour (`guideWindow.targetBarColor`, `progressColor`, `bgColor`) or a number (`guideWindow.bgOpacity`). |
+
+The player changes the guide window's parts in its settings (the tabs,
+the step count, the skip and report buttons, the target bar beside the
+live goal, the progress line and more, `guideWindow.*`). A layout leaves
+those parts to the settings and gives its preference as `defaults`, never
+by hiding a part from a hook. A setting reads, in order:
+
+1. the player's saved value;
+2. the layout in use's default;
+3. Polestar's default.
+
+Switching layout changes only the settings the player never set; each
+setting whose value changes is announced (`SETTING_CHANGED`) so the window
+and the settings window follow. A player's own value survives a switch,
+even one equal to Polestar's default. A reset (`Polestar.Set(path, nil)`)
+goes back to the layout's default. `Polestar.GetDefault(path)` is the
+default in use (the layout's, else Polestar's);
+`Polestar.GetBaseDefault(path)` is Polestar's own.
 
 The refusals, beside the common ones: `a layout carries no tokens or
 colours (<field> is a skin's field)`, `hooks.<name> is a skin's (a layout
 hooks the guide window's structure only)`, `unknown hooks "<name>"`,
-`hooks.<name> has the wrong type`, `onApply must be a function`.
+`hooks.<name> has the wrong type`, `onApply must be a function`,
+`defaults must be a table of setting = value`, `defaults key "<path>" is
+not a guide window setting (guideWindow.<name>)`, `defaults["<path>"] must
+be a <type>, like Polestar's default`, `defaults["<path>"] must be false or
+a colour`, `defaults["<path>"] must be false or a number`.
 
 A hook answers in this order: the layout's, else the skin's, else
 Polestar's own. With no layout chosen (`ui.layout` unset), every hook is
@@ -271,7 +294,7 @@ one of its ids, and when the player picks one.
 | `SetLayout(id)` | `ok, why`: saves `ui.layout`, loading the addon that declares `id` when it is installed and not loaded. `SetLayout()` goes back to Polestar's own layout. `why` as `LoadLayoutAddon`'s. |
 | `LayoutId()` | The layout in use, or nil for Polestar's own. |
 | `Layouts()` | The registered layouts' ids, sorted. |
-| `LayoutInfo(id)` | `{ id, name, addon, author, version, desc, api, hooks = { name, ... }, failed }` or nil. `failed` is the error that turned it off. |
+| `LayoutInfo(id)` | `{ id, name, addon, author, version, desc, api, hooks = { name, ... }, defaults, failed }` or nil. `defaults` is a copy of the layout's. `failed` is the error that turned it off. |
 | `InstalledLayouts()` | Every installed addon that declares layouts, as `InstalledSkins()`. |
 | `LoadLayoutAddon(id)` | `ok, why`, as `LoadSkinAddon`; the last reason is `"no installed addon declares it (## X-Polestar-Layout)"`. |
 

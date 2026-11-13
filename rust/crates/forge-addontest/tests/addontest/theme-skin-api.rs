@@ -2123,3 +2123,82 @@ emit(out)"##
 	assert_eq!(out["layoutId"], "ledger");
 	assert_eq!(out["skin"], json!(["ember", "hearth"]), "picked: its addon loads and the skin is in use");
 }
+
+// A layout's defaults for the guide window's settings (spec.defaults): a setting reads the player's saved value,
+// else the layout's default, else Polestar's. Switching layout changes only the settings the player never set (each
+// announced, so the window follows); a player's own value survives the switch; a reset goes back to the layout's
+// default. Only guideWindow.* settings Polestar has, with values of their default's type, are taken.
+#[test]
+fn a_layout_s_settings_defaults_sit_between_the_player_s_values_and_polestar_s() {
+	let out = run_ui(
+		r##"
+		local T = Polestar.Theme
+		local P = GF.parts
+		local function try(id, defaults)
+			local ok, msg = T.RegisterLayout(id, { api = 2, name = id, addon = "Polestar_Layout_Test", defaults = defaults })
+			return { ok = ok, msg = msg or false }
+		end
+		local out = { bad = {
+			try("b1", { ["ui.scale"] = 1 }),
+			try("b2", { ["guideWindow.nope"] = true }),
+			try("b3", { ["guideWindow.tabs"] = "no" }),
+			try("b4", { ["guideWindow.targetBarColor"] = "nope" }),
+			try("b5", { ["guideWindow.bgOpacity"] = "x" }),
+			try("b6", "tabs"),
+		} }
+		out.good = try("bare", { ["guideWindow.tabs"] = false, ["guideWindow.targetBar"] = false,
+			["guideWindow.targetBarColor"] = "#ff0000", ["guideWindow.bgOpacity"] = 0.5, ["guideWindow.padding"] = 4 })
+		try("tabsOnly", { ["guideWindow.tabs"] = false })
+		local heard = {}
+		Polestar.On("SETTING_CHANGED", function(path) if path:find("^guideWindow%.") then heard[#heard + 1] = path end end)
+		uistub.openTabs(TABS, 1)
+		stub.advance(1)
+		local function read()
+			return { tabs = Polestar.Get("guideWindow.tabs"), bar = Polestar.Get("guideWindow.targetBar"),
+				pad = Polestar.Get("guideWindow.padding"), opacity = Polestar.Get("guideWindow.bgOpacity") or false,
+				strip = P.strip:IsShown() }
+		end
+		out.house = read()
+		T.SetLayout("bare")
+		stub.advance(1)
+		out.bare = read()
+		table.sort(heard)
+		out.heard = table.concat(heard, ",")
+		out.resetTo = Polestar.GetDefault("guideWindow.tabs")
+		out.base = Polestar.GetBaseDefault("guideWindow.tabs")
+		-- The player's own value, then a switch: it stays.
+		Polestar.Set("guideWindow.padding", 2)
+		Polestar.Set("guideWindow.tabs", true)
+		out.saved = { Polestar.DB().settings.guideWindow.tabs, Polestar.DB().settings.guideWindow.padding }
+		T.SetLayout("tabsOnly")
+		out.switched = read()
+		T.SetLayout()
+		out.none = read()
+		-- A reset goes back to the layout's default.
+		T.SetLayout("bare")
+		Polestar.Set("guideWindow.tabs", nil)
+		Polestar.Set("guideWindow.padding", Polestar.GetDefault("guideWindow.padding"))
+		out.reset = read()
+		out.stored = { Polestar.DB().settings.guideWindow.tabs == nil, Polestar.DB().settings.guideWindow.padding == nil }
+		out.info = T.LayoutInfo("bare").defaults["guideWindow.tabs"]
+		emit(out)"##,
+	);
+	let bad: Vec<String> = out["bad"].as_array().unwrap().iter().map(|b| b["msg"].as_str().unwrap_or("").to_string()).collect();
+	assert_eq!(bad[0], "defaults key \"ui.scale\" is not a guide window setting (guideWindow.<name>)");
+	assert_eq!(bad[1], "defaults key \"guideWindow.nope\" is not a guide window setting (guideWindow.<name>)");
+	assert_eq!(bad[2], "defaults[\"guideWindow.tabs\"] must be a boolean, like Polestar's default");
+	assert_eq!(bad[3], "defaults[\"guideWindow.targetBarColor\"] must be false or a colour");
+	assert_eq!(bad[4], "defaults[\"guideWindow.bgOpacity\"] must be false or a number");
+	assert_eq!(bad[5], "defaults must be a table of setting = value");
+	assert_eq!(out["good"], json!({ "ok": true, "msg": false }));
+	assert_eq!(out["house"], json!({ "tabs": true, "bar": true, "pad": 0, "opacity": false, "strip": true }), "Polestar's defaults");
+	assert_eq!(out["bare"], json!({ "tabs": false, "bar": false, "pad": 4, "opacity": 0.5, "strip": false }), "the layout's defaults, the strip hidden: {out}");
+	assert_eq!(out["heard"], "guideWindow.bgOpacity,guideWindow.padding,guideWindow.tabs,guideWindow.targetBar,guideWindow.targetBarColor", "each setting that changed is announced");
+	assert_eq!((out["resetTo"].clone(), out["base"].clone()), (json!(false), json!(true)), "reset goes to the layout's default");
+	assert_eq!(out["saved"], json!([true, 2]), "the player's values are kept, Polestar's default included");
+	assert_eq!(out["switched"], json!({ "tabs": true, "bar": true, "pad": 2, "opacity": false, "strip": true }), "the player's values survive the switch: {out}");
+	assert_eq!(out["none"], json!({ "tabs": true, "bar": true, "pad": 2, "opacity": false, "strip": true }));
+	assert_eq!(out["reset"], json!({ "tabs": false, "bar": false, "pad": 4, "opacity": 0.5, "strip": false }), "reset: the layout's defaults again: {out}");
+	assert_eq!(out["stored"], json!([true, true]), "nothing stored for a reset setting");
+	assert_eq!(out["info"], false);
+}
