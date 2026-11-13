@@ -236,6 +236,11 @@ check("skin moonlit", Theme.RegisterSkin("moonlit", {
 		guideTakes = function(goal)
 			return false
 		end,
+		-- The step's header (Name, Where, Why, Level, Icon), laid out: the
+		-- answer is its height. Moonlit keeps Polestar's.
+		guidePerson = function(person, width, height)
+			return height
+		end,
 		-- The cards on the guide window: "headsup" (a class quest or dungeon
 		-- heads-up) and "classcard" (the class quest card in the window);
 		-- parts: titles, bodies (the strings Polestar sizes), accents.

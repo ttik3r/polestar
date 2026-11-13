@@ -86,6 +86,10 @@ local function layoutCard(width)
 			h = h + 3 + person.Level:GetStringHeight()
 		end
 		h = floor(h + 8 + 0.5)
+		-- A skin may lay the step's header out its own way (Skin API 2,
+		-- hooks.guidePerson(person, width, height)): its answer is the height.
+		local ran, skinH = Theme.SkinHookValue("guidePerson", person, cw, h)
+		if ran and type(skinH) == "number" and skinH >= 0 then h = floor(skinH + 0.5) end
 		person:SetHeight(h)
 		person:ClearAllPoints()
 		person:SetPoint("TOPLEFT", card, "TOPLEFT", 0, -y)

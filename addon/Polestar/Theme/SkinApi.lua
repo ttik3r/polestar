@@ -40,14 +40,16 @@ local PAINT_KINDS = { window = true, guide = true, toast = true, panel = true, s
 --   under the window's parts), the step on screen (guideRender), its
 --   progress (guideProgress), the frame the heads-up card sits on
 --   (guideAnchor), each tab of its strip (guideTab), a part the skin
---   places itself (guidePlace), its menu (guideMenu) and a goal the skin
---   shows on a card of its own, out of the window's list (guideTakes);
+--   places itself (guidePlace), its menu (guideMenu), a goal the skin
+--   shows on a card of its own, out of the window's list (guideTakes) and
+--   the step's header, laid out the skin's way (guidePerson);
 --   the arrow (arrow), the map and minimap pins (pin), the cards on the
 --   guide window (card: the heads-up card, the class quest card), the
 --   toasts (toast: the rare alert, the transport banner, While you're here)
 --   and the buttons Polestar puts on the screen (actionButton).
 local HOOKS = { arrow = true, pin = true, guideTitle = true, guideRow = true, guideLayout = true, guideRender = true,
-	guideProgress = true, guideAnchor = true, guideTab = true, guidePlace = true, guideMenu = true, guideTakes = true, card = true, toast = true,
+	guideProgress = true, guideAnchor = true, guideTab = true, guidePlace = true, guideMenu = true, guideTakes = true, guidePerson = true,
+	card = true, toast = true,
 	actionButton = true }
 -- The checks read them too (Polestar_SkinAPI/SkinCheck.lua).
 I.PAINT_KINDS, I.HOOKS = PAINT_KINDS, HOOKS
