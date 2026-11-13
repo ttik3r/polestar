@@ -280,20 +280,42 @@ emit({ rows = #rows, text = math.floor(r.Text:GetWidth() + 0.5) })`);
 	assert.ok(out.text > 200, `the text is ${out.text} wide`);
 });
 
-// The last step's line (guideWindow.lastStep, Polestar's part `last`): on by
-// Atlas's default, on the rail with a node of its own, done or skipped; the
-// player's setting turns it off; none on a guide's first step or in compact
-// mode.
-test('the last step shows on the rail: done or skipped, off by the setting, none at step 1 or in compact mode', () => {
+// The steps before (guideWindow.lastSteps, Polestar's part `last`): 1 by
+// Atlas's default, each row on the rail with a node of its own, done or
+// skipped, the oldest on top; never more than come before; the player's count
+// wins, a reset goes back to Atlas's; none in compact mode or under
+// Polestar's own layout (0 by default).
+test('the steps before show on the rail: as many as asked and come before, done or skipped, oldest on top', () => {
 	const [out] = runAddon({
 		stubs: ['stub_world.lua'],
 		addons: ['Polestar', 'Polestar_Skin_Atlas', 'Polestar_Layout_Atlas'],
-		script: `${GUIDE}
+		script: `
+w = stub.world
+w.addMap(1429, { name = "Elwynn Forest", c = 0, left = 1500, right = -1500, top = 500, bottom = -1500 })
+w.moveTo(1429, 48, 42)
+Polestar.RegisterPack({ addon = "Polestar_Test", id = "test", format = 1, title = "Test", author = "Test", version = "1", license = "MIT" })
+Polestar.Set("behavior.suggestFrom", "test")
+Polestar.RegisterGuide({
+	id = "test/before", pack = "test", title = "Before", minLevel = 1, maxLevel = 20,
+	steps = {
+		{ goals = { { t = "accept", quest = 7, title = "Kobold Camp Cleanup", npc = 197, npcName = "Marshal McBride" } } },
+		{ goals = { { t = "accept", quest = 33, title = "Wolves Across the Border", npc = 196, npcName = "Eagan Peltskinner" } } },
+		{ goals = { { t = "accept", quest = 18, title = "Brotherhood of Thieves", npc = 823, npcName = "Deputy Willem" } } },
+		{ goals = { { t = "accept", quest = 783, title = "A Threat Within", npc = 823, npcName = "Deputy Willem" } } },
+		{ goals = { { t = "accept", quest = 5261, title = "Eagan Peltskinner", npc = 823, npcName = "Deputy Willem" } } },
+	},
+})
+stub.login()
+stub.fire("QUEST_LOG_UPDATE"); stub.advance(0.6)
 local T, E = Polestar.Theme, Polestar.Engine
 local function draw()
 	Polestar.UI.GuideFrame.Layout()
 	if Polestar.UI.GuideFrame.Render then Polestar.UI.GuideFrame.Render() end
 	stub.advance(1)
+end
+local function accept(q, title)
+	stub.world.accept(q, {}, title)
+	stub.fire("QUEST_LOG_UPDATE"); stub.advance(0.6)
 end
 Polestar.Set("ui.shown", true)
 Polestar.Set("ui.skin", "atlas")
@@ -301,34 +323,47 @@ T.SetLayout("atlas")
 draw()
 local parts = T.GuideParts()
 local last = parts.last
+-- The rows shown, top to bottom: step, status, number, "skipped" said, a
+-- rail node beside it; and whether they stack oldest on top.
 local function state()
-	local text = last.Text:GetText() or ""
-	return { shown = last:IsShown() and true or false, index = last.psIndex or false, status = last.psStatus or false,
-		num = last:IsShown() and last.Num:GetText() or false, skipped = text:find("skipped", 1, true) ~= nil }
+	local rows, nodes = {}, {}
+	for _, region in ipairs({ parts.window:GetChildren() }) do
+		for _, t in ipairs({ region:GetRegions() }) do
+			local p = t.GetPoint and { t:GetPoint(1) }
+			if p and p[2] and t:IsShown() then nodes[p[2]] = true end
+		end
+	end
+	local n = last:IsShown() and (last.psCount or 0) or 0
+	local tops = {}
+	for i = 1, n do
+		local r = last.Rows[i]
+		local text = r.Text:GetText() or ""
+		rows[#rows + 1] = { index = r.psIndex, status = r.psStatus, num = r.Num:GetText(),
+			skipped = text:find("skipped", 1, true) ~= nil, node = nodes[r] or false }
+		local _, _, _, _, y = r:GetPoint(1)
+		tops[#tops + 1] = y
+	end
+	local stacked = true
+	for i = 2, #tops do if not (tops[i] < tops[i - 1]) then stacked = false end end
+	return { n = n, rows = rows, stacked = stacked }
 end
 local out = { first = state() }
-stub.world.accept(7, {}, "Kobold Camp Cleanup")
-stub.fire("QUEST_LOG_UPDATE"); stub.advance(0.6)
+accept(7, "Kobold Camp Cleanup")
 draw()
-out.done = state()
+out.atlas = state()
+Polestar.Set("guideWindow.lastSteps", 3)
+draw()
+out.two = state()
+accept(33, "Wolves Across the Border")
+E.Skip(); stub.advance(0.6)
+accept(783, "A Threat Within")
+draw()
 out.step = E.GetStepIndex()
--- The rail's node beside it, the line from it down.
-local node
-for _, region in ipairs({ parts.window:GetChildren() }) do
-	for _, t in ipairs({ region:GetRegions() }) do
-		local p = t.GetPoint and { t:GetPoint(1) }
-		if p and p[2] == last and t:IsShown() then node = true end
-	end
-end
-out.node = node or false
-E.Skip()
-stub.advance(0.6)
+out.three = state()
+Polestar.Set("guideWindow.lastSteps", 0)
 draw()
-out.skipped = state()
-Polestar.Set("guideWindow.lastStep", false)
-draw()
-out.off = state()
-Polestar.Set("guideWindow.lastStep", nil)
+out.zero = state()
+Polestar.Set("guideWindow.lastSteps", nil)
 draw()
 out.back = state()
 Polestar.Set("ui.compact", true)
@@ -342,16 +377,15 @@ out.failed = T.LayoutInfo("atlas").failed or false
 emit(out)`,
 	}).emitted;
 	assert.equal(out.failed, false, 'no hook failed');
-	assert.equal(out.first.shown, false, 'no last step at step 1');
-	assert.equal(out.step, 2);
-	assert.deepEqual(out.done, { shown: true, index: 1, status: 'done', num: '1', skipped: false }, 'step 1 done, above step 2');
-	assert.equal(out.node, true, 'a node on the rail beside it');
-	assert.equal(out.skipped.shown, true);
-	assert.equal(out.skipped.index, 2);
-	assert.equal(out.skipped.status, 'skipped', 'a skipped step shows as skipped');
-	assert.equal(out.skipped.skipped, true, 'its line says skipped');
-	assert.equal(out.off.shown, false, "the player's setting turns it off");
-	assert.equal(out.back.shown, true, "reset, Atlas's default shows it again");
-	assert.equal(out.compact.shown, false, 'compact mode leaves it out');
-	assert.equal(out.house.shown, false, "Polestar's own layout keeps it off by default");
+	assert.equal(out.first.n, 0, 'nothing before step 1');
+	assert.deepEqual(out.atlas.rows, [{ index: 1, status: 'done', num: '1', skipped: false, node: true }], "Atlas's 1: step 1 done, on a node");
+	assert.equal(out.two.n, 1, 'three asked at step 2: the one there is');
+	assert.equal(out.step, 5);
+	assert.deepEqual(out.three.rows.map((r) => [r.index, r.status, r.skipped, r.node]),
+		[[2, 'done', false, true], [3, 'skipped', true, true], [4, 'done', false, true]], 'three, the oldest on top, the skipped one in the middle');
+	assert.equal(out.three.stacked, true, 'each row under the one before');
+	assert.equal(out.zero.n, 0, '0 turns them off');
+	assert.deepEqual(out.back.rows.map((r) => r.index), [4], "reset: Atlas's 1, the newest");
+	assert.equal(out.compact.n, 0, 'compact mode leaves them out');
+	assert.equal(out.house.n, 0, "Polestar's own layout: 0 by default");
 });

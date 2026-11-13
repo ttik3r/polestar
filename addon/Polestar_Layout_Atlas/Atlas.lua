@@ -1245,9 +1245,9 @@ on("guideProgress", function(foot, frac)
 end)
 
 ---------------------------------------------------------------------------
--- The rail: a line down the window's left from the last step's node (a
--- disc in the success colour once done, hollow when skipped; the player's
--- guideWindow.lastStep, on by Atlas's default) through the current step's
+-- The rail: a line down the window's left from the steps before's nodes
+-- (each a disc in the success colour once done, hollow when skipped; the
+-- player's guideWindow.lastSteps, 1 by Atlas's default) through the current step's
 -- (a disc in the accent) to the steps in Up next (hollow nodes, fainter
 -- ahead).
 -- The card and Up next are set in from it (guideInset); each Up next row is
@@ -1401,7 +1401,7 @@ local function hideNode(n)
 	if n then n.ring:Hide(); n.disc:Hide(); n.hole:Hide() end
 end
 
--- The last step's node: a filled disc in the success colour once done; a
+-- A step before's node: a filled disc in the success colour once done; a
 -- skipped step's hollow, as a step not done.
 local function paintPast(n, status)
 	local br, bg, bb = Theme.Color("bg")
@@ -1420,27 +1420,38 @@ local function paintPast(n, status)
 	end
 end
 
--- The last step's line (parts.last, guideWindow.lastStep: Polestar fills
--- it, from the window's own step, and leaves it out in compact mode and on
--- a guide's first step): on the rail, its number, icon and text in Up
--- next's columns, its first goal in the goal's words, "skipped" after a
--- skipped step. Polestar places it again at every layout.
-local function lastLine(last, person)
-	local v = rawget(last, "psView")
-	if not (v and rawget(last, "Text") and rawget(last, "Num")) then return end
-	-- Up next's columns: the line stands out of the card by the card's
-	-- inset over Up next's.
+-- The steps before (parts.last, guideWindow.lastSteps: Polestar fills its
+-- Rows, oldest first, from the window's own step, and leaves them out in
+-- compact mode and where no step comes before): on the rail, each row's
+-- number, icon and text in Up next's columns, its first goal in the goal's
+-- words, "skipped" after a skipped step. Polestar places them again at
+-- every layout. -> the rows shown
+local function lastLines(last, person)
+	local rows = {}
+	local n = tonumber(rawget(last, "psCount")) or 0
+	local pool = rawget(last, "Rows")
+	if type(pool) ~= "table" then return rows end
+	for i = 1, n do
+		local r = pool[i]
+		if r and rawget(r, "psView") and rawget(r, "Text") and rawget(r, "Num") then rows[#rows + 1] = r end
+	end
+	if #rows == 0 then return rows end
+	-- Up next's columns: the rows stand out of the card by the card's inset
+	-- over Up next's.
 	last:ClearAllPoints()
 	last:SetPoint("BOTTOMLEFT", person, "TOPLEFT", -(CARD_X - UP_X), 0)
 	last:SetPoint("BOTTOMRIGHT", person, "TOPRIGHT", 0, 0)
-	local text = stepLine(v)
-	if rawget(last, "psStatus") == "skipped" then
-		text = text .. "  |c" .. Theme.Hex("textMuted") .. tr("skipped") .. "|r"
-	end
-	last.Text:SetText(text)
-	last.Text:SetTextColor(Theme.Color("textDim"))
 	local w = last:GetWidth()
-	if type(w) == "number" and w > 0 then last.Text:SetWidth(math.max(40, w - 59 - 14)) end
+	for _, r in ipairs(rows) do
+		local text = stepLine(r.psView)
+		if rawget(r, "psStatus") == "skipped" then
+			text = text .. "  |c" .. Theme.Hex("textMuted") .. tr("skipped") .. "|r"
+		end
+		r.Text:SetText(text)
+		r.Text:SetTextColor(Theme.Color("textDim"))
+		if type(w) == "number" and w > 0 then r.Text:SetWidth(math.max(40, w - 59 - 14)) end
+	end
+	return rows
 end
 
 -- The rail and its nodes, on a layer of Atlas's own over the window.
@@ -1461,15 +1472,19 @@ local function rail(parts)
 	end
 	layer:Show()
 	local last = parts.last
-	local pn = node(layer, "past", layer)
+	local past = (last and last:IsShown()) and lastLines(last, person) or {}
+	if not layer.pasts then layer.pasts = {} end
 	local top
-	if last and last:IsShown() then
-		lastLine(last, person)
-		paintPast(pn, rawget(last, "psStatus"))
-		placeNode(pn, last, "LEFT", RAIL - UP_X, 0)
-		top = pn.disc
-	else
-		hideNode(pn)
+	for i = 1, math.max(#past, #layer.pasts) do
+		local pn = node(layer.pasts, i, layer)
+		local r = past[i]
+		if r then
+			paintPast(pn, rawget(r, "psStatus"))
+			placeNode(pn, r, "LEFT", RAIL - UP_X, 0)
+			top = top or pn.disc
+		else
+			hideNode(pn)
+		end
 	end
 	local cn = node(layer, "cur", layer)
 	paintNode(cn, true, 1)
@@ -1704,7 +1719,7 @@ local function spec(hooks)
 			["guideWindow.progress"] = false,
 			["guideWindow.targetBar"] = false,
 			["guideWindow.reportButton"] = false,
-			["guideWindow.lastStep"] = true,
+			["guideWindow.lastSteps"] = 1,
 		},
 		-- Under another layout: Polestar's own parts get their look back; the
 		-- pieces Atlas made itself hide.
