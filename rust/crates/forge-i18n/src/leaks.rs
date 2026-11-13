@@ -676,9 +676,10 @@ fn packs_lua(root: &Path, locale: &str, scene: &Scene) -> Result<String, String>
 		return Ok(String::new());
 	}
 	// The settings window (Polestar_Options) loads on its first opening, the Skin API's checks
-	// (Polestar_SkinAPI) with the first skin another addon registers and the game's looks with Hearth
-	// (Polestar_Looks) the first time one is painted, as in the client.
-	let mut names: Vec<String> = ["Polestar_QuestDB", "Polestar_Codex", "Polestar_ItemDB", "Polestar_Options", "Polestar_SkinAPI", "Polestar_Looks"].iter().map(|x| x.to_string()).collect();
+	// (Polestar_SkinAPI) with the first skin another addon registers, the game's looks with Hearth
+	// (Polestar_Looks) the first time one is painted and the guide window's other tab styles
+	// (Polestar_TabStyles) the first time one is drawn, as in the client.
+	let mut names: Vec<String> = ["Polestar_QuestDB", "Polestar_Codex", "Polestar_ItemDB", "Polestar_Options", "Polestar_SkinAPI", "Polestar_Looks", "Polestar_TabStyles"].iter().map(|x| x.to_string()).collect();
 	// The walking map (Polestar_Nav) plans paths in the background, seconds of Lua each step: only the
 	// scenes about travel load it.
 	if scene.nav {

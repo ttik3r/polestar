@@ -3,8 +3,9 @@
 use std::path::Path;
 
 /// Always in the release: the addon, our guides, the walking router and maps, the settings window, the Skin
-/// API's checks and the game looks with Hearth (the last three loaded on demand; all committed).
-pub const RELEASE_ADDONS: [&str; 6] = ["Polestar", "Polestar_Guides", "Polestar_Nav", "Polestar_Options", "Polestar_SkinAPI", "Polestar_Looks"];
+/// API's checks, the game looks with Hearth and the guide window's other tab styles (the last four loaded on
+/// demand; all committed).
+pub const RELEASE_ADDONS: [&str; 7] = ["Polestar", "Polestar_Guides", "Polestar_Nav", "Polestar_Options", "Polestar_SkinAPI", "Polestar_Looks", "Polestar_TabStyles"];
 /// The Codex folder (Lookup, Dungeons and Rares read it): a release refuses to go without it.
 pub const CODEX: &str = "Polestar_Codex";
 /// The optional recorder, in a zip of its own.
@@ -46,7 +47,7 @@ fn has_toc(addons: &Path, name: &str) -> bool {
 /// Leffe's, loaded on demand by Polestar_Nav's router).
 pub const NAV_PARTS: [&str; 2] = ["Polestar_Nav_EK", "Polestar_Nav_Kalimdor"];
 
-/// The release's folders: the six always shipped, the walking maps' part addons when written, our guides'
+/// The release's folders: the seven always shipped, the walking maps' part addons when written, our guides'
 /// faction parts and race parts once built, Polestar's own extra packs once built (Polestar_Experimental:
 /// loaded on demand, once a player switches it on), the data addons that are built (our guides' texts are in
 /// the language folders), then the skin addons.
@@ -203,6 +204,7 @@ mod tests {
 				"Polestar_Options",
 				"Polestar_SkinAPI",
 				"Polestar_Looks",
+				"Polestar_TabStyles",
 				"Polestar_Guides_Alliance",
 				"Polestar_Guides_Horde",
 				"Polestar_Guides_Orc",

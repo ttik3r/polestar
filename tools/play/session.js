@@ -283,9 +283,11 @@ C_Map.GetMapArtID = function(id) local m = ART[id]; return m and m.artID end`);
 		// Polestar's own load-on-demand addons, where the addon has them, load from their TOC when Polestar
 		// asks (C_AddOns.LoadAddOn), as in the client and forge-addontest's run.rs: the settings window
 		// (Polestar_Options, UI/OptionsLoader.lua), the Skin API's checks (Polestar_SkinAPI, with the first
-		// skin or scheme another addon registers) and the game looks with Hearth (Polestar_Looks,
-		// Theme.LoadLooks, the first time one is painted). Without them a game look draws as Polestar's own.
-		for (const part of ['Polestar_Options', 'Polestar_SkinAPI', 'Polestar_Looks']) {
+		// skin or scheme another addon registers), the game looks with Hearth (Polestar_Looks,
+		// Theme.LoadLooks, the first time one is painted) and the guide window's other tab styles
+		// (Polestar_TabStyles, the first time one is drawn). Without them a game look draws as Polestar's
+		// own and the tabs stay above the step bar.
+		for (const part of ['Polestar_Options', 'Polestar_SkinAPI', 'Polestar_Looks', 'Polestar_TabStyles']) {
 			if (fs.existsSync(path.join(ADDONS, part, `${part}.toc`))) lines.push(`stub.packs.${part} = stub.packs.${part} or { ${tocFiles(part).map(luaString).join(', ')} }`);
 		}
 		// The layouts and skins in addon/ are installed, as in the client: each shows in the AddOns list

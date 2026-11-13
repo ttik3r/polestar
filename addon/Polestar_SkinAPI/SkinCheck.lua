@@ -622,7 +622,8 @@ end
 
 -- A layout's defaults for the guide window's settings: { ["guideWindow.tabs"]
 -- = false, ... }, each a guideWindow.* setting Polestar has, with a value of
--- the type of Polestar's default (false: false, a colour for a *Color
+-- the type of Polestar's default (a string for a string setting such as
+-- guideWindow.tabStyle; for a false default: false, a colour for a *Color
 -- setting, true for a switch off by default, a number otherwise). -> true,
 -- the defaults copied | false, why
 local function readLayoutDefaults(t)

@@ -1161,7 +1161,11 @@ assert(Theme.RegisterSkin("ref-hooks", {
 
 `Theme.GuideParts()` hands over the guide window's frames, to place things
 by and to restyle (capability `guideParts`): `window`, `strip` (the tabs),
-`nav` (the step bar), `body`, `card` (the step), `last` (the steps before this one over the header, as many as
+`tabSwitch` (the Title menu tab style's switcher), `tabEdge` (the On the top
+edge style's tabs), `tabSide` (the Down the left side style's tabs),
+`windowClose` (Polestar's own window ×, right of "…"; each of these four is
+nil until its style is first drawn, and is in the parts from that layout's
+`guideLayout` on), `nav` (the step bar), `body`, `card` (the step), `last` (the steps before this one over the header, as many as
 `guideWindow.lastSteps` asks, 0 to 5, and never more than come before:
 `psCount` the rows shown, `Rows` the rows, pooled, the oldest first, each
 with `psIndex` the step, `psStatus` `"done"`, `"skipped"` or the step's
@@ -1189,7 +1193,7 @@ your pieces in that window's store, as Aurora does: a hook that reaches for
 | `guideRender` | `function(view, parts)` | after every render of the window | `view`: the step on screen (`index`, `title`, `note`, `status`, `goals`: the goals below), or nil when the window shows no step (no guide open, a guide finished). `parts`: the window's, as for `guideLayout`. |
 | `guideProgress` | `function(foot, frac)` | after the progress is painted (every render) | `foot`: the progress part (its bar is `GuideParts().line`). `frac`: how much of the guide is done, 0-1. |
 | `guideAnchor` | `function()` -> frame | each time the heads-up card is placed on the window's edge | Answer a frame of yours (your own cards above the window) and the heads-up card sits on its edge instead of the window's; nil keeps the window's. Not asked while the player gives the card a spot of its own. |
-| `guideTab` | `function(button, parts, active)` | after Polestar painted a tab of the strip, at every render of the strip and repaint | `button`: the tab. `parts`: `selected` (the active tab's wash), `bar` (its line), `label`, `range` (the guide's levels), `icon`, `close`. `active`: whether it is the tab in view. |
+| `guideTab` | `function(button, parts, active)` | after Polestar painted a tab of the strip, at every render of the strip and repaint | `button`: the tab. `parts`: `selected` (the active tab's wash), `bar` (its line), `label`, `range` (the guide's levels), `icon`, `close`. The On the top edge and Down the left side styles' icon tabs run it too, with `selected`, `bar`, `icon` and `style` (`"edge"` or `"strip"`). `active`: whether it is the tab in view. |
 | `guidePlace` | `function(name, frame, width, height)` -> true | at every layout, for each part about to be placed, laid out and shown | `name`: `"tip"` (the step's tip, in the card), `"banner"`, `"here"` (While you're here), `"after"` ("Then:"), `"along"`, `"upnext"`, `"party"`, `"xp"`. `frame`: that part; `width`: the window's; `height`: the part's. Answer `true` and the window leaves the part out, its height too: place it yourself (`SetParent`, `SetPoint`), on a card of yours above the window for example. Answer anything else and the window places it; a part you moved under a frame of yours goes back under its own then. |
 | `guideMenu` | `function(items, button)` | each time the window's menu opens (the list is made anew every time) | `items`: the entries, `{ text, icon?, checked?, disabled?, onClick?, tip? }` or `{ separator = true }` (`icon` a glyph name); add, remove or reorder them. `button`: the menu button. |
 | `guideTakes` | `function(goal)` -> true | at every render, for each goal of the step about to be listed as a row | `goal`: the goal (the fields below). Answer `true` and the window leaves it out of its rows: show it on a card of yours (an optional goal, for example). Anything else keeps it. Only the rows change: the step, its progress and the arrow still count the goal. |

@@ -1,0 +1,11 @@
+---
+section: players
+---
+- Guide window: the tabs come in four styles, picked with Tab style next to
+  the Tabs switch in Options: Above the step bar (as before), Title menu (the
+  guide's name opens a list of your open guides), On the top edge (icon tabs
+  over the window) and Down the left side. Each keeps selecting, the
+  right-click menu, middle-click to close, "+", Reopen and the six-tab limit.
+  The window's × sits right of "…" past a thin line, or is a tab of its own
+  on the top edge. The three new styles come in their own folder,
+  Polestar_TabStyles, loaded the first time you pick one.

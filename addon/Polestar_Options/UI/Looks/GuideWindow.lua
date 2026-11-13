@@ -50,7 +50,7 @@ local PREVIEW_H = 250 -- the drawing's height until its band lays it out
 -- part as the window names it (GF.Placed).
 local PART_OF = {}
 for part, keys in pairs({
-	bars = { "tabs", "tabHeight", "navHeight", "barTextSize", "stepCount", "guideTitle", "skipButton", "reportButton" },
+	bars = { "tabs", "tabStyle", "tabHeight", "navHeight", "barTextSize", "stepCount", "guideTitle", "skipButton", "reportButton" },
 	person = { "titleSize", "glyphSize", "lastSteps" },
 	goals = { "goalSize", "detailSize", "rowSpacing", "lineSpacing", "checkSize", "targetBar", "targetBarWidth", "targetBarColor" },
 	tip = { "noteSize" },
@@ -198,9 +198,11 @@ function UI.GuideWindowScene(band)
 		if not self.psDrawn then return end
 		local F = G.frame
 		local w, y = F:GetWidth(), F:GetHeight()
+		-- Tabs drawn outside the window (guideWindow.tabStyle "edge", "strip") keep their room in the box.
+		local ol, ot = G.TabsOutside()
 		local s = (tonumber(ns.Get("ui.scale")) or 1) * band:TrueScale()
-		local k = s * min(1, (width - 32) / (w * s))
-		local room = (self.psHeight - 8) / k
+		local k = s * min(1, (width - 32) / ((w + ol) * s))
+		local room = (self.psHeight - 8) / k - ot
 		local placed = G.Placed()
 		local at, rowsFoot = {}, 0
 		for _, p in ipairs(placed) do
@@ -218,7 +220,7 @@ function UI.GuideWindowScene(band)
 		local snap = ns.UI.Preview.Snap
 		F:SetScale(k)
 		F:ClearAllPoints()
-		F:SetPoint("TOPLEFT", self, "TOPLEFT", snap(F, (width / k - w) / 2), snap(F, scroll - drop))
+		F:SetPoint("TOPLEFT", self, "TOPLEFT", snap(F, (width / k - w - ol) / 2 + ol), snap(F, scroll - drop - ot))
 		self.psScale, self.psScroll = k, scroll
 		local seen = scroll + self.psHeight / k
 		for _, p in ipairs(placed) do
@@ -291,6 +293,9 @@ function UI.GuideWindowScene(band)
 		local spacing = { P.tip.Text }
 		for _, t in ipairs(texts) do spacing[#spacing + 1] = t end
 		for _, s in ipairs(subs) do spacing[#spacing + 1] = s end
+		-- The tab styles' frames the copy has made so far (each on its style's first use).
+		local styled = { P.strip }
+		for _, k in ipairs({ "tabSwitch", "tabEdge", "tabSide" }) do styled[#styled + 1] = P[k] end
 		for key, parts in pairs({
 			["ui.style"] = window, ["ui.backing"] = window, ["guideWindow.veil"] = window, ["guideWindow.shade"] = window,
 			["guideWindow.outline"] = window, ["ui.barShown"] = { P.strip, nav }, ["ui.scale"] = window, ["ui.width"] = window,
@@ -301,7 +306,8 @@ function UI.GuideWindowScene(band)
 			["ui.barsBottom"] = { P.strip, nav }, ["guideWindow.stepAnim"] = moving, ["guideWindow.animSpeed"] = moving,
 			-- A goal done shuts into the done line.
 			["guideWindow.foldAnim"] = { G.lines[1] or person },
-			["guideWindow.tabs"] = { P.strip }, ["guideWindow.tabHeight"] = { P.strip }, ["guideWindow.navHeight"] = { nav },
+			["guideWindow.tabs"] = { P.strip }, ["guideWindow.tabStyle"] = styled,
+			["guideWindow.tabHeight"] = { P.strip }, ["guideWindow.navHeight"] = { nav },
 			["guideWindow.barTextSize"] = bars, ["guideWindow.stepCount"] = { nav.Steps }, ["guideWindow.guideTitle"] = { nav.Title },
 			["guideWindow.skipButton"] = { nav.Skip }, ["guideWindow.reportButton"] = { nav.Report },
 			["guideWindow.titleSize"] = { person.Name }, ["guideWindow.lastSteps"] = { person }, ["guideWindow.goalSize"] = texts, ["guideWindow.detailSize"] = details,
@@ -367,7 +373,8 @@ local function buildPreview(view)
 		local s = (tonumber(ns.Get("ui.scale")) or 1) * self:TrueScale()
 		-- Drawn first: its natural size at its own scale.
 		G:Draw()
-		local winW, winH = G.Window:GetWidth() * s, G.Window:GetHeight() * s
+		local ol, ot = G.Copy.TabsOutside()
+		local winW, winH = (G.Window:GetWidth() + ol) * s, (G.Window:GetHeight() + ot) * s
 		local room = self.psRoom and max(60, self.psRoom - 2 * P.BAND_PAD - P.LINE_GAP - P.LINE_H) or winH + 8
 		-- Whole: its height and the 8 its crop keeps under it; else the room, cut.
 		local h = min(winH + 8, room)
@@ -519,6 +526,15 @@ local SPECS = {
 				{ kind = "toggle", key = "guideWindow.tabs", label = L["Tabs"], new = NEW,
 					help = L["The tabs of the open guides above the step bar. Off: the step bar names the guide, and the guide menu switches guides."],
 					search = "tabs, tab bar, header, strip, hide tabs, guides" },
+			} },
+		{ kind = "dropdown", key = "guideWindow.tabStyle", label = L["Tab style"], new = "0.4.0", disabled = offKey("tabs"),
+			help = L["How the tabs of the open guides show: a strip above the step bar, a menu on the guide's title, small tabs on the window's top edge, or a column down its left side."],
+			search = "tab style, tabs, switcher, dropdown, edge tabs, side strip, vertical tabs, title menu",
+			choices = {
+				{ value = "underline", label = L["Above the step bar"] },
+				{ value = "switcher", label = L["Title menu"] },
+				{ value = "edge", label = L["On the top edge"] },
+				{ value = "strip", label = L["Down the left side"] },
 			} },
 		{ kind = "slider", key = "guideWindow.navHeight", label = L["Step bar height"], min = 0.7, max = 1.6, step = 0.05, format = percent, new = NEW,
 			help = L["How tall the bar with the step number, Skip and the menu is."], search = "bar height, header, navigator, taller, shorter, size, step bar height" },

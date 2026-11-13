@@ -1739,7 +1739,8 @@ local function spec(hooks)
 		-- The J2 look's starting point. The player's own choices win; a
 		-- reset returns to these.
 		defaults = {
-			["guideWindow.tabs"] = false,
+			["guideWindow.tabs"] = true,
+			["guideWindow.tabStyle"] = "switcher",
 			["guideWindow.progress"] = false,
 			["guideWindow.targetBar"] = false,
 			["guideWindow.reportButton"] = false,
