@@ -170,3 +170,43 @@ emit(out)`,
 	assert.equal(out.back, false, "Polestar's own layout again");
 	assert.deepEqual(out.rule, [false, true], 'the header has no rule under Atlas, its rule back after');
 });
+
+// The layout's hooks, captured from a stand-in RegisterLayout, with the
+// window on screen: `h` the hooks, `parts` the window's parts.
+const HOOKS = `${GUIDE}
+local T = Polestar.Theme
+local spec
+local register = T.RegisterLayout
+T.RegisterLayout = function(id, s) spec = s; return true end
+assert(loadfile(${luaPath(LAYOUT)}))("Polestar_Layout_Atlas", {})
+T.RegisterLayout = register
+Polestar.Set("ui.skin", "atlas")
+Polestar.Set("ui.shown", true)
+Polestar.UI.GuideFrame.Layout()
+stub.advance(1)
+local h, parts = spec.hooks, T.GuideParts()`;
+
+const hooks = (script) => runAddon({ stubs: ['stub_world.lua'], addons: ['Polestar', 'Polestar_Skin_Atlas'], script: `${HOOKS}\n${script}` }).emitted[0];
+
+test('an area goal loses its spots line, and on the rail its next-spot button', () => {
+	const out = hooks(`
+local row = parts.rows[1]
+local goal = { index = 1, t = "kill", text = "Kill Rockjaw Trogg", subject = "Rockjaw Trogg", spots = 12, spread = true, status = "active", quest = 7 }
+local area = Polestar.UI.AreaLine(goal)
+row.Sub:SetText("Ask the guard first\\n" .. area)
+row.Sub:Show()
+row.Alt:Show()
+h.guideRow(row, goal, { current = true })
+local railSub, railAlt = row.Sub:GetText(), row.Alt:IsShown()
+Polestar.Set("ui.compact", true)
+row.Sub:SetText(area)
+row.Sub:Show()
+row.Alt:Show()
+h.guideRow(row, goal, { current = true })
+emit({ area = area ~= nil, sub = railSub, rail = railAlt, compactAlt = row.Alt:IsShown(), compactSub = row.Sub:IsShown() and row.Sub:GetText() or false })`);
+	assert.equal(out.area, true);
+	assert.ok(!/spots/.test(out.sub) && /Ask the guard first/.test(out.sub), `sub: ${out.sub}`);
+	assert.equal(out.rail, false, 'the next-spot button is off on the rail');
+	assert.equal(out.compactAlt, true, 'compact mode keeps it');
+	assert.ok(!/spots/.test(String(out.compactSub)), `compact sub: ${out.compactSub}`);
+});

@@ -75,6 +75,9 @@ function Core.questLevel(quest)
 	local lvl = quest and Lv and Lv.QuestLevel and Lv.QuestLevel(quest, E and E.GetGuide and E.GetGuide() or nil)
 	if type(lvl) == "number" and lvl > 0 then return lvl end
 end
+-- An area objective's spots line (UI.AreaLine: "Rockjaw Troggs all over
+-- this area: 12 spots"), the line Polestar puts under such a goal.
+function Core.areaLine(goal) local u = ui(); return u and u.AreaLine and u.AreaLine(goal) or nil end
 function Core.distanceText(yards) return P.FormatDistance and P.FormatDistance(yards, { round = 5 }) or nil end
 
 -- The arrow: what it points at, how far, and pointing it at a goal.
@@ -958,11 +961,48 @@ local function rowBack(row)
 		row.Check:Enable()
 	end
 end
-onLeave(function(parts) for _, row in ipairs(parts.rows or {}) do rowBack(row) end end)
+onLeave(function(parts)
+	for _, row in ipairs(parts.rows or {}) do
+		rowBack(row)
+		local own = stores[row]
+		if own and own._alt then
+			own._alt = nil
+			if row.Alt then row.Alt:Show() end
+		end
+	end
+end)
+
+-- Sub-text `sub` without its line `line` (both as shown, colours aside):
+-- nil when nothing is left.
+local function dropLine(sub, line)
+	local want, out = plainText(line), {}
+	for l in (sub .. "\n"):gmatch("(.-)\n") do
+		if plainText(l) ~= want then out[#out + 1] = l end
+	end
+	return #out > 0 and table.concat(out, "\n") or nil
+end
+
+-- The goal's spots line goes (the arrow leads through the spots); on the
+-- rail the next-spot button goes too (a click on the arrow moves on).
+local function spotsOff(row, goal, own)
+	local area = Core.areaLine(goal)
+	local sub = area and row.Sub and row.Sub:IsShown() and row.Sub:GetText() or nil
+	if sub then
+		local left = dropLine(sub, area)
+		row.Sub:SetText(left or "")
+		row.Sub:SetShown(left ~= nil)
+	end
+	own._alt = nil
+	if row.Alt and row.Alt:IsShown() and not compact() and has("guideInset") then
+		row.Alt:Hide()
+		own._alt = true
+	end
+end
 
 local function goalRow(row, goal, info)
 	local own = store(row)
 	rowBack(row)
+	spotsOff(row, goal, own)
 	local text = row.Text:GetText() or ""
 	local live = info.current and not info.done and not info.skipped
 	own._single = true
