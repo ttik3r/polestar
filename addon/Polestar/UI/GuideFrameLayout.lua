@@ -66,6 +66,22 @@ ns.UI.GuideFrame.Part(function(GF)
 			sec:SetPoint("TOPLEFT", card, "TOPLEFT", PAD, -(y + 8))
 			y = y + 8 + sec:GetStringHeight()
 		end
+		-- The last step's line (guideWindow.lastStep), one line over the header.
+		local last = card.Last
+		if last:IsShown() then
+			last:ClearAllPoints()
+			last:SetPoint("TOPLEFT", card, "TOPLEFT", 0, -y)
+			last:SetPoint("TOPRIGHT", card, "TOPRIGHT", 0, -y)
+			last:SetHeight(UP_ROW)
+			last.Num:ClearAllPoints()
+			last.Num:SetPoint("LEFT", last, "TOPLEFT", PAD - 10, -UP_ROW / 2)
+			last.Icon:ClearAllPoints()
+			last.Icon:SetPoint("LEFT", last, "TOPLEFT", TEXT_X - 2, -UP_ROW / 2)
+			last.Text:ClearAllPoints()
+			last.Text:SetPoint("LEFT", last, "TOPLEFT", TEXT_X - 2 + 13 + 9, -UP_ROW / 2)
+			last.Text:SetWidth(max(40, width - TEXT_X - 14 - PAD))
+			y = y + UP_ROW
+		end
 		if person:IsShown() then
 			local nameW = cw - ICON - 10
 			person.Name:SetWidth(nameW)

@@ -279,3 +279,79 @@ emit({ rows = #rows, text = math.floor(r.Text:GetWidth() + 0.5) })`);
 	assert.ok(out.rows > 0, 'Up next has rows');
 	assert.ok(out.text > 200, `the text is ${out.text} wide`);
 });
+
+// The last step's line (guideWindow.lastStep, Polestar's part `last`): on by
+// Atlas's default, on the rail with a node of its own, done or skipped; the
+// player's setting turns it off; none on a guide's first step or in compact
+// mode.
+test('the last step shows on the rail: done or skipped, off by the setting, none at step 1 or in compact mode', () => {
+	const [out] = runAddon({
+		stubs: ['stub_world.lua'],
+		addons: ['Polestar', 'Polestar_Skin_Atlas', 'Polestar_Layout_Atlas'],
+		script: `${GUIDE}
+local T, E = Polestar.Theme, Polestar.Engine
+local function draw()
+	Polestar.UI.GuideFrame.Layout()
+	if Polestar.UI.GuideFrame.Render then Polestar.UI.GuideFrame.Render() end
+	stub.advance(1)
+end
+Polestar.Set("ui.shown", true)
+Polestar.Set("ui.skin", "atlas")
+T.SetLayout("atlas")
+draw()
+local parts = T.GuideParts()
+local last = parts.last
+local function state()
+	local text = last.Text:GetText() or ""
+	return { shown = last:IsShown() and true or false, index = last.psIndex or false, status = last.psStatus or false,
+		num = last:IsShown() and last.Num:GetText() or false, skipped = text:find("skipped", 1, true) ~= nil }
+end
+local out = { first = state() }
+stub.world.accept(7, {}, "Kobold Camp Cleanup")
+stub.fire("QUEST_LOG_UPDATE"); stub.advance(0.6)
+draw()
+out.done = state()
+out.step = E.GetStepIndex()
+-- The rail's node beside it, the line from it down.
+local node
+for _, region in ipairs({ parts.window:GetChildren() }) do
+	for _, t in ipairs({ region:GetRegions() }) do
+		local p = t.GetPoint and { t:GetPoint(1) }
+		if p and p[2] == last and t:IsShown() then node = true end
+	end
+end
+out.node = node or false
+E.Skip()
+stub.advance(0.6)
+draw()
+out.skipped = state()
+Polestar.Set("guideWindow.lastStep", false)
+draw()
+out.off = state()
+Polestar.Set("guideWindow.lastStep", nil)
+draw()
+out.back = state()
+Polestar.Set("ui.compact", true)
+draw()
+out.compact = state()
+Polestar.Set("ui.compact", false)
+T.SetLayout()
+draw()
+out.house = state()
+out.failed = T.LayoutInfo("atlas").failed or false
+emit(out)`,
+	}).emitted;
+	assert.equal(out.failed, false, 'no hook failed');
+	assert.equal(out.first.shown, false, 'no last step at step 1');
+	assert.equal(out.step, 2);
+	assert.deepEqual(out.done, { shown: true, index: 1, status: 'done', num: '1', skipped: false }, 'step 1 done, above step 2');
+	assert.equal(out.node, true, 'a node on the rail beside it');
+	assert.equal(out.skipped.shown, true);
+	assert.equal(out.skipped.index, 2);
+	assert.equal(out.skipped.status, 'skipped', 'a skipped step shows as skipped');
+	assert.equal(out.skipped.skipped, true, 'its line says skipped');
+	assert.equal(out.off.shown, false, "the player's setting turns it off");
+	assert.equal(out.back.shown, true, "reset, Atlas's default shows it again");
+	assert.equal(out.compact.shown, false, 'compact mode leaves it out');
+	assert.equal(out.house.shown, false, "Polestar's own layout keeps it off by default");
+});

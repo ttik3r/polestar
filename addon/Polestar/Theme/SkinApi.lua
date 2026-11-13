@@ -341,7 +341,7 @@ end
 
 -- The guide window's parts for a skin's hooks and its own frames (Skin API 2,
 -- capability "guideParts"): window, strip (tabs), nav (the step bar), body,
--- card (the step), person (its header), goals (the scroll of goal rows), rows
+-- card (the step), last (the last step's line), person (its header), goals (the scroll of goal rows), rows
 -- (the goal rows, pooled), tip, after ("Then:"), along, upnext, empty, banner,
 -- foot (the progress), here (While you're here). Frames to place things by
 -- and to restyle; nil before the window is built. One table, made once. The

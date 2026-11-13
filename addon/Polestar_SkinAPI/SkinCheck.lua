@@ -618,7 +618,8 @@ end
 -- A layout's defaults for the guide window's settings: { ["guideWindow.tabs"]
 -- = false, ... }, each a guideWindow.* setting Polestar has, with a value of
 -- the type of Polestar's default (false: false, a colour for a *Color
--- setting, a number otherwise). -> true, the defaults copied | false, why
+-- setting, true for a switch off by default, a number otherwise). -> true,
+-- the defaults copied | false, why
 local function readLayoutDefaults(t)
 	if t == nil then return true, nil end
 	if type(t) ~= "table" then return false, "defaults must be a table of setting = value" end
@@ -637,10 +638,12 @@ local function readLayoutDefaults(t)
 				local c = specColor(v)
 				if not c then return false, format("defaults[%q] must be false or a colour", path) end
 				out[path] = c
+			elseif v == true then
+				out[path] = true
 			elseif type(v) == "number" and v == v and v ~= math.huge and v ~= -math.huge then
 				out[path] = v
 			else
-				return false, format("defaults[%q] must be false or a number", path)
+				return false, format("defaults[%q] must be false, true or a number", path)
 			end
 		elseif type(v) ~= type(d) or (type(v) == "number" and (v ~= v or v == math.huge or v == -math.huge)) then
 			return false, format("defaults[%q] must be a %s, like Polestar's default", path, type(d))
