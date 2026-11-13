@@ -137,7 +137,11 @@ function Core.tipPages(tip)
 	local list = tip and tip.psTips
 	return type(list) == "table" and #list > 1 and list or nil
 end
-function Core.tipOpen(tip) return tip and tip.psOpen and true or false end
+function Core.tipOpen(tip)
+	local G = frame()
+	if G and G.TipOpen then return G.TipOpen() and true or false end
+	return tip and tip.psOpen and true or false
+end
 
 ---------------------------------------------------------------------------
 -- Atlas's own pieces on a frame: one table per frame, hidden all at once
@@ -1294,6 +1298,82 @@ local function rail(parts)
 	layer.line:SetShown(bottom ~= cn.disc)
 end
 on("guideLayout", function(parts) if parts.window then rail(parts) end end)
+
+---------------------------------------------------------------------------
+-- The tip: a faint line over it and an "i" for its toggle, its text on one
+-- line until opened. A step with more than one tip gets a pager on the
+-- right ("1/2 ›"), where Polestar hands the tips over (Core.tipPages).
+---------------------------------------------------------------------------
+
+local tipPage = setmetatable({}, { __mode = "k" }) -- tip -> { list, at }
+
+local function pager(tip)
+	local own = store(tip)
+	local pages = Core.tipPages(tip)
+	-- Polestar's own pager, where it has one, stays.
+	if not pages or rawget(tip, "Pager") then
+		if own.pager then own.pager:Hide() end
+		tipPage[tip] = nil
+		return
+	end
+	local state = tipPage[tip]
+	if not state or state.list ~= pages then
+		state = { list = pages, at = 1 }
+		tipPage[tip] = state
+	end
+	if not own.pager then
+		local b = CreateFrame("Button", nil, tip)
+		b:SetSize(36, 16)
+		b.Label = b:CreateFontString(nil, "OVERLAY")
+		b.Label:SetPoint("RIGHT", b, "RIGHT", 0, 0)
+		b.Label:SetJustifyH("RIGHT")
+		b:SetScript("OnClick", function()
+			local s = tipPage[tip]
+			if not s then return end
+			s.at = s.at % #s.list + 1
+			tip.Text:SetText(s.list[s.at])
+			Core.relayout()
+		end)
+		b:SetScript("OnEnter", function(self) self.Label:SetTextColor(Theme.Color("text")) end)
+		b:SetScript("OnLeave", function(self) self.Label:SetTextColor(Theme.Color("textMuted")) end)
+		own.pager = b
+	end
+	local b = own.pager
+	Theme.Font(b.Label, "small")
+	b.Label:SetTextColor(Theme.Color("textMuted"))
+	b.Label:SetText(state.at .. "/" .. #pages .. " \226\128\186")
+	b:ClearAllPoints()
+	b:SetPoint("TOPRIGHT", tip, "TOPRIGHT", -12, -4)
+	b:Show()
+end
+
+local function tipLook(tip, on)
+	local own = store(tip)
+	if not own.rule then
+		own.rule = tip:CreateTexture(nil, "ARTWORK")
+		own.rule:SetTexture(Theme.Media("white"))
+	end
+	own.rule:SetShown(on)
+	local icon = tip.Toggle and tip.Toggle.Icon
+	if not on then
+		if own.pager then own.pager:Hide() end
+		if icon then icon:SetTexture(Theme.Media(Core.tipOpen(tip) and "chevron-up" or "chevron-down")) end
+		return
+	end
+	if icon then icon:SetTexture(Theme.Media(Theme.Icon and Theme.Icon("info") or "info")) end
+	own.rule:ClearAllPoints()
+	own.rule:SetPoint("TOPLEFT", tip, "TOPLEFT", 11, 0)
+	own.rule:SetPoint("TOPRIGHT", tip, "TOPRIGHT", -12, 0)
+	own.rule:SetHeight(pixel(tip))
+	local r, g, b = Theme.Color("textMuted")
+	own.rule:SetVertexColor(r, g, b, 0.35)
+	pager(tip)
+end
+onLeave(function(parts) if parts.tip then tipLook(parts.tip, false) end end)
+
+on("guidePlace", function(name, part)
+	if name == "tip" then tipLook(part, true) end
+end)
 
 ---------------------------------------------------------------------------
 -- Registration
