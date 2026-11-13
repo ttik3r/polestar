@@ -230,6 +230,12 @@ check("skin moonlit", Theme.RegisterSkin("moonlit", {
 			items[#items + 1] = { separator = true }
 			items[#items + 1] = { text = "Moonlit", icon = "star", disabled = true }
 		end,
+		-- A goal of the step about to be listed as a row: true takes it out
+		-- of the window's rows for the skin to show (an optional goal on a
+		-- card of its own). Moonlit lists every goal in the window.
+		guideTakes = function(goal)
+			return false
+		end,
 		-- The cards on the guide window: "headsup" (a class quest or dungeon
 		-- heads-up) and "classcard" (the class quest card in the window);
 		-- parts: titles, bodies (the strings Polestar sizes), accents.

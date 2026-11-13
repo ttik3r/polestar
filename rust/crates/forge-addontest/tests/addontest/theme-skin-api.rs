@@ -392,7 +392,7 @@ fn api_version_and_capabilities_say_what_this_polestar_offers() {
 		for _, c in ipairs({ "skins", "schemes", "surfaces.window", "surfaces.toast", "surfaces.arrow", "surfaces.pin", "fonts", "preset",
 			"lightSchemes", "surfaces.guideTitle", "variants", "resolve", "shadow", "artTint", "media.dart", "guideParts",
 			"surfaces.card", "surfaces.actionButton", "surfaces.guideRow", "surfaces.guideLayout", "surfaces.guideRender",
-			"surfaces.guideProgress", "surfaces.guideAnchor", "media.pins", "arrow.parts", "pin.parts", "tokens.accent2", "tokens.glow",
+			"surfaces.guideProgress", "surfaces.guideAnchor", "surfaces.guideTakes", "media.pins", "arrow.parts", "pin.parts", "tokens.accent2", "tokens.glow",
 			"tokens.pins", "skins.installed", "theme.functions", "kit.color", "kit.glow", "kit.tintArt" }) do
 			if not T.HasCapability(c) then caps[#caps + 1] = c end
 		end
@@ -404,7 +404,7 @@ fn api_version_and_capabilities_say_what_this_polestar_offers() {
 	assert!(out["n"].as_u64().unwrap() >= 40);
 	assert_eq!(
 		out["surfaces"]["hooks"],
-		json!(["actionButton", "arrow", "card", "guideAnchor", "guideLayout", "guideMenu", "guidePlace", "guideProgress", "guideRender", "guideRow", "guideTab", "guideTitle", "pin", "toast"])
+		json!(["actionButton", "arrow", "card", "guideAnchor", "guideLayout", "guideMenu", "guidePlace", "guideProgress", "guideRender", "guideRow", "guideTab", "guideTakes", "guideTitle", "pin", "toast"])
 	);
 	assert_eq!(out["surfaces"]["paint"], json!(["button", "checkbox", "close", "dropdown", "editbox", "guide", "inset", "panel", "scrollbar", "sidebar", "tab", "tile", "toast", "window"]));
 }
@@ -1190,6 +1190,49 @@ fn a_part_a_skin_places_itself_leaves_the_guide_window_s_height_and_comes_back_w
 	assert_eq!(out["noTip"]["parent"], true);
 	assert_eq!(out["back"], json!({ "h": out["house"].clone(), "after": true, "tip": true }), "claimed no more: back under its own frame, the window its height again");
 	assert_eq!(out["off"], out["house"], "Polestar's own look: the house layout");
+}
+
+// Skin API 2's guideTakes: each goal of the step about to be listed is offered to the skin; one it takes (its answer
+// true) leaves the window's rows for a card of the skin's own, the other goals stay. Taken no more (Polestar's own
+// look), the goal is a row again.
+#[test]
+fn a_goal_a_skin_takes_leaves_the_guide_window_s_rows_and_comes_back_without_the_skin() {
+	let out = run_ui(
+		r##"
+		local T = Polestar.Theme
+		local offered = {}
+		local ok, why = T.RegisterSkin("taker", { name = "Taker", addon = "Test_Taker", base = "polestar",
+			hooks = {
+				guideTakes = function(goal)
+					offered[goal.t] = true
+					return goal.t == "collect"
+				end,
+			} })
+		uistub.openTabs(TABS, 1)
+		local function rows()
+			local kinds = {}
+			for _, r in ipairs(GF.rows) do
+				if r:IsShown() and r.psGoal then kinds[#kinds + 1] = r.psGoal.t end
+			end
+			table.sort(kinds)
+			return table.concat(kinds, ",")
+		end
+		local house = rows()
+		Polestar.Set("ui.skin", "taker")
+		GF.Render()
+		local taken = rows()
+		Polestar.Set("ui.skin", "polestar")
+		GF.Render()
+		emit({ ok = ok, why = why or false, house = house, taken = taken, back = rows(), kill = offered.kill or false,
+			collect = offered.collect or false, cap = T.HasCapability("surfaces.guideTakes") })"##,
+	);
+	assert_eq!(out["ok"], true, "registered: {}", out["why"]);
+	assert_eq!(out["cap"], true, "the capability says the hook is there");
+	assert!(out["house"].as_str().unwrap_or("").contains("collect"), "the house lists the collect goal: {out}");
+	assert_eq!((out["kill"].clone(), out["collect"].clone()), (json!(true), json!(true)), "each goal is offered: {out}");
+	assert!(!out["taken"].as_str().unwrap_or("").contains("collect"), "the taken goal leaves the rows: {out}");
+	assert!(out["taken"].as_str().unwrap_or("").contains("kill"), "the other goals stay: {out}");
+	assert_eq!(out["back"], out["house"], "without the skin, the goal is a row again");
 }
 
 // The settings window's Theme page with its picker's cards as a player gets them: the arrow (Nav, with Maps) for

@@ -1830,13 +1830,17 @@ end
 -- The goals a group shows as rows, as painted (UI.ReadingGoal): never one
 -- that does not apply or is folded into another (a quest started by an item
 -- is one row); a "Go to" naming the step's own place (`header`) only when
--- nothing else shows, since the header already says it.
+-- nothing else shows, since the header already says it; never one the skin
+-- in use shows on a card of its own (Skin API 2, hooks.guideTakes(goal):
+-- true takes it out of the window's list).
 -- -> rows (goal views), the hidden header goal
 local function shownGoals(v, group)
 	local list, others = {}, 0
 	for _, gi in ipairs(group.goals or {}) do
 		local goal = v.goals[gi]
-		if goal and goal.status ~= "na" and not goal.folded then
+		local ran, taken
+		if goal then ran, taken = Theme.SkinHookValue("guideTakes", goal) end
+		if goal and goal.status ~= "na" and not goal.folded and not (ran and taken == true) then
 			list[#list + 1] = UI.ReadingGoal(v, goal)
 			if not goal.header then others = others + 1 end
 		end
