@@ -426,7 +426,84 @@ local function hereLook(here, on)
 		if own.info then own.info:Hide() end
 	end
 end
-onLeave(function(parts) if parts.here then hereLook(parts.here, false) end end)
+
+-- Its rows as the target's line: no step line under it and no × of its own
+-- (the card's × stays), the count beside the distance ("2/12 · 80 yd").
+-- An off-route timer's row keeps its line and its × (they are its point).
+-- -> the height its rows gave up
+local HERE_COUNT = "|c%x%x%x%x%x%x%x%x(%d+/%d+)|r"
+local function hereRows(here)
+	local shift = 0
+	for _, r in ipairs(rawget(here, "Rows") or {}) do
+		local own = store(r)
+		if own.count then own.count:Hide() end
+		if r:IsShown() and r.Text and r.Sub and r.Close and r.Dist and not r.psOff then
+			if shift ~= 0 then
+				local p, rel, rp, x, y = r:GetPoint(1)
+				r:ClearAllPoints()
+				r:SetPoint(p, rel, rp, x, (y or 0) + shift)
+			end
+			if r.Sub:IsShown() then
+				local d = 2 + math.floor(r.Sub:GetStringHeight() + 0.5)
+				r.Sub:Hide()
+				own._sub = true
+				r:SetHeight(math.max(1, (r:GetHeight() or 0) - d))
+				shift = shift + d
+			end
+			if r.Close:IsShown() then
+				r.Close:Hide()
+				own._close = true
+			end
+			-- From Polestar's own line (UI.SetCounted keeps it), so a second
+			-- layout finds the count it took out at the first.
+			local text = type(r.Text.psCounted) == "string" and r.Text.psCounted or r.Text:GetText() or ""
+			local count = text:match(HERE_COUNT) or text:match("%s(%d+/%d+)%s*$")
+			if count then
+				local left = text:gsub("%s*" .. HERE_COUNT, "", 1)
+				if left == text then left = text:gsub("%s+%d+/%d+%s*$", "", 1) end
+				r.Text:SetText(left)
+				own._text = true
+				if not own.count then
+					own.count = r:CreateFontString(nil, "OVERLAY")
+					own.count:SetJustifyH("RIGHT")
+					own.count:SetWordWrap(false)
+				end
+				local c = own.count
+				c:SetFont(r.Dist:GetFont())
+				c:SetTextColor(Theme.Color("textMuted"))
+				local dist = r.Dist:GetText()
+				c:SetText(count .. ((dist and dist ~= "") and "  \194\183  " or ""))
+				c:ClearAllPoints()
+				c:SetPoint("RIGHT", r.Dist, "LEFT", 0, 0)
+				c:Show()
+				local w = r.Text:GetWidth() or 0
+				if w > 0 then r.Text:SetWidth(math.max(40, w - math.ceil(c:GetStringWidth()) - 4)) end
+			end
+		end
+	end
+	return shift
+end
+
+-- Its rows back as Polestar laid them out.
+local function hereRowsBack(here)
+	for _, r in ipairs(rawget(here, "Rows") or {}) do
+		local own = stores[r]
+		if own then
+			if own._sub then r.Sub:Show() end
+			if own._close then r.Close:Show() end
+			if own._text and type(r.Text.psCounted) == "string" then r.Text:SetText(r.Text.psCounted) end
+			own._sub, own._close, own._text = nil, nil, nil
+			if own.count then own.count:Hide() end
+		end
+	end
+end
+
+onLeave(function(parts)
+	if parts.here then
+		hereLook(parts.here, false)
+		hereRowsBack(parts.here)
+	end
+end)
 
 -- The training reminder as a card: "TRAINING DUE", the trainer line and the
 -- place on its right; × puts it off (Later), a click takes it up.
@@ -695,7 +772,10 @@ local classShut = {}
 on("guidePlace", function(name, part, width, height)
 	if name == "here" then
 		hereLook(part, true)
-		part:SetHeight(height)
+		local h = math.max(1, height - hereRows(part))
+		part:SetHeight(h)
+		local body = rawget(part, "Body")
+		if type(body) == "table" and body.SetHeight then body:SetHeight(h) end
 		slots.here = part
 		return true
 	end

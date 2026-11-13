@@ -210,3 +210,32 @@ emit({ area = area ~= nil, sub = railSub, rail = railAlt, compactAlt = row.Alt:I
 	assert.equal(out.compactAlt, true, 'compact mode keeps it');
 	assert.ok(!/spots/.test(String(out.compactSub)), `compact sub: ${out.compactSub}`);
 });
+
+test("While you're here keeps its line: no step line or × of its own, the count by the distance", () => {
+	const out = hooks(`
+local GF = Polestar.UI.GuideFrame
+local r = GF.HereRow(1)
+r.psView, r.psOff = { step = 7, index = 1 }, nil
+Polestar.UI.SetCounted(r.Text, "Kill Small Crag Boar 2/12")
+r.Sub:SetText("Step 7")
+r.Sub:Show()
+r.Dist:SetText("80 yd")
+r:Show()
+parts.here:Show()
+local h0 = GF.LayoutHere(300)
+h.guidePlace("here", parts.here, 300, h0)
+local first = { r.Text:GetText(), r.Sub:IsShown(), r.Close:IsShown() }
+-- A second layout finds the count it took out at the first.
+local h1 = GF.LayoutHere(300)
+h.guidePlace("here", parts.here, 300, h1)
+local own
+for _, region in ipairs({ r:GetRegions() }) do
+	if region.GetText and region ~= r.Text and region ~= r.Sub and region ~= r.Dist and region:IsShown() and (region:GetText() or ""):find("2/12", 1, true) then own = region:GetText() end
+end
+emit({ text = first[1], sub = first[2], close = first[3], count = own or false, shorter = parts.here:GetHeight() < h0 })`);
+	assert.equal(out.text, 'Kill Small Crag Boar');
+	assert.equal(out.sub, false, 'no step line');
+	assert.equal(out.close, false, "no × of the row's own");
+	assert.equal(out.count, '2/12  ·  ', 'the count left of the distance');
+	assert.equal(out.shorter, true, 'the card gives up the step line');
+});
