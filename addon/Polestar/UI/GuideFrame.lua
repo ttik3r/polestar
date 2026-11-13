@@ -977,7 +977,7 @@ do
 		local below, rel = fit.below, fit.rel
 		for i = 1, fit.n do
 			local f, at = below[i], -(y + rel[i])
-			f:SetPoint("TOPLEFT", body, "TOPLEFT", 0, at)
+			f:SetPoint("TOPLEFT", body, "TOPLEFT", f.psInset or 0, at)
 			f:SetPoint("TOPRIGHT", body, "TOPRIGHT", 0, at)
 		end
 		y = y + fit.h

@@ -1062,6 +1062,7 @@ built.
 | `guideMenu` | `function(items, button)` | each time the window's menu opens (the list is made anew every time) | `items`: the entries, `{ text, icon?, checked?, disabled?, onClick?, tip? }` or `{ separator = true }` (`icon` a glyph name); add, remove or reorder them. `button`: the menu button. |
 | `guideTakes` | `function(goal)` -> true | at every render, for each goal of the step about to be listed as a row | `goal`: the goal (the fields below). Answer `true` and the window leaves it out of its rows: show it on a card of yours (an optional goal, for example). Anything else keeps it. Only the rows change: the step, its progress and the arrow still count the goal. |
 | `guidePerson` | `function(person, width, height)` -> height | at every layout of a step, after Polestar laid out the step's header (the person or place the step is at) | `person`: the header (`GuideParts().person`), its pieces `Name`, `Where`, `Why`, `Level` and `Icon` placed and sized. `width`: the room for its text. `height`: the height Polestar gave it. Move or restyle its pieces and answer the height it takes (a number, 0 or more); anything else keeps Polestar's. |
+| `guideInset` | `function(name)` -> x | at every layout of a step, for each part that may be set in | `name`: `"card"` (the step's card: its header, goals and tip) or `"upnext"` (Up next). Answer a number above 0 and the part starts that far in from the window's left edge, narrower by as much (room for a rail of yours down the left side, for example); anything else keeps it at the edge. |
 
 The goal a `guideRow` or `guideTakes` hook gets (and each of `view.goals`) is the Engine's
 step view of it. The fields a dense row reads:
@@ -1351,7 +1352,7 @@ version 1, the API's preview before it.
 | `theme.functions` (**2**) | the [Theme functions](#other-theme-functions-a-skin-may-use) under the version promise |
 | `surfaces.window`, `surfaces.guide`, `surfaces.toast`, `surfaces.panel`, `surfaces.sidebar`, `surfaces.inset`, `surfaces.button`, `surfaces.tile`, `surfaces.dropdown`, `surfaces.editbox`, `surfaces.checkbox`, `surfaces.tab`, `surfaces.close`, `surfaces.scrollbar` | each painter kind |
 | `surfaces.arrow`, `surfaces.pin`, `surfaces.guideTitle` | those hooks |
-| `surfaces.guideRow`, `surfaces.guideLayout`, `surfaces.guideRender`, `surfaces.guideProgress`, `surfaces.guideAnchor`, `surfaces.guideTab`, `surfaces.guidePlace`, `surfaces.guideMenu`, `surfaces.guideTakes`, `surfaces.guidePerson`, `surfaces.card`, `surfaces.toast`, `surfaces.actionButton` (**2**) | those hooks |
+| `surfaces.guideRow`, `surfaces.guideLayout`, `surfaces.guideRender`, `surfaces.guideProgress`, `surfaces.guideAnchor`, `surfaces.guideTab`, `surfaces.guidePlace`, `surfaces.guideMenu`, `surfaces.guideTakes`, `surfaces.guidePerson`, `surfaces.guideInset`, `surfaces.card`, `surfaces.toast`, `surfaces.actionButton` (**2**) | those hooks |
 
 Note `surfaces.toast` names both the `toast` painter kind and the `toast`
 hook: both are in version 2. A later Polestar adds capabilities without

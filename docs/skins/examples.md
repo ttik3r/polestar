@@ -119,7 +119,7 @@ window = function(frame, base, k)
 end,
 ```
 
-**A hook on every surface.** Each of the sixteen hooks adds the same idea
+**A hook on every surface.** Each of the seventeen hooks adds the same idea
 where it lands, after Polestar's own look is on: a glow of `accent2` behind
 the arrow's dial (`kit.glow`), a shadow under the step pins' numbers, the
 moonline over the guide window's title, a bar of `accent2` beside the current

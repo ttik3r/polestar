@@ -254,10 +254,22 @@ local function stack(frame, y, h)
 end
 
 -- `frame` stacked at y, unless the skin places it itself (claimed): it is
--- part `name` of hooks.guidePlace. -> the new y
-local function place(name, frame, y, h, width)
+-- part `name` of hooks.guidePlace. `x`: its inset from the left (inset),
+-- kept for fitGoals. -> the new y
+local function place(name, frame, y, h, width, x)
 	if claimed(name, frame, width, h) then return y end
-	return stack(frame, y, h)
+	frame.psInset = x
+	y = stack(frame, y, h)
+	if x and x > 0 then frame:SetPoint("TOPLEFT", body, "TOPLEFT", x, -(y - h)) end
+	return y
+end
+
+-- A part the skin sets in from the window's left edge (Skin API 2,
+-- hooks.guideInset(name)): "card" (the step's card), "upnext". -> its
+-- inset, 0 without one
+local function inset(name)
+	local ran, x = Theme.SkinHookValue("guideInset", name)
+	return (ran and type(x) == "number" and x > 0) and floor(x + 0.5) or 0
 end
 
 -- The tallest the window may be: ui.maxHeight of the screen's height, in
@@ -404,13 +416,15 @@ function GF.Layout()
 		for _, f in ipairs({ card, after, along, GF.here, upnext, UI.JourneyPanel and UI.JourneyPanel.frame }) do f:Hide() end
 		y = stack(list, y, UI.StepList.Layout(width, min(capHeight(), roomAbove() or math.huge) - ((showStrip and TAB_H or 0) + NAV_H + PROG_H + y)))
 	elseif state == "steps" then
-		fit.fixed = layoutCard(width)
+		local cx = inset("card")
+		card:SetWidth(width - cx)
+		fit.fixed = layoutCard(width - cx)
 		fit.top = y
 		-- The card animates its own offset; keep its anchor's base in step.
 		if Anim.IsRunning(card, "offset") then
-			card.psAnchor[5] = -y
+			card.psAnchor[4], card.psAnchor[5] = cx, -y
 		else
-			Anim.Anchor(card, "TOPLEFT", body, "TOPLEFT", 0, -y)
+			Anim.Anchor(card, "TOPLEFT", body, "TOPLEFT", cx, -y)
 		end
 		content = contentHeight()
 		y = y + fit.fixed + content
@@ -420,7 +434,10 @@ function GF.Layout()
 		if GF.here:IsShown() then y = place("here", GF.here, y, GF.LayoutHere(width), width) end
 		if after:IsShown() then y = place("after", after, y, layoutAfter(width), width) end
 		if along:IsShown() then y = place("along", along, y, layoutAlong(width), width) end
-		if upnext:IsShown() then y = place("upnext", upnext, y, layoutUpnext(width), width) end
+		if upnext:IsShown() then
+			local ux = inset("upnext")
+			y = place("upnext", upnext, y, layoutUpnext(width - ux), width - ux, ux)
+		end
 	else
 		y = stack(empty, y, layoutEmpty(width))
 		y = stackJourney(y, width)

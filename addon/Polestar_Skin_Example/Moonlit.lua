@@ -241,6 +241,11 @@ check("skin moonlit", Theme.RegisterSkin("moonlit", {
 		guidePerson = function(person, width, height)
 			return height
 		end,
+		-- How far in from the window's left edge a part starts: "card" (the
+		-- step's card) or "upnext". Moonlit keeps both at the edge.
+		guideInset = function(name)
+			return 0
+		end,
 		-- The cards on the guide window: "headsup" (a class quest or dungeon
 		-- heads-up) and "classcard" (the class quest card in the window);
 		-- parts: titles, bodies (the strings Polestar sizes), accents.
