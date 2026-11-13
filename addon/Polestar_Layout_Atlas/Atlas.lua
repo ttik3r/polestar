@@ -1640,6 +1640,14 @@ local function spec(hooks)
 		author = "TTik3r",
 		desc = "The step on a timeline, Up next on a rail that fades ahead, cards above the window.",
 		hooks = hooks,
+		-- The J2 look's starting point. The player's own choices win; a
+		-- reset returns to these.
+		defaults = {
+			["guideWindow.tabs"] = false,
+			["guideWindow.progress"] = false,
+			["guideWindow.targetBar"] = false,
+			["guideWindow.reportButton"] = false,
+		},
 		-- Under another layout: Polestar's own parts get their look back; the
 		-- pieces Atlas made itself hide.
 		onLeave = function()

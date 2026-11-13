@@ -148,6 +148,10 @@ out.rule = { rule() }
 local function skip() return nav.Skip:IsShown() and true or false end
 local function report() return nav.Report:IsShown() and true or false end
 out.switches = { skip(), report() }
+-- Atlas's defaults (spec.defaults) start Report off; the player's choice wins.
+Polestar.Set("guideWindow.reportButton", true)
+draw()
+out.switches[3] = report()
 Polestar.Set("guideWindow.rules", false)
 Polestar.Set("guideWindow.skipButton", false)
 Polestar.Set("guideWindow.reportButton", false)
@@ -183,7 +187,7 @@ emit(out)`,
 	assert.equal(out.failed, false, 'no hook failed in normal or compact mode');
 	assert.equal(out.back, false, "Polestar's own layout again");
 	assert.deepEqual(out.rule, [true, true], 'the header keeps its rule (guideWindow.rules) under Atlas and after');
-	assert.deepEqual(out.switches, [true, true], 'Skip and Report show under Atlas, as the settings say');
+	assert.deepEqual(out.switches, [true, false, true], "Skip shows, Report starts off by Atlas's default, the player's choice turns it on");
 	assert.deepEqual(out.off, [false, false, false], 'switched off, they stay off under Atlas');
 	assert.equal(out.skipLabel, false, 'Skip is its glyph alone under Atlas');
 });
