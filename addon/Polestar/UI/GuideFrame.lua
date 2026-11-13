@@ -1678,6 +1678,9 @@ local function fillUpcoming(E, index)
 			r.Text:SetText(r.psSummary)
 			W.Color(r.Text, warn and "warning" or "textDim")
 			r:SetShown(upcomingOpen())
+			-- The skin in use's touch on the row (Skin API 2,
+			-- hooks.guideUpRow(row, view, index)).
+			Theme.SkinHook("guideUpRow", r, v, i)
 		end
 		i = i + 1
 	end

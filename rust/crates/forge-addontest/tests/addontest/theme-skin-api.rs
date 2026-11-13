@@ -392,7 +392,7 @@ fn api_version_and_capabilities_say_what_this_polestar_offers() {
 		for _, c in ipairs({ "skins", "schemes", "surfaces.window", "surfaces.toast", "surfaces.arrow", "surfaces.pin", "fonts", "preset",
 			"lightSchemes", "surfaces.guideTitle", "variants", "resolve", "shadow", "artTint", "media.dart", "guideParts",
 			"surfaces.card", "surfaces.actionButton", "surfaces.guideRow", "surfaces.guideLayout", "surfaces.guideRender",
-			"surfaces.guideProgress", "surfaces.guideAnchor", "surfaces.guideTakes", "surfaces.guidePerson", "surfaces.guideInset", "media.pins", "arrow.parts", "pin.parts", "tokens.accent2", "tokens.glow",
+			"surfaces.guideProgress", "surfaces.guideAnchor", "surfaces.guideTakes", "surfaces.guidePerson", "surfaces.guideInset", "surfaces.guideUpRow", "media.pins", "arrow.parts", "pin.parts", "tokens.accent2", "tokens.glow",
 			"tokens.pins", "skins.installed", "theme.functions", "kit.color", "kit.glow", "kit.tintArt" }) do
 			if not T.HasCapability(c) then caps[#caps + 1] = c end
 		end
@@ -404,7 +404,7 @@ fn api_version_and_capabilities_say_what_this_polestar_offers() {
 	assert!(out["n"].as_u64().unwrap() >= 40);
 	assert_eq!(
 		out["surfaces"]["hooks"],
-		json!(["actionButton", "arrow", "card", "guideAnchor", "guideInset", "guideLayout", "guideMenu", "guidePerson", "guidePlace", "guideProgress", "guideRender", "guideRow", "guideTab", "guideTakes", "guideTitle", "pin", "toast"])
+		json!(["actionButton", "arrow", "card", "guideAnchor", "guideInset", "guideLayout", "guideMenu", "guidePerson", "guidePlace", "guideProgress", "guideRender", "guideRow", "guideTab", "guideTakes", "guideTitle", "guideUpRow", "pin", "toast"])
 	);
 	assert_eq!(out["surfaces"]["paint"], json!(["button", "checkbox", "close", "dropdown", "editbox", "guide", "inset", "panel", "scrollbar", "sidebar", "tab", "tile", "toast", "window"]));
 }
@@ -817,6 +817,8 @@ T.SkinHookValue = function(surface, ...)
 end
 Polestar.Set("behavior.autoAccept", false)
 Polestar.Set("ui.launcher", true)
+-- Up next on, for its rows (guideUpRow).
+Polestar.Set("ui.upcoming", 2)
 E.SetGuide("test/class/call-of-water"); stub.advance(3)
 -- The skin, chosen with the window on screen.
 Polestar.Set("ui.skin", "moonlit")
@@ -1321,6 +1323,49 @@ fn a_skin_sets_the_step_s_card_and_up_next_in_from_the_window_s_left_edge() {
 	assert_eq!(n(&s["up"]["x"]) - n(&h["up"]["x"]), 10.0, "Up next moves in by its inset: {out}");
 	assert_eq!(n(&h["up"]["w"]) - n(&s["up"]["w"]), 10.0, "Up next narrows by its inset: {out}");
 	assert_eq!(out["back"], out["house"], "without the skin, at the edge as before");
+}
+
+// Skin API 2's guideUpRow: each Up next row, once painted, is handed to the skin with the step it shows and that
+// step's number, at every render; the skin's touch on it goes with the skin, since Polestar paints the row again.
+#[test]
+fn a_skin_hears_each_up_next_row_with_its_step_and_its_touch_goes_with_it() {
+	let out = run_ui(
+		r##"
+		local T = Polestar.Theme
+		local seen = {}
+		local ok, why = T.RegisterSkin("uprow", { name = "Up row", addon = "Test_UpRow", base = "polestar",
+			hooks = {
+				guideUpRow = function(row, v, i)
+					seen[#seen + 1] = { i = i, step = type(v) == "table" and v.title or false, mine = row.psIndex == i }
+					row.Text:SetText("#" .. i)
+				end,
+			} })
+		Polestar.Set("ui.upcoming", 3)
+		Polestar.Set("ui.upcomingOpen", true)
+		uistub.openTabs(TABS, 1)
+		local function texts()
+			local out = {}
+			for _, r in ipairs(GF.upRows) do if r:IsShown() then out[#out + 1] = r.Text:GetText() end end
+			return out
+		end
+		local house = texts()
+		Polestar.Set("ui.skin", "uprow")
+		GF.Render()
+		local skinned = texts()
+		Polestar.Set("ui.skin", "polestar")
+		GF.Render()
+		emit({ ok = ok, why = why or false, house = house, skinned = skinned, back = texts(), seen = seen,
+			cap = T.HasCapability("surfaces.guideUpRow") })"##,
+	);
+	assert_eq!(out["ok"], true, "registered: {}", out["why"]);
+	assert_eq!(out["cap"], true);
+	let house = out["house"].as_array().cloned().unwrap_or_default();
+	assert!(!house.is_empty(), "Up next lists steps: {out}");
+	let seen = out["seen"].as_array().cloned().unwrap_or_default();
+	assert!(seen.len() >= house.len(), "every row is handed over: {out}");
+	assert!(seen.iter().all(|s| s["mine"] == json!(true) && s["step"].is_string()), "each with its step and number: {out}");
+	assert_eq!(out["skinned"][0], json!(format!("#{}", seen[0]["i"])), "the skin's touch is on the row: {out}");
+	assert_eq!(out["back"], out["house"], "without the skin, Polestar's rows");
 }
 
 // The settings window's Theme page with its picker's cards as a player gets them: the arrow (Nav, with Maps) for

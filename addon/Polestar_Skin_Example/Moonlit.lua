@@ -246,6 +246,11 @@ check("skin moonlit", Theme.RegisterSkin("moonlit", {
 		guideInset = function(name)
 			return 0
 		end,
+		-- An Up next row once painted (Num, Icon, Text), with the step it
+		-- shows and that step's number. Rows are pooled: a skin sets every
+		-- piece it uses each time. Moonlit leaves them as Polestar paints them.
+		guideUpRow = function(row, view, index)
+		end,
 		-- The cards on the guide window: "headsup" (a class quest or dungeon
 		-- heads-up) and "classcard" (the class quest card in the window);
 		-- parts: titles, bodies (the strings Polestar sizes), accents.
