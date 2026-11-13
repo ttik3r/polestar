@@ -140,6 +140,12 @@ Polestar.Theme.RegisterLayout("ledger", {
 - **Who answers**: the layout's hook where it has one, else the skin's,
   else Polestar's own. A skin that hooks the same surface keeps it under
   Polestar's own layout.
+- **Layout, then skin**: for `guideTitle`, `guideRow`, `guideRender`,
+  `guidePlace` and `guideProgress` the skin's hook also runs, after the
+  layout's and with the same parts, so the layout lays out and the skin
+  styles. The layout's answer wins when it is not nil; the skin's counts
+  when the layout's is nil. For `guidePlace` the layout alone decides
+  where a part goes.
 - **The choice**: the setting `ui.layout`, unset for Polestar's own layout.
   `Polestar.Theme.SetLayout("ledger")` picks one (in chat: `/run
   Polestar.Theme.SetLayout("ledger")`), `Polestar.Theme.SetLayout()` goes
@@ -148,7 +154,9 @@ Polestar.Theme.RegisterLayout("ledger", {
   `## X-Polestar-Layout: ledger` and `## LoadOnDemand: 1` loads at login
   when the saved layout is its own, and when the player picks it.
 - **Errors**: a layout's hook, `onApply` or `onLeave` runs under `pcall`;
-  the first error is noted and the layout is off for the session.
+  the first error is noted and the layout is off for the session. A
+  failing layout leaves the skin in use, and a failing skin leaves the
+  layout in use.
 
 The functions and messages are in the
 [reference](skins/reference.md#layouts).

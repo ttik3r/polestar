@@ -239,6 +239,21 @@ in use whatever the layout. A layout's hook, `onApply` or `onLeave` runs
 under `pcall`: the first error is noted (`/polestar debug`) and the
 layout is off for the session, the player's choice kept.
 
+Five hooks run both: `guideTitle`, `guideRow`, `guideRender`,
+`guidePlace` and `guideProgress`. The layout's hook runs first, then the
+skin's, with the same parts: the layout lays the part out, the skin
+styles it.
+
+| Hook | Layout answers | Skin answers | Result |
+|---|---|---|---|
+| any of the five | not nil | anything | the layout's |
+| any of the five but `guidePlace` | nil | a value | the skin's |
+| `guidePlace` | nil | `true` | nil: the window places the part (the layout decides) |
+
+A skin hook that fails turns the skin off and leaves the layout in use.
+A layout hook that fails turns the layout off; the skin's hook still
+runs that time and after.
+
 A layout addon declares its ids in its TOC and may load on demand. Its
 folder is `Polestar_Layout_<Name>`, which the install check leaves alone
 as it does `Polestar_Skin_*` ([publishing](publishing.md#naming)):

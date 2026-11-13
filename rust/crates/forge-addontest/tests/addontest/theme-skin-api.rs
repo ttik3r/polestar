@@ -1892,8 +1892,8 @@ emit(out)"##
 
 // A layout may also lay out the title bar (guideTitle: which of its parts show), a goal row (guideRow: its lines
 // and columns) and where the progress shows (guideProgress), the skin's tokens colouring them: under a skin, each
-// runs as the layout's, the skin's accent still the one in use, and the skin's own hooks there answer again once
-// the layout leaves. The other skin hooks (toast, card, the tabs, the menu) stay a skin's.
+// runs as the layout's, the skin's accent still the one in use, the skin's own hook running after it, and only
+// the skin's once the layout leaves. The other skin hooks (toast, card, the tabs, the menu) stay a skin's.
 #[test]
 fn a_layout_lays_out_the_title_bar_goal_rows_and_progress_in_the_skin_s_tokens() {
 	let out = run_ui(
@@ -1947,8 +1947,119 @@ fn a_layout_lays_out_the_title_bar_goal_rows_and_progress_in_the_skin_s_tokens()
 	for k in ["title", "row", "progress"] {
 		assert!(out["skin"][k]["skin"].as_f64().unwrap_or(0.0) > 0.0, "no layout: the skin's {k}: {out}");
 		assert!(out["layout"][k]["layout"].as_f64().unwrap_or(0.0) > 0.0, "the layout's {k}: {out}");
-		assert!(out["layout"][k]["skin"].is_null(), "the layout's {k} answers in the skin's place: {out}");
+		assert!(out["layout"][k]["skin"].as_f64().unwrap_or(0.0) > 0.0, "the skin's {k} still styles under the layout: {out}");
 		assert!(out["back"][k]["skin"].as_f64().unwrap_or(0.0) > 0.0, "the skin's {k} again: {out}");
 	}
 	assert_eq!(out["accent"], "ff8800", "the skin's accent colours the layout's row");
+}
+
+// Under a layout, the skin's own guideTitle, guideRow, guideRender, guidePlace and guideProgress run after the
+// layout's, with the same parts: the layout lays out, the skin styles. The layout's answer wins when it is not
+// nil, else the skin's counts; for guidePlace the layout alone decides. A skin hook that fails turns the skin off
+// and leaves the layout in use, and a layout hook that fails leaves the skin's hooks running.
+#[test]
+fn under_a_layout_the_skin_s_title_rows_render_place_and_progress_hooks_run_after_the_layout_s() {
+	let out = run_ui(
+		r##"
+		local T = Polestar.Theme
+		local order, kinds = {}, { "guideTitle", "guideRow", "guideRender", "guidePlace", "guideProgress" }
+		local answer = { layout = nil, skin = nil }
+		local skinBreaks, layoutBreaks = false, false
+		local args = {}
+		local function hooks(who)
+			local t = {}
+			for _, k in ipairs(kinds) do
+				t[k] = function(...)
+					if who == "skin" and skinBreaks then error("skin boom") end
+					if who == "layout" and layoutBreaks then error("layout boom") end
+					order[k] = (order[k] or "") .. who:sub(1, 1)
+					args[k] = args[k] or {}
+					args[k][who] = (select(1, ...))
+					return answer[who]
+				end
+			end
+			return t
+		end
+		assert(T.RegisterSkin("glow", { name = "Glow", addon = "Test_Glow", base = "polestar", tokens = { accent = "#33ccaa" }, hooks = hooks("skin") }))
+		-- Shaped as the Atlas layout: its own title bar, rows, progress and While you're here above the window.
+		local ok, why = T.RegisterLayout("atlas-test", { api = 2, name = "Atlas test", addon = "Polestar_Layout_AtlasTest", hooks = hooks("layout") })
+		Polestar.Set("ui.skin", "glow")
+		T.SetLayout("atlas-test")
+		uistub.openTabs(TABS, 1)
+		stub.advance(1)
+		order = {}
+		GF.ApplyStyle()
+		GF.Render()
+		stub.advance(1)
+		local same = {}
+		for _, k in ipairs(kinds) do same[k] = args[k] ~= nil and args[k].layout == args[k].skin end
+		local snap = {}
+		for k, v in pairs(order) do snap[k] = v end
+		local out = { ok = ok, why = why or false, order = snap, same = same, accent = string.format("%02x", math.floor(T.Accent() * 255 + 0.5)) }
+		local function ask(surface, l, s)
+			answer.layout, answer.skin = l, s
+			return { T.SkinHookValue(surface, "x") }
+		end
+		out.layoutWins = ask("guideRow", "l", "s")
+		out.nilSkin = ask("guideRow", nil, "s")
+		out.bothNil = ask("guideRow", nil, nil)
+		out.placeNil = ask("guidePlace", nil, true)
+		out.placeMine = ask("guidePlace", true, nil)
+		out.inset = ask("guideInset", nil, nil)
+		answer.layout, answer.skin = nil, nil
+		skinBreaks = true
+		T.SkinHook("guideTitle", GF.parts.nav, {})
+		out.skinFailed = { T.SkinId(), T.LayoutId() or false, T.SkinHooks("guideRow") }
+		emit(out)"##,
+	);
+	assert_eq!(out["ok"], true, "registered: {}", out["why"]);
+	for k in ["guideTitle", "guideRow", "guideRender", "guideProgress"] {
+		let o = out["order"][k].as_str().unwrap_or("");
+		assert!(o.starts_with("ls"), "{k}: the layout's, then the skin's: {out}");
+		assert_eq!(o, "ls".repeat(o.len() / 2), "{k}: each layout call followed by the skin's: {out}");
+	}
+	assert!(out["order"]["guidePlace"].as_str().unwrap_or("").starts_with("ls"), "guidePlace too: {out}");
+	for k in ["guideTitle", "guideRow", "guideRender", "guidePlace", "guideProgress"] {
+		assert_eq!(out["same"][k], true, "{k}: the skin gets the layout's parts: {out}");
+	}
+	assert_eq!(out["accent"], "33", "the skin's tokens stay");
+	assert_eq!(out["layoutWins"], json!([true, "l"]), "the layout's answer wins");
+	assert_eq!(out["nilSkin"], json!([true, "s"]), "the layout's nil: the skin's counts");
+	assert_eq!(out["bothNil"], json!([true]));
+	assert_eq!(out["placeNil"], json!([true]), "guidePlace: the layout decides, its nil kept");
+	assert_eq!(out["placeMine"], json!([true, true]));
+	assert_eq!(out["inset"], json!([false]), "a hook neither sets");
+	assert_eq!(out["skinFailed"][1], "atlas-test", "a failing skin hook leaves the layout in use: {out}");
+	assert_eq!(out["skinFailed"][2], true, "the layout's hooks still run: {out}");
+}
+
+// The reverse: a layout's guideTitle that fails turns the layout off; the skin's guideTitle runs on and the skin
+// stays in use.
+#[test]
+fn a_failing_layout_hook_leaves_the_skin_s_hook_running() {
+	let out = run_ui(
+		r##"
+		local T = Polestar.Theme
+		local skinRan, breaks = 0, false
+		assert(T.RegisterSkin("glow", { name = "Glow", addon = "Test_Glow", base = "polestar",
+			hooks = { guideTitle = function() skinRan = skinRan + 1 end } }))
+		assert(T.RegisterLayout("brittle", { api = 2, name = "Brittle", addon = "Polestar_Layout_Brittle",
+			hooks = { guideTitle = function() if breaks then error("boom") end end } }))
+		Polestar.Set("ui.skin", "glow")
+		T.SetLayout("brittle")
+		breaks = true
+		local before = skinRan
+		local ran = T.SkinHook("guideTitle", {}, {})
+		local first = skinRan - before
+		stub.advance(1)
+		T.SkinHook("guideTitle", {}, {})
+		emit({ ran = ran, first = first, after = skinRan - before, layout = T.LayoutId() or false, skin = T.SkinId(),
+			failed = T.LayoutInfo("brittle").failed ~= nil })"##,
+	);
+	assert_eq!(out["ran"], true, "the skin's hook ran though the layout's failed");
+	assert_eq!(out["first"], 1);
+	assert_eq!(out["after"], 2, "and runs on");
+	assert_eq!(out["layout"], false, "the layout is off");
+	assert_eq!(out["skin"], "glow", "the skin stays");
+	assert_eq!(out["failed"], true);
 }

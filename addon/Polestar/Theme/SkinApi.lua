@@ -244,6 +244,14 @@ local function failLayout(id, err)
 	end
 end
 
+-- The hooks where a skin styles what the layout lays out: the layout's hook
+-- runs first, then the skin's, with the same parts. The layout's answer wins
+-- when it is not nil; the skin's counts when the layout's is nil, except for
+-- guidePlace, where the layout alone decides the placement. Every other hook
+-- is the layout's where it has one, else the skin's.
+local BOTH = { guideTitle = true, guideRow = true, guideRender = true, guidePlace = true, guideProgress = true }
+local LAYOUT_DECIDES = { guidePlace = true }
+
 -- The hook that answers for `surface`: the layout's, else the skin's.
 -- -> fn, whose (true: the layout's) | nil
 local function hookFor(surface)
@@ -254,33 +262,54 @@ local function hookFor(surface)
 	return nil
 end
 
+-- Run the hooks for `surface`. -> ran, the answer. A failing layout hook
+-- turns the layout off, a failing skin hook the skin; neither touches the
+-- other.
+local function runHooks(surface, ...)
+	local lfn = BOTH[surface] and layoutHooks and layoutHooks[surface]
+	if not lfn then
+		local fn, byLayout = hookFor(surface)
+		if not fn then return false end
+		local ok, v = pcall(fn, ...)
+		if ok then return true, v end
+		if byLayout then failLayout(layoutId, v) else failSkin(liveId, v) end
+		return false
+	end
+	local ran, v = false, nil
+	local lid = layoutId
+	local ok, r = pcall(lfn, ...)
+	if ok then ran, v = true, r else failLayout(lid, r) end
+	local sfn = liveHooks and liveHooks[surface]
+	if sfn and not FAILED[liveId] then
+		local sid = liveId
+		local sok, sr = pcall(sfn, ...)
+		if not sok then
+			failSkin(sid, sr)
+		else
+			if not ran or (v == nil and not LAYOUT_DECIDES[surface]) then v = sr end
+			ran = true
+		end
+	end
+	return ran, v
+end
+
 -- A module's own art handed to the layout and the skin in use, after the
 -- module painted it (the hooks above: Nav/Arrow.lua "arrow", Nav/Pins.lua
 -- "pin", UI/Toasts.lua "card" and "toast", QoL/Buttons.lua "actionButton",
 -- the guide window's). The layout's hook runs where it has one, else the
--- skin's. -> true when a hook ran
+-- skin's; for BOTH's hooks the layout's, then the skin's. -> true when a
+-- hook ran
 function Theme.SkinHook(surface, ...)
-	local fn, byLayout = hookFor(surface)
-	if not fn then return false end
-	local ok, err = pcall(fn, ...)
-	if not ok then
-		if byLayout then failLayout(layoutId, err) else failSkin(liveId, err) end
-		return false
-	end
-	return true
+	return (runHooks(surface, ...))
 end
 
--- The hook for `surface` with its answer: -> true, its first result when the
+-- The hook for `surface` with its answer: -> true, its first result when a
 -- hook ran (false and nothing when there is none or it failed, the layout or
--- skin then off as with Theme.SkinHook).
+-- skin then off as with Theme.SkinHook). For BOTH's hooks the layout's
+-- answer unless it is nil, then the skin's (guidePlace: the layout's alone).
 function Theme.SkinHookValue(surface, ...)
-	local fn, byLayout = hookFor(surface)
-	if not fn then return false end
-	local ok, v = pcall(fn, ...)
-	if not ok then
-		if byLayout then failLayout(layoutId, v) else failSkin(liveId, v) end
-		return false
-	end
+	local ran, v = runHooks(surface, ...)
+	if not ran then return false end
 	return true, v
 end
 
