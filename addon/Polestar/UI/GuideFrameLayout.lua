@@ -41,7 +41,7 @@ ns.UI.GuideFrame.Part(function(GF)
 			home = frame:GetParent()
 			frame.psHome = home
 		end
-		local ran, mine = Theme.SkinHookValue("guidePlace", name, frame, width, h)
+		local ran, mine = GF.HookValue("guidePlace", name, frame, width, h)
 		if ran and mine == true then return true end
 		if frame:GetParent() ~= home then frame:SetParent(home) end
 		return false
@@ -89,7 +89,7 @@ ns.UI.GuideFrame.Part(function(GF)
 			h = floor(h + 8 + 0.5)
 			-- A skin may lay the step's header out its own way (Skin API 2,
 			-- hooks.guidePerson(person, width, height)): its answer is the height.
-			local ran, skinH = Theme.SkinHookValue("guidePerson", person, cw, h)
+			local ran, skinH = GF.HookValue("guidePerson", person, cw, h)
 			if ran and type(skinH) == "number" and skinH >= 0 then h = floor(skinH + 0.5) end
 			person:SetHeight(h)
 			person:ClearAllPoints()
@@ -273,7 +273,7 @@ ns.UI.GuideFrame.Part(function(GF)
 	-- hooks.guideInset(name)): "card" (the step's card), "upnext". -> its
 	-- inset, 0 without one
 	local function inset(name)
-		local ran, x = Theme.SkinHookValue("guideInset", name)
+		local ran, x = GF.HookValue("guideInset", name)
 		return (ran and type(x) == "number" and x > 0) and floor(x + 0.5) or 0
 	end
 
@@ -470,7 +470,7 @@ ns.UI.GuideFrame.Part(function(GF)
 		-- A skin's own room under the window's parts (Skin API 2,
 		-- hooks.guideLayout(parts, width, y)): it may place its frames from y
 		-- down; its answer is the height they take.
-		local ran, extra = Theme.SkinHookValue("guideLayout", GF.SkinParts(), width, y)
+		local ran, extra = GF.HookValue("guideLayout", GF.SkinParts(), width, y)
 		if ran and type(extra) == "number" and extra > 0 then y = y + extra end
 		local showFoot = (state == "steps" or state == "complete" or state == "skippedout") and GF.On("progress")
 		foot:SetShown(showFoot)
@@ -601,7 +601,7 @@ ns.UI.GuideFrame.Part(function(GF)
 		GF.PaintStatus(frac, foot.Pct:GetText())
 		foot.psDone, foot.psTotal = done, total
 		-- A skin's own progress (Skin API 2, hooks.guideProgress(foot, frac)).
-		Theme.SkinHook("guideProgress", foot, frac)
+		GF.Hook("guideProgress", foot, frac)
 	end
 
 	GF.StripShown = stripShown

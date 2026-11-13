@@ -63,7 +63,7 @@ local LAYOUT_HOOKS = { guideLayout = true, guideRender = true, guidePlace = true
 	guidePerson = true, guideInset = true, guideUpRow = true, guideShows = true, guideTitle = true, guideRow = true,
 	guideProgress = true }
 -- The registered layouts (Theme.RegisterLayout): id -> { id, name, addon,
--- author, version, desc, api, hooks, onApply, onLeave, defaults }.
+-- author, version, desc, api, hooks, onApply, onLeave, defaults, preset }.
 local LAYOUTS, LAYOUT_FAILED = {}, {}
 -- The checks read them too (Polestar_SkinAPI/SkinCheck.lua).
 I.PAINT_KINDS, I.HOOKS, I.LAYOUT_HOOKS, I.LAYOUTS = PAINT_KINDS, HOOKS, LAYOUT_HOOKS, LAYOUTS
@@ -74,7 +74,7 @@ for _, c in ipairs({ "schemes", "skins", "tokens", "legibility", "fonts", "fontS
 	-- Skin API 2
 	"variants", "resolve", "shadow", "artTint", "media.dart", "tokens.accent2", "tokens.glow", "tokens.pins",
 	"kit.glow", "kit.gameArt", "kit.crossfade", "kit.tintArt", "kit.gradient.horizontal", "kit.color",
-	"media.pins", "arrow.parts", "pin.parts", "skins.installed", "theme.functions", "layouts" }) do CAPABILITIES[c] = true end
+	"media.pins", "arrow.parts", "pin.parts", "skins.installed", "theme.functions", "layouts", "layouts.preset" }) do CAPABILITIES[c] = true end
 for kind in pairs(PAINT_KINDS) do CAPABILITIES["surfaces." .. kind] = true end
 for name in pairs(HOOKS) do CAPABILITIES["surfaces." .. name] = true end
 
@@ -272,31 +272,41 @@ end
 local BOTH = { guideTitle = true, guideRow = true, guideRender = true, guidePlace = true, guideProgress = true }
 local LAYOUT_DECIDES = { guidePlace = true }
 
--- The hook that answers for `surface`: the layout's, else the skin's.
--- -> fn, whose (true: the layout's) | nil
-local function hookFor(surface)
-	local fn = layoutHooks and layoutHooks[surface]
+-- The layout a window draws with: `choice` nil is the layout in use (the
+-- live window, the settings' preview), false Polestar's own (no layout's
+-- hooks), an id that layout's, while it is registered and has not failed
+-- (Polestar's own until then). -> id, hooks | nil
+local function layoutOf(choice)
+	if choice == nil then return layoutId, layoutHooks end
+	local l = choice and not LAYOUT_FAILED[choice] and LAYOUTS[choice]
+	if l then return choice, l.hooks end
+	return nil, nil
+end
+
+-- The hook that answers for `surface` under layout hooks `lhooks`: the
+-- layout's, else the skin's. -> fn, whose (true: the layout's) | nil
+local function hookFor(surface, lhooks)
+	local fn = lhooks and lhooks[surface]
 	if fn then return fn, true end
 	fn = liveHooks and liveHooks[surface]
 	if fn and not FAILED[liveId] then return fn, false end
 	return nil
 end
 
--- Run the hooks for `surface`. -> ran, the answer. A failing layout hook
--- turns the layout off, a failing skin hook the skin; neither touches the
--- other.
-local function runHooks(surface, ...)
-	local lfn = BOTH[surface] and layoutHooks and layoutHooks[surface]
+-- Run the hooks for `surface` under layout `lid` (its hooks `lhooks`). ->
+-- ran, the answer. A failing layout hook turns the layout off, a failing
+-- skin hook the skin; neither touches the other.
+local function runHooks(lid, lhooks, surface, ...)
+	local lfn = BOTH[surface] and lhooks and lhooks[surface]
 	if not lfn then
-		local fn, byLayout = hookFor(surface)
+		local fn, byLayout = hookFor(surface, lhooks)
 		if not fn then return false end
 		local ok, v = pcall(fn, ...)
 		if ok then return true, v end
-		if byLayout then failLayout(layoutId, v) else failSkin(liveId, v) end
+		if byLayout then failLayout(lid, v) else failSkin(liveId, v) end
 		return false
 	end
 	local ran, v = false, nil
-	local lid = layoutId
 	local ok, r = pcall(lfn, ...)
 	if ok then ran, v = true, r else failLayout(lid, r) end
 	local sfn = liveHooks and liveHooks[surface]
@@ -320,7 +330,7 @@ end
 -- skin's; for BOTH's hooks the layout's, then the skin's. -> true when a
 -- hook ran
 function Theme.SkinHook(surface, ...)
-	return (runHooks(surface, ...))
+	return (runHooks(layoutId, layoutHooks, surface, ...))
 end
 
 -- The hook for `surface` with its answer: -> true, its first result when a
@@ -328,7 +338,23 @@ end
 -- skin then off as with Theme.SkinHook). For BOTH's hooks the layout's
 -- answer unless it is nil, then the skin's (guidePlace: the layout's alone).
 function Theme.SkinHookValue(surface, ...)
-	local ran, v = runHooks(surface, ...)
+	local ran, v = runHooks(layoutId, layoutHooks, surface, ...)
+	if not ran then return false end
+	return true, v
+end
+
+-- Theme.SkinHook and Theme.SkinHookValue for a guide window that draws with
+-- a layout of its own (a copy's GF.layoutChoice: a preset card drawn with
+-- the layout it picks, or with Polestar's own while another is in use):
+-- `choice` as layoutOf's. The skin's hooks are the skin in use's.
+function Theme.SkinHookFor(choice, surface, ...)
+	local id, hooks = layoutOf(choice)
+	return (runHooks(id, hooks, surface, ...))
+end
+
+function Theme.SkinHookValueFor(choice, surface, ...)
+	local id, hooks = layoutOf(choice)
+	local ran, v = runHooks(id, hooks, surface, ...)
 	if not ran then return false end
 	return true, v
 end
@@ -336,7 +362,7 @@ end
 -- Whether the layout or the skin in use hooks `surface` (a module may skip
 -- the work of handing over its parts when none does).
 function Theme.SkinHooks(surface)
-	return hookFor(surface) ~= nil
+	return hookFor(surface, layoutHooks) ~= nil
 end
 
 -- The guide window's parts for a skin's hooks and its own frames (Skin API 2,
@@ -346,8 +372,9 @@ end
 -- foot (the progress), here (While you're here). Frames to place things by
 -- and to restyle; nil before the window is built. One table, made once. The
 -- live window's: the guide hooks run for every guide window (the settings
--- preview's copy too), each handing its own parts or frames, so a hook reads
--- the window it dresses from what it is given.
+-- preview's copy too, and a preset card's drawn with the layout it picks),
+-- each handing its own parts or frames, so a hook reads the window it
+-- dresses from what it is given.
 function Theme.GuideParts()
 	local G = ns.UI and ns.UI.GuideFrame
 	return G and G.SkinParts and G.SkinParts() or nil
@@ -514,12 +541,31 @@ local function switchLayout()
 	local was = layoutId and LAYOUTS[layoutId]
 	layoutId, layoutHooks = id, l and l.hooks or nil
 	applyDefaults(l and l.defaults or nil)
-	for _, step in ipairs({ { was, "onLeave" }, { l, "onApply" } }) do
-		local s, name = step[1], step[2]
-		if s and type(s[name]) == "function" then
-			local ok, err = pcall(s[name], s.id)
-			if not ok then failLayout(s.id, err) end
+	-- The layout leaving: onLeave(id, parts, live) once per guide window it
+	-- dressed, the live window's parts first, then each copy's that draws
+	-- with the layout in use (UI.GuideFrame.copies); once with no parts
+	-- before the window is built.
+	if was and type(was.onLeave) == "function" then
+		local G = ns.UI and ns.UI.GuideFrame
+		local windows = {}
+		local live = Theme.GuideParts()
+		if live then windows[1] = { live, true } end
+		for copy in pairs(G and G.copies or {}) do
+			local p = copy.SkinParts and copy.SkinParts()
+			if p then windows[#windows + 1] = { p, false } end
 		end
+		if #windows == 0 then windows[1] = { nil, true } end
+		for _, w in ipairs(windows) do
+			local ok, err = pcall(was.onLeave, was.id, w[1], w[2])
+			if not ok then
+				failLayout(was.id, err)
+				break
+			end
+		end
+	end
+	if l and type(l.onApply) == "function" then
+		local ok, err = pcall(l.onApply, l.id)
+		if not ok then failLayout(l.id, err) end
 	end
 	return true
 end
@@ -567,7 +613,8 @@ end
 
 -- A registered layout's public facts (name, addon, author, version, desc,
 -- api, hooks: the surfaces it hooks, sorted; defaults: its settings'
--- defaults, a copy), or nil.
+-- defaults, a copy; preset: its card in the guide window's Presets, { label,
+-- help, set } with set a copy, or nil), or nil.
 function Theme.LayoutInfo(id)
 	local l = LAYOUTS[id]
 	if not l then return nil end
@@ -576,8 +623,49 @@ function Theme.LayoutInfo(id)
 	table.sort(hooks)
 	local defaults = {}
 	for k, v in pairs(l.defaults or {}) do defaults[k] = v end
+	local preset = l.preset
+	if preset then
+		local set = {}
+		for k, v in pairs(preset.set) do set[k] = v end
+		preset = { label = preset.label, help = preset.help, set = set }
+	end
 	return { id = id, name = l.name, addon = l.addon, author = l.author, version = l.version, desc = l.desc, api = l.api,
-		hooks = hooks, defaults = defaults, failed = LAYOUT_FAILED[id] }
+		hooks = hooks, defaults = defaults, preset = preset, failed = LAYOUT_FAILED[id] }
+end
+
+-- The installed layouts with a card in the guide window's Presets, in the
+-- order of the addons, then of their ids: a registered layout's when its
+-- spec has a preset; a layout not registered yet (its addon not loaded, or
+-- loading on demand) when its TOC names it in
+--   ## X-Polestar-Layout-Preset: ledger = Ledger; ledger-wide = Ledger wide
+-- (a bare id takes the id as its label), its help the TOC's Notes. A layout
+-- whose addon cannot load, or loaded without registering it, has none.
+-- -> { { id, label, help, set (a registered layout's, a copy; {} else), loaded, addon }, ... }
+function Theme.LayoutPresets()
+	local out = {}
+	for _, rec in ipairs(Theme.InstalledLayouts()) do
+		local named = {}
+		local declared = C_AddOns.GetAddOnMetadata(rec.addon, "X-Polestar-Layout-Preset")
+		if type(declared) == "string" then
+			for item in declared:gmatch("[^;]+") do
+				local id, label = item:match("^%s*([^=%s]+)%s*=%s*(.-)%s*$")
+				if not id then id = item:match("^%s*([^=%s]+)%s*$") end
+				if id then named[id] = label ~= "" and label or id end
+			end
+		end
+		for _, id in ipairs(rec.ids) do
+			local info = LAYOUTS[id] and Theme.LayoutInfo(id)
+			if info then
+				local p = info.preset
+				if p then
+					out[#out + 1] = { id = id, label = p.label or info.name, help = p.help, set = p.set, loaded = true, addon = rec.addon }
+				end
+			elseif named[id] and not rec.loaded and not rec.reason then
+				out[#out + 1] = { id = id, label = named[id], help = rec.notes, set = {}, loaded = false, addon = rec.addon }
+			end
+		end
+	end
+	return out
 end
 
 -- The built-in schemes and skins (their tokens are Theme.lua's tables;

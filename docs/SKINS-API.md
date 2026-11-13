@@ -155,6 +155,27 @@ Polestar.Theme.RegisterLayout("ledger", {
   Polestar's. Switching layout changes only the settings the player never
   set, the settings window shows the value in use, and a reset goes back
   to the layout's default.
+- **A preset card**: `preset = { label = "Ledger", help = "...", set = {
+  ["ui.skin"] = "ledger" } }` puts a card for the layout in the guide
+  window's Presets, after Polestar's own (Standard, Compact, Transparent,
+  Large text). Picking it chooses the layout, loading its addon, then
+  writes `set`: look settings as a skin's preset takes, and the skin the
+  layout is drawn for (`ui.skin`), never `ui.layout`. Picking one of
+  Polestar's own cards goes back to Polestar's own layout. The card is
+  checked while the layout is in use, and its picture is the guide window
+  drawn through the layout's hooks; Polestar's own cards draw with
+  Polestar's own layout whatever the layout in use. Keep `defaults` out of
+  `set`: they stay the layout's soft defaults. A layout that loads on
+  demand names its card in its TOC so it shows before the addon loads
+  (`## X-Polestar-Layout-Preset: ledger = Ledger`); its picture is then the
+  label alone. Capability `layouts.preset`.
+- **Leaving**: `onLeave(id, parts, live)` runs once for each guide window
+  the layout dressed: the live window (`live` true), then each copy drawing
+  with the layout in use, such as the settings preview (`live` false). It
+  gives that window's parts their look back and hides the pieces the layout
+  made in it; the live window's call also hides pieces outside any guide
+  window. A guide window's frame carries `psGuideWindow = true`, so a layout
+  can tell which window a piece sits in.
 - **The choice**: the setting `ui.layout`, unset for Polestar's own layout.
   `Polestar.Theme.SetLayout("ledger")` picks one (in chat: `/run
   Polestar.Theme.SetLayout("ledger")`), `Polestar.Theme.SetLayout()` goes

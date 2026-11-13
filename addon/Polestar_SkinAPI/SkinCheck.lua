@@ -1,7 +1,7 @@
 -- The Skin API's checks (docs/skins/reference.md): what a colour scheme, a
 -- skin or a layout from another addon goes through as it registers (its
 -- fields, colours and fonts, its text's legibility, its variants, shadow,
--- art tint and preset; a layout's structure hooks). Polestar loads this part (Polestar_SkinAPI, load on demand) with
+-- art tint and preset; a layout's structure hooks and preset card). Polestar loads this part (Polestar_SkinAPI, load on demand) with
 -- the first scheme or skin another addon registers (Theme/SkinApi.lua), so a
 -- player who uses none never loads it. Polestar's own internals come through
 -- Polestar.ThemeInternal; the checks go back to it as I.register, and the
@@ -197,7 +197,7 @@ local SKIN_FIELDS = { api = true, name = true, addon = true, author = true, vers
 	variants = true, defaultVariant = true, resolve = true, shadow = true, artTint = true }
 -- A layout's (Theme.RegisterLayout): the window's structure, no look.
 local LAYOUT_FIELDS = { api = true, name = true, addon = true, author = true, version = true, desc = true, hooks = true,
-	onApply = true, onLeave = true, defaults = true }
+	onApply = true, onLeave = true, defaults = true, preset = true }
 -- A variant's own (spec.variants, Skin API 2): what it changes of the skin.
 local VARIANT_FIELDS = { id = true, name = true, desc = true, base = true, scheme = true, tokens = true, media = true,
 	arrow = true, preset = true, artTint = true, shadow = true }
@@ -211,10 +211,15 @@ local PRESET_DENIED_KEYS = { ["ui.skin"] = true }
 
 -- A preset value as its setting holds it, checked against the setting's
 -- default: the same type; a colour setting (default false) takes a colour.
--- -> value | nil, why
-local function presetValue(path, v)
+-- A layout's preset (skinOk) may also name the skin it is drawn for
+-- (ui.skin). -> value | nil, why
+local function presetValue(path, v, skinOk)
 	if type(path) ~= "string" or not path:match("^[%a][%w_]*%.[%w_.]+$") then
 		return nil, format("preset key %q is not a setting path (like \"ui.scale\")", tostring(path))
+	end
+	if skinOk and path == "ui.skin" then
+		if type(v) ~= "string" or not v:match("^[%w_%-]+$") then return nil, "preset.set[\"ui.skin\"] must be a skin id" end
+		return v
 	end
 	if PRESET_DENIED_KEYS[path] or PRESET_DENIED_SECTIONS[path:match("^[^.]+")] then
 		return nil, format("preset.%s is not a look setting (a preset changes how Polestar looks, never what it does)", path)
@@ -651,6 +656,39 @@ local function readLayoutDefaults(t)
 	return true, out
 end
 
+-- A layout's card in the guide window's Presets: { label, help, set = {
+-- [path] = value } }, label at most 40 characters (the layout's name when
+-- unset), help at most 200, set the look's settings it writes as a skin's
+-- preset does, and the skin it is drawn for (ui.skin). Picking the card
+-- chooses the layout (ui.layout, never in set) and then writes set; the
+-- layout's defaults stay its own (spec.defaults), out of the preset.
+-- -> true, the preset copied | false, why
+local LAYOUT_PRESET_FIELDS = { label = true, help = true, set = true }
+local function readLayoutPreset(p, name)
+	if p == nil then return true, nil end
+	if type(p) ~= "table" then return false, "preset must be a table { label, help, set }" end
+	for k in pairs(p) do
+		if not LAYOUT_PRESET_FIELDS[k] then return false, format("unknown field preset.%s", tostring(k)) end
+	end
+	for _, f in ipairs({ { "label", 40 }, { "help", 200 } }) do
+		local v = p[f[1]]
+		if v ~= nil and (type(v) ~= "string" or v == "" or #v > f[2]) then
+			return false, format("preset.%s must be a string of 1-%d characters", f[1], f[2])
+		end
+	end
+	local set = {}
+	if p.set ~= nil then
+		if type(p.set) ~= "table" then return false, "preset.set must be a table of setting = value" end
+		for path, v in pairs(p.set) do
+			if path == "ui.layout" then return false, "preset.set[\"ui.layout\"]: picking the card chooses the layout" end
+			local value, why = presetValue(path, v, true)
+			if value == nil then return false, why end
+			set[path] = value
+		end
+	end
+	return true, { label = p.label or name, help = p.help, set = set }
+end
+
 -- Register layout `id`: its facts, its structure hooks and its onApply and
 -- onLeave, nothing of a look (a skin's tokens, colours, fonts or painters).
 local function registerLayout(id, spec)
@@ -684,11 +722,14 @@ local function registerLayout(id, spec)
 	local defaults
 	ok, defaults = readLayoutDefaults(spec.defaults)
 	if not ok then return false, defaults end
+	local preset
+	ok, preset = readLayoutPreset(spec.preset, spec.name)
+	if not ok then return false, preset end
 	local hooks = {}
 	for k, v in pairs(spec.hooks or {}) do hooks[k] = v end
 	LAYOUTS[id] = { id = id, name = spec.name, addon = spec.addon, author = spec.author, version = spec.version,
 		desc = spec.desc, api = spec.api or 1, hooks = hooks, onApply = spec.onApply, onLeave = spec.onLeave,
-		defaults = defaults }
+		defaults = defaults, preset = preset }
 	-- A saved choice waiting for this layout (its addon loaded late) shows now.
 	if I.layoutRegistered then I.layoutRegistered(id) end
 	return true

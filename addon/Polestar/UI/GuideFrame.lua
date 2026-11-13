@@ -91,14 +91,40 @@ function GF.Part(fn)
 	fn(GF)
 end
 -- A copy of the window, unnamed, in `parent`, drawing `content` (a provider
--- of GF.CONTENT): built, not drawn. -> its table (copy.frame, copy.parts,
--- copy.rows, ... as the live window's)
-function GF.Copy(parent, content)
-	local copy = { live = false, parent = parent, content = content }
+-- of GF.CONTENT): built, not drawn. opts.layout: the layout it draws with
+-- (GF.layoutChoice). -> its table (copy.frame, copy.parts, copy.rows, ... as
+-- the live window's)
+function GF.Copy(parent, content, opts)
+	local copy = { live = false, parent = parent, content = content, layoutChoice = opts and opts.layout }
 	for _, fn in ipairs(partsOf) do fn(copy) end
 	copy.Build()
+	-- A copy drawing with the layout in use is a window the layout leaves
+	-- (Theme's switch hands its parts to the layout's onLeave, as the live
+	-- window's): GF.copies, held weakly.
+	if copy.layoutChoice == nil then
+		GF.copies = GF.copies or setmetatable({}, { __mode = "k" })
+		GF.copies[copy] = true
+	end
 	return copy
 end
+
+-- The layout's and the skin's hooks for this window (Theme.SkinHookFor):
+-- GF.layoutChoice is the layout it draws with, nil the one in use (the live
+-- window, the settings' preview), false Polestar's own (a built-in preset's
+-- card), an id that layout's (a layout's preset card). The hooks get this
+-- window's parts. With the layout in use they go through Theme.SkinHook and
+-- Theme.SkinHookValue, as every other surface's do.
+GF.Part(function(GF)
+	local Theme = ns.Theme
+	function GF.Hook(surface, ...)
+		if GF.layoutChoice == nil then return Theme.SkinHook(surface, ...) end
+		return Theme.SkinHookFor(GF.layoutChoice, surface, ...)
+	end
+	function GF.HookValue(surface, ...)
+		if GF.layoutChoice == nil then return Theme.SkinHookValue(surface, ...) end
+		return Theme.SkinHookValueFor(GF.layoutChoice, surface, ...)
+	end
+end)
 
 GF.Part(function(GF)
 	local UI, Theme, W, Anim = ns.UI, ns.Theme, ns.Widgets, ns.Anim
@@ -849,7 +875,7 @@ GF.Part(function(GF)
 			r.psRowInfo = info
 		end
 		info.current, info.done, info.skipped = current and true or false, done, skipped
-		Theme.SkinHook("guideRow", r, goal, info)
+		GF.Hook("guideRow", r, goal, info)
 	end
 
 	local function layoutBar(b, tw)
@@ -1448,7 +1474,7 @@ GF.Part(function(GF)
 	-- goals area scrolls past the window's cap, default on), "classCardLater"
 	-- (the class quest card on the chain's later steps, default on).
 	function GF.Shows(name, default)
-		local ran, v = Theme.SkinHookValue("guideShows", name, default)
+		local ran, v = GF.HookValue("guideShows", name, default)
 		if ran and type(v) == "boolean" then return v end
 		return default
 	end
@@ -1810,7 +1836,7 @@ GF.Part(function(GF)
 				r:SetShown(rowsShown)
 				-- The skin in use's touch on the row (Skin API 2,
 				-- hooks.guideUpRow(row, view, index)).
-				Theme.SkinHook("guideUpRow", r, v, i)
+				GF.Hook("guideUpRow", r, v, i)
 			end
 			i = i + 1
 		end
@@ -1972,7 +1998,7 @@ GF.Part(function(GF)
 		for _, gi in ipairs(group.goals or {}) do
 			local goal = v.goals[gi]
 			local ran, taken
-			if goal then ran, taken = Theme.SkinHookValue("guideTakes", goal) end
+			if goal then ran, taken = GF.HookValue("guideTakes", goal) end
 			if goal and goal.status ~= "na" and not goal.folded and not (ran and taken == true) then
 				list[#list + 1] = UI.ReadingGoal(v, goal)
 				if not goal.header then others = others + 1 end
@@ -2530,7 +2556,7 @@ GF.Part(function(GF)
 	-- the step on screen, nil when there is none.
 	function GF.Render()
 		render()
-		if F then Theme.SkinHook("guideRender", state == "steps" and view or nil, GF.SkinParts()) end
+		if F then GF.Hook("guideRender", state == "steps" and view or nil, GF.SkinParts()) end
 	end
 
 	-- The step the window shows (the catch-up's while it goes over the steps).
@@ -3144,6 +3170,9 @@ GF.Part(function(GF)
 		-- The parts a skin's hooks get (Skin API 2; Theme.GuideParts hands out
 		-- the live window's): this window's, its frame and goal rows with them.
 		local skinParts = { window = F, rows = rows }
+		-- Marks a guide window's frame: a layout tells its own pieces by the
+		-- window they sit in.
+		F.psGuideWindow = true
 		for k, v in pairs(GF.parts) do skinParts[k] = v end
 		function GF.SkinParts() return skinParts end
 		handOver()
