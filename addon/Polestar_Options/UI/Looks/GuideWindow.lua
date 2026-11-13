@@ -58,7 +58,7 @@ local WATCH = {
 local PART_OF = {}
 for part, keys in pairs({
 	bars = { "tabs", "tabHeight", "navHeight", "barTextSize", "stepCount", "guideTitle", "skipButton", "reportButton" },
-	person = { "titleSize", "glyphSize" },
+	person = { "titleSize", "glyphSize", "lastStep" },
 	goals = { "goalSize", "detailSize", "rowSpacing", "lineSpacing", "checkSize", "targetBar", "targetBarWidth", "targetBarColor" },
 	tip = { "noteSize", "upSize" },
 	foot = { "progress", "progressHeight", "progressColor", "progressPct" },
@@ -549,7 +549,7 @@ local function buildWindow(f, top)
 			["guideWindow.tabs"] = { strip }, ["guideWindow.tabHeight"] = { strip }, ["guideWindow.navHeight"] = { nav },
 			["guideWindow.barTextSize"] = bars, ["guideWindow.stepCount"] = { nav.Count }, ["guideWindow.guideTitle"] = { nav.Title },
 			["guideWindow.skipButton"] = { nav.Skip, nav.SkipIcon }, ["guideWindow.reportButton"] = { nav.Report },
-			["guideWindow.titleSize"] = { person.Name }, ["guideWindow.goalSize"] = texts, ["guideWindow.detailSize"] = subs,
+			["guideWindow.titleSize"] = { person.Name }, ["guideWindow.lastStep"] = { person }, ["guideWindow.goalSize"] = texts, ["guideWindow.detailSize"] = subs,
 			["guideWindow.glyphSize"] = icons, ["guideWindow.rowSpacing"] = rows, ["guideWindow.lineSpacing"] = texts,
 			["guideWindow.checkSize"] = checks, ["guideWindow.targetBar"] = { self.Rows[2].Mark },
 			["guideWindow.targetBarWidth"] = { self.Rows[2].Mark }, ["guideWindow.targetBarColor"] = { self.Rows[2].Mark },
@@ -798,6 +798,9 @@ local SPECS = {
 			help = L["The bug button that reports a problem with the step. The guide menu still has it."], search = "bug, report, problem, button, report button" },
 	} },
 	{ page = PAGE, tab = L["Parts"], section = L["Step card"], controls = {
+		{ kind = "toggle", key = "guideWindow.lastStep", label = L["Last step"], new = NEW,
+			help = L["The step before this one, on one dimmed line over the step: done or skipped. Click it to go back to that step."],
+			search = "last step, previous step, step before, done step, history, back" },
 		textSize("titleSize", L["Name size"], L["The name of the person to talk to now, or the step's place, at the top of the card."],
 			"title, step title, name, header, npc name, person"),
 		textSize("goalSize", L["Goal size"], L["The goal lines of the step and of While you're here."], "goal, goals, objectives, step text, lines, text size"),

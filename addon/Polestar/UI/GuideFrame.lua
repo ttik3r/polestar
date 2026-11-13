@@ -190,7 +190,7 @@ GF.LOOK = {
 	targetBar = true, targetBarColor = false, targetBarWidth = 2,
 	progress = true, progressPct = true, progressHeight = 3, progressColor = false,
 	bgColor = false, bgOpacity = false, border = true, idleAlpha = 1, combatAlpha = 0.35, veil = 0.68, shade = 0.2,
-	stepAnim = true, animSpeed = 1, foldAnim = true, rules = true, hideTaxi = false,
+	stepAnim = true, animSpeed = 1, foldAnim = true, rules = true, hideTaxi = false, lastStep = false,
 }
 ns.RegisterDefaults("guideWindow", GF.LOOK)
 
@@ -1669,6 +1669,41 @@ local function navigatorFor(guide, index)
 	nav.Steps:SetWidth(24 + cw + 24)
 end
 
+-- The last step: the step before the one on screen that the route holds,
+-- one dimmed line over the step's header (guideWindow.lastStep, off by
+-- default; not in compact mode, nor on a guide's first step). It says
+-- whether it was done or skipped; a click goes back to it.
+local function fillLast(E, index)
+	local last = card.Last
+	local found, v
+	if GF.On("lastStep") and not compact() and type(index) == "number" then
+		for s = index - 1, 1, -1 do
+			local sv = E.GetStepView(s)
+			if sv and sv.status ~= "na" and not sv.along and not UI.StepHidden(s) then
+				found, v = s, sv
+				break
+			end
+		end
+	end
+	last.psIndex, last.psView = found, v
+	if not v then
+		last.psStatus, last.psSummary, last.psTitle = nil, nil, nil
+		last:Hide()
+		return
+	end
+	local skipped = v.skipped or v.status == "skipped"
+	last.psStatus = skipped and "skipped" or v.status
+	last.psSummary = UI.StepSummary(v)
+	last.psTitle = v.title or last.psSummary
+	last.Num:SetText(UI.StepNo(found))
+	last.Icon:SetTexture(Theme.VerbIcon(UI.FirstVerb(v)))
+	local text = last.psSummary
+	if skipped then text = text .. "  |c" .. Theme.Hex("textMuted") .. L["skipped"] .. "|r" end
+	last.Text:SetText(text)
+	W.Color(last.Text, "textMuted")
+	last:Show()
+end
+
 local function fillUpcoming(E, index)
 	for i = 1, #upRows do upRows[i]:Hide() end
 	local want = compact() and 0 or (ns.Get("ui.upcoming") or 0)
@@ -2393,6 +2428,7 @@ local function render()
 	fillAlong(E)
 	GF.FillHere(E)
 	fillUpcoming(E, index)
+	fillLast(E, index)
 	showSteps(true)
 	GF.Layout()
 	followCurrent(focusChanged)
@@ -2741,6 +2777,31 @@ local function build()
 	card.Section:SetJustifyH("LEFT")
 	card.Section:SetWordWrap(false)
 	card.Section:Hide()
+	-- The last step's line over the header (fillLast, layoutCard).
+	local last = CreateFrame("Button", nil, card)
+	last:SetHeight(UP_ROW)
+	W.Hover(last)
+	last.Num = GF.SizeAs(T(last, "number", "textMuted"), "up")
+	last.Num:SetJustifyH("RIGHT")
+	last.Num:SetWidth(22)
+	last.Icon = last:CreateTexture(nil, "ARTWORK")
+	last.Icon:SetSize(13, 13)
+	W.Color(last.Icon, "textMuted")
+	last.Text = GF.SizeAs(T(last, "label", "textMuted"), "up")
+	last.Text:SetJustifyH("LEFT")
+	last.Text:SetWordWrap(false)
+	last:SetAlpha(0.7)
+	last:SetScript("OnClick", function(self)
+		local E = Engine()
+		if E and E.Goto and self.psIndex then E.Goto(self.psIndex) end
+	end)
+	last:SetScript("OnEnter", function(self)
+		W.Tooltip(self, tooltipAnchor(), self.psTitle or "", { { L["Click to jump to this step"], Theme.Accent() } })
+		GF.HoverIn()
+	end)
+	last:SetScript("OnLeave", function(self) W.HideTooltip(self) end)
+	last:Hide()
+	card.Last = last
 	-- Blizzard: a gold separator under the person, above the goals.
 	person.Rule = person:CreateTexture(nil, "ARTWORK")
 	person.Rule:SetTexture(Theme.Media("white"))
@@ -3004,7 +3065,7 @@ local function build()
 	GF.parts = {
 		strip = strip, nav = nav, body = body, card = card, person = person, tip = tip, after = after,
 		along = along, upnext = upnext, empty = empty, band = band, banner = banner, foot = foot, line = foot.Line, here = GF.here,
-		goals = goals,
+		goals = goals, last = last,
 	}
 	GF.chrome = chrome
 	handOver()
