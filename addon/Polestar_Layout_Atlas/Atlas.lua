@@ -1100,6 +1100,202 @@ on("guideProgress", function(foot, frac)
 end)
 
 ---------------------------------------------------------------------------
+-- The rail: a line down the window's left from the current step's node (a
+-- disc in the accent) to the steps in Up next (hollow nodes, fainter ahead).
+-- The card and Up next are set in from it (guideInset); each Up next row is
+-- its first goal on one line with its zone on the right (guideUpRow). The
+-- "after" line is not shown: the rail shows the next step already. Out of
+-- compact mode only, and only where Polestar sets parts in (guideInset).
+---------------------------------------------------------------------------
+
+local CARD_X, UP_X, RAIL = 22, 13, 15 -- the card's and Up next's insets, the rail's x
+local FADE = { 0.9, 0.65, 0.4 } -- the steps ahead, fainter further on
+
+local function onRail() return not compact() and has("guideInset") end
+
+on("guideInset", function(name)
+	if not onRail() then return nil end
+	if name == "card" then return CARD_X end
+	if name == "upnext" then return UP_X end
+end)
+
+-- Done goals stay in place; the goals do not scroll on their own; on the
+-- rail Up next has no heading to open it by.
+on("guideShows", function(what, shown)
+	if what == "done" then return true end
+	if what == "goalScroll" then return false end
+	if what == "upnextHead" then return not onRail() end
+	return shown
+end)
+
+-- Up next's rows, in order.
+local function upRows(frame)
+	local rows = {}
+	if not (frame and frame:IsShown()) then return rows end
+	for _, r in ipairs({ frame:GetChildren() }) do
+		if type(rawget(r, "Num")) == "table" and rawget(r, "psIndex") and r:IsShown() then rows[#rows + 1] = r end
+	end
+	table.sort(rows, function(a, b) return a.psIndex < b.psIndex end)
+	return rows
+end
+
+-- A step's line on the rail: its first goal that is not a walk, in the
+-- goal's words, and the zone it is in.
+local function stepLine(v)
+	local first, place
+	for _, g in ipairs(v.goals or {}) do
+		if g.status ~= "na" then
+			if not place and g.map then place = Core.mapName(g.map) end
+			if not first and g.t ~= "goto" then first = g end
+		end
+	end
+	first = first or (v.goals and v.goals[1])
+	return first and Core.goalText(first) or Core.stepSummary(v) or "", place
+end
+
+-- An Up next row (guideUpRow; Polestar sets the row again at every fill).
+on("guideUpRow", function(row, v)
+	local own = store(row)
+	if not onRail() then
+		if own.zone then own.zone:Hide() end
+		return
+	end
+	local text, place = stepLine(v or {})
+	row.Text:SetText(text)
+	row.Text:SetTextColor(Theme.Color("textDim"))
+	row.Text:SetMaxLines(1)
+	if not own.zone then
+		own.zone = row:CreateFontString(nil, "OVERLAY")
+		Theme.Font(own.zone, "label")
+		own.zone:SetJustifyH("RIGHT")
+		own.zone:SetWordWrap(false)
+	end
+	own.zone:SetText(place or "")
+	own.zone:SetTextColor(Theme.Color("textMuted"))
+	own.zone:ClearAllPoints()
+	own.zone:SetPoint("RIGHT", row, "TOPRIGHT", -14, -12)
+	own.zone:SetShown(place ~= nil)
+	row:Show()
+end)
+
+-- Up next's rows fade ahead; each text stops short of its zone.
+local function upFit(frame)
+	local rows = upRows(frame)
+	for i, r in ipairs(rows) do
+		r:SetAlpha(onRail() and (FADE[i] or FADE[#FADE]) or 1)
+		if onRail() then
+			local zone = stores[r] and stores[r].zone
+			local zw = (zone and zone:IsShown()) and math.min(zone:GetStringWidth() + 1, 110) or 0
+			if zone then zone:SetWidth(zw) end
+			local left = 59 -- Polestar's text column in the row
+			r.Text:SetWidth(math.max(40, (r:GetWidth() or 300) - left - 14 - (zw > 0 and zw + 8 or 0)))
+		end
+	end
+end
+onLeave(function(parts) for _, r in ipairs(upRows(parts.upnext)) do r:SetAlpha(1) end end)
+
+on("guidePlace", function(name, part)
+	if name == "after" and onRail() then
+		part:Hide()
+		return true
+	end
+	if name == "upnext" then upFit(part) end
+end)
+
+-- A node: a disc, with a ring of the window's ground round it (the current
+-- step) or a hollow middle (the steps ahead).
+local function node(holder, key, parent)
+	local n = holder[key]
+	if n then return n end
+	n = {}
+	for i, part in ipairs({ "ring", "disc", "hole" }) do
+		local t = parent:CreateTexture(nil, "OVERLAY", nil, i)
+		t:SetTexture(Theme.Media("circle"))
+		n[part] = t
+	end
+	holder[key] = n
+	return n
+end
+
+local function paintNode(n, current, alpha)
+	local br, bg, bb = Theme.Color("bg")
+	local size = current and 10 or 8
+	n.ring:SetSize(size + 6, size + 6)
+	n.ring:SetVertexColor(br, bg, bb, current and 1 or 0)
+	n.disc:SetSize(size, size)
+	n.hole:SetSize(size - 2, size - 2)
+	if current then
+		local r, g, b = Theme.Accent()
+		n.disc:SetVertexColor(r, g, b, 1)
+		n.hole:SetVertexColor(0, 0, 0, 0)
+	else
+		local r, g, b = Theme.Color("textDim")
+		n.disc:SetVertexColor(r, g, b, 0.42 * alpha)
+		n.hole:SetVertexColor(br, bg, bb, 1)
+	end
+end
+
+local function placeNode(n, rel, point, x, y)
+	for _, part in ipairs({ "ring", "disc", "hole" }) do
+		local t = n[part]
+		t:ClearAllPoints()
+		t:SetPoint("CENTER", rel, point, x, y)
+		t:Show()
+	end
+end
+
+local function hideNode(n)
+	if n then n.ring:Hide(); n.disc:Hide(); n.hole:Hide() end
+end
+
+-- The rail and its nodes, on a layer of Atlas's own over the window.
+local function rail(parts)
+	local window, person = parts.window, parts.person
+	local own = store(window)
+	if not own.rail then
+		own.rail = CreateFrame("Frame", nil, window)
+		own.rail:SetAllPoints(window)
+		own.rail.dots = {}
+	end
+	local layer = own.rail
+	layer:SetFrameLevel(window:GetFrameLevel() + 8)
+	local parent = person and person:GetParent()
+	if not (onRail() and person and person:IsShown() and parent and parent:IsShown() and person.Name) then
+		layer:Hide()
+		return
+	end
+	layer:Show()
+	local cn = node(layer, "cur", layer)
+	paintNode(cn, true, 1)
+	placeNode(cn, person, "TOPLEFT", RAIL - CARD_X, -(10 + person.Name:GetStringHeight() / 2))
+	local bottom = cn.disc
+	local rows = upRows(parts.upnext)
+	for i = 1, math.max(#rows, #layer.dots) do
+		local d = node(layer.dots, i, layer)
+		local r = rows[i]
+		if r then
+			paintNode(d, false, FADE[i] or FADE[#FADE])
+			placeNode(d, r, "TOPLEFT", RAIL - UP_X, -12)
+			bottom = d.disc
+		else
+			hideNode(d)
+		end
+	end
+	if not layer.line then
+		layer.line = layer:CreateTexture(nil, "ARTWORK")
+		layer.line:SetTexture(Theme.Media("white"))
+	end
+	layer.line:SetWidth(pixel(layer))
+	layer.line:ClearAllPoints()
+	layer.line:SetPoint("TOP", cn.disc, "CENTER", 0, 0)
+	layer.line:SetPoint("BOTTOM", bottom, "CENTER", 0, 0)
+	local r, g, b = Theme.Color("textMuted")
+	layer.line:SetVertexColor(r, g, b, 0.35)
+	layer.line:SetShown(bottom ~= cn.disc)
+end
+on("guideLayout", function(parts) if parts.window then rail(parts) end end)
+
+---------------------------------------------------------------------------
 -- Registration
 ---------------------------------------------------------------------------
 

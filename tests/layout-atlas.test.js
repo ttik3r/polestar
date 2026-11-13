@@ -105,6 +105,7 @@ run("guideShows", "upnextHead", true)
 run("guideInset", "card")
 if parts.person then run("guidePerson", parts.person, 300, 20) end
 for _, r in ipairs(parts.rows or {}) do run("guideRow", r, view.goals[1], { current = true }) end
+if parts.upnext then for i, r in ipairs({ parts.upnext:GetChildren() }) do run("guideUpRow", r, view, i) end end
 run("guideLayout", parts, 300, 200)
 run("guideProgress", parts.foot, 0.4)
 run("guideAnchor")
