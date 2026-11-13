@@ -146,7 +146,7 @@ Messages:
 | `GUIDE_PLACED` | guideId, stepIndex or nil, `{ guideId, ... }` | Engine, active tab, once placement of a guide just opened ends (see "Placement"; not for a guide a login or /reload brings back): where the guide resumes, and the guides passed whole on the way; the guide window goes over the steps before it, titles and count rolling (`GF.PlayCatchUp`, after `PLAYER_ENTERING_WORLD`) |
 | `CATCH_UP` | true \| false | Guide window, while its catch-up goes over the steps (`GF.PlayCatchUp`): the arrow shows an hourglass turning over in its dial's place (`Arrow.SetBusy`; Media/UI `hourglass`, `hourglass-sand`, tools/media/ui.js) |
 | `SETTING_CHANGED` | path, value | Core settings |
-| `TOGGLE_FRAME` / `SHOW_FRAME` | — | commands, keybinds → UI (from a hidden Polestar both show it again, the window with it) |
+| `TOGGLE_FRAME` / `SHOW_FRAME` | — | commands, keybinds → UI (from a hidden Polestar both show it again, the window with it; a window on but out of sight stays on and they say why: see "Out of sight") |
 | `POLESTAR_HIDDEN` | hidden (true \| false) | Core, `Polestar.SetHidden` (and true again as "Keep the arrow when hidden" changes while hidden): see "Hiding Polestar" |
 | `SHOW_PICKER` | — | commands → UI |
 | `SHOW_OPTIONS` | section or nil | commands → UI |
@@ -552,6 +552,44 @@ call: a new one fails the test until it is listed, so a new surface is
 decided on. New frames on the screen take `Polestar.UIParent` as their
 parent, new sounds go through `Polestar.PlaySound`, new toasts check
 `Polestar.Hidden()`, and new map drawings hang off `view.frame`.
+
+### Out of sight
+
+```lua
+Polestar.OutOfSight(frame) -> bool  -- shown, but another addon keeps it out of sight (its scale under 0.2)
+Polestar.SayOutOfSight() -> bool    -- one chat line: which of the window and the arrow is out of sight, how to get it back
+Polestar.WatchSight(frame, role)    -- role "window" | "arrow": post-hooks its SetScale and OnShow
+```
+
+Some UI addons follow the guide's steps in their own quest tracker and route
+and keep one arrow on screen by turning the guide window and the arrow down
+to nothing (a scale far below a pixel, alpha 0) instead of hiding them, laid
+again after each of Polestar's own `SetScale` and `SetAlpha`. Both still read
+as shown, so `GuideShown()` holds and the action buttons stay (the target
+button may be all the player sees). It is told by the scale alone: Polestar
+never sets its own frames' scale that low (the window's is 0.6 at least, the
+arrow's 0.5), while the player's own fades take both to alpha 0 in a fight
+(`guideWindow.combatAlpha`, `nav.arrowCombatAlpha`) and the window to 0.03 at
+rest (`ui.opacity` 0.3 times `guideWindow.idleAlpha` 0.1).
+
+- The guide window (`UI/GuideFrame.lua`) and the arrow (`Nav/Arrow.lua`) are
+  watched: the first time on the account one of them goes out of sight
+  (`PolestarDB.sightTold`), a notice at the top of the screen for 12 seconds
+  and the chat line say so; not while Polestar is hidden.
+- The window's toggle (`TOGGLE_FRAME`: `/polestar`, its key, the minimap
+  menu's Guide window) leaves a window that is on but out of sight on and
+  says why instead: turning it off would take away only the action buttons.
+  Showing a window that stays out of sight (the toggle, `SHOW_FRAME`) says
+  so too. `Nav.ToggleArrow` does the same for the arrow, and
+  `Nav.SayGuideHidden` (`/polestar arrow show`, `way`, `near`) names it.
+  Polestar never takes its frames back from the other addon.
+- Scales are worked out from the scale Polestar set, never the frame's own:
+  `GF.ApplyScale` from `GF.scale`, and unlock mode's `Movers.Ratio` from the
+  setting's scale while the frame is out of sight, so a box stands where the
+  frame would and a drag saves a place on the screen.
+
+`rust/crates/forge-addontest/tests/addontest/out-of-sight.rs` plays it with a
+stand-in for such an addon.
 
 ### Gamepad interface
 
@@ -1373,7 +1411,7 @@ Polestar.Engine.SetGuide(id)                -- persists CharState().guide, recom
 Polestar.Engine.ReplaceSteps(id, steps) -> true | false, reason   -- Polestar.API.ReplaceSteps: the guide takes `steps` in place, in its tab; done steps before the live step that the list leaves out stay in front (Own.stepsKept); ticks, skips, `when` outcomes and the view go with their steps by step key (Own.remap with the old steps' goals); the live step is found again, not placed afresh; GUIDE_CHANGED once while its tab is active
 Polestar.Engine.GetStepIndex() -> i | nil
 Polestar.Engine.GetStepCount() -> n
-Polestar.Engine.GetStepView(i) -> view | nil
+Polestar.Engine.GetStepView(i, shared?) -> view | nil   -- built afresh; shared = true for a reader that never writes into the view: one view per step for every such reader of the same moment (the same frame and ns.Moment(): no timer, script, game event or message since, no Engine.RequestUpdate; the same evaluation and guide). QoL.CurrentStep, the map layers, the quest log's room, Gossip, Up next, the hand-off and party share it; the guide window, which keeps its view, does not
 Polestar.Engine.GetSection(i) -> { index, title, skill, skillLine, from, to, rank, state } | nil   -- the skill range step i of a profession guide is under (GUIDE_FORMAT.md, "Sections"): title "First Aid 1-40" (the client's profession name), state "done" (the player's skill reached `to`), "current" (the first range it has not) or "ahead"; the view's `section`. The steps of a done range are done unless one trains a rank the player lacks, and a range's counted collect/buy goals ask for their count less what its `craft … until` goals would have used from `from` to the skill (Own.needOf)
 Polestar.Engine.Next() / Prev() / Goto(i)    -- look at another step; changes nothing (Goto un-skips its target)
 Polestar.Engine.Skip() -> stepIndex         -- skip the step shown, saved; fires PLAYER_SKIPPED_STEP
@@ -1399,6 +1437,7 @@ Polestar.Engine.GetAlong() -> { { index, title, untilStep?, goals = { goal view,
 Polestar.Engine.AimAlong(stepIndex, goalIndex) -> bool     -- lead the arrow to one of them (row click); holds while it is listed
 Polestar.Engine.GetWaypoint() -> waypoint | nil
 Polestar.Engine.GetProgress() -> doneSteps, totalSteps
+Polestar.Engine.ProgressSoon(fn) -> doneSteps, totalSteps | nil   -- the same count for the guide window's bar without the frame's spike: kept for this evaluation, else nil and counted 40 steps a frame (none while an update is due; an evaluation half way starts it again), then fn(done, total), each fn once
 Polestar.Engine.StepNumber(i) -> number, hidden     -- step i of the active guide as the player counts it (see "Steps the character has")
 Polestar.Engine.StepTotal() -> number               -- the steps the player sees
 Polestar.Engine.StepNumberOf(guide, i) -> number, hidden; Polestar.Engine.StepTotalOf(guide) -> number  -- the same for any guide
@@ -1606,7 +1645,10 @@ Polestar.Engine.StepHiddenFor(step, who?) -> bool  -- no step of its own for who
   than the global cooldown and not run out; it times an update for when it
   ends, and `BAG_UPDATE_COOLDOWN`/`SPELL_UPDATE_COOLDOWN` update once a guide
   has asked), whether the character knows a spell (`Compat.IsSpellKnown`,
-  else `Compat.IsPlayerSpell`; `SPELLS_CHANGED` updates), and the player's
+  else `Compat.IsPlayerSpell`; `SPELLS_CHANGED` updates), whether it knows a
+  flight path (`taxi`, format 10: `Own.fpKnown`, as for a `getfp` goal: the
+  node in `CharState().flags.taxi`, else the name among the flight maps
+  opened; learning one updates), and the player's
   answer at a group quest (`Own.groupAnswer`:
   `CharState().groupQuests[q]`, "do" or "skip", set by `Engine.AnswerGroup`
   from the guide window's banner or Options, Discovery, Group quests;
@@ -1826,7 +1868,7 @@ Polestar.Engine.StepHiddenFor(step, who?) -> bool  -- no step of its own for who
   dismiss holds across builds. Learning it (the flight map, "New flight path
   discovered", `TAXI_NODE_STATUS_CHANGED`: Nav marks the node known, a build
   follows) ends the line and ticks the guide's later `getfp` goal for that
-  flight master (`fpKnown`), as an early pick-up does; the live step stays.
+  flight master (`Own.fpKnown`), as an early pick-up does; the live step stays.
   The arrival poll measures at most `HERE_MAX` of them (`Own.hereList`): all
   when that many fit, else the nearest (`Own.herePick`, again each
   `HERE_REPICK` yards the player moves). It (`Own.hereTick`, allocation-free:
@@ -3019,9 +3061,23 @@ Polestar.Theme.SkinHook(surface, ...), SkinHookValue(surface, ...) -> ran, answe
 Polestar.Theme.DrawSkinCard(frame, id, variant?), DrawSchemeCard(frame, id)   -- the Theme page's picker cards (Polestar_Options/Theme/SkinPicker.lua)
 Polestar.Theme.PaletteFor(id)
 Polestar.Theme.Metric(key, house) -> n   -- a size in the skin in use; `house` in the house style
+Polestar.Theme.House(key) -> token | nil   -- the house look's own (Theme/House.lua); nil in every other look
 Polestar.Theme.Icon(name) -> name        -- a glyph a skin draws its own way ("bug" -> "flag")
 Polestar.Theme.FontKey() -> "opensans" | "game" | "inter" | "fira"   -- ui.font, "skin" resolved
 ```
+
+**The house look** (`Theme/House.lua`, loaded before `Theme/Theme.lua`):
+Polestar gold, the status and subject colours every look starts from
+(`SHARED`), the colour schemes (`SCHEMES`), the type ladder (`ROLES`) and
+the frame painters (`HOUSE_PAINT`, handed Theme.lua's paint helpers by
+`House.Bind` as Theme.lua loads). Theme.lua takes them as its own locals; the
+Skin API fills the same tables. The house's sizes stay each module's own
+constants, read through `Theme.Metric(key, house)`. What the house look alone
+draws (the 0.3.8 glow-up, docs/DESIGN.md "The House Look's Own Touches") is
+its own `TOKENS`, read through `Theme.House(key)`: the token while the house
+skin itself is drawn (`Theme.SkinId()` is `polestar`), nil for every other
+look, a skin built on the house look and a picker card of another skin
+included, where the caller keeps its own way.
 
 **Skins** (`ui.skin`, Appearance > Windows > Frame): `polestar`, the house
 style everything below describes (the default); the two directions of the
@@ -3042,8 +3098,14 @@ skin brings:
   `arrive`, `veil`, `veilWindow`, `menuBg`, `inputBg`, `control`,
   `accentLine`, `padSelect`, `chipAccent`, `separator`, `rowLine`, `icon`,
   `iconHover`, `buttonText`, `personName`, `tabRest`) exist in the house
-  style too, as their house equivalents; `ember` (the firelight) is read by
-  Hearth's own painters alone;
+  style too, as their house equivalents; `menuBg`, the ground of the menus
+  and popups that open over other frames (a panel marked `psMenu`: the
+  dropdown menus, a setting's cog, Quick settings, the settings search's
+  list; the tooltip), is never see-through: the panel colour at full
+  opacity in the house style, solid in the other built-in looks (the game
+  looks lay their menu art over it at the game's own 92.5 %), a skin's own
+  held at 0.97 at least;
+  `ember` (the firelight) is read by Hearth's own painters alone;
 - its paints (`Theme.SKIN_PAINT`, falling back to the house paint): Halo's
   veil (Media/UI/veil-soft, nine slices laid 24 units out); Hearth's board (a
   bg → bgBottom gradient on its own texture, `psSkin.kit.board`, so the house
@@ -6793,28 +6855,28 @@ and resets leave it) and the page opens there again; a first visit lands on
 the lead tab.
 
 **Preview hotspots and lights.** A preview may make its parts lead to their
-settings: `s:Hot(region, key)` on its stage (or `host:Hotspot(region, key)`,
+settings: `f:Hot(region, key)` on its band (or `host:Hotspot(region, key)`,
 `Polestar.UI.Options.PreviewHotspot(frame, region, key)`) lays a button over
 `region`; under the cursor a 1px accent outline goes round it and the tooltip
 names the setting; a click opens its row (`O.Jump`, the tab on screen first)
 and lights it. The first preview with hotspots says "Click a part of the
-preview to find its settings" in a foot row under it until the first click
+preview to find its settings" in its hint line until the first click
 (`PolestarDB.optionsPreviewHint`). The other way round, the pointer on a row
 (or its extras or cog) lights every hotspot of that setting and every part a
-page lights for it, `s:Light(key, region, ...)`, an accent outline and a soft
+page lights for it, `f:Light(key, region, ...)`, an accent outline and a soft
 wash, until it leaves (`O.PreviewFocus` -> `P.Focus` -> `P.LightUp`); a light's
-frame is made the first time it lights. `s:LightEdge` lights with the outline
-alone: a big part, or one outside the stage (the Theme page lights the
+frame is made the first time it lights. `f:LightEdge` lights with the outline
+alone: a big part, or one outside the band (the Theme page lights the
 settings window's own sidebar, border, header band, haze and rim);
-`s:LightRing` with an outline standing 3 px off a part drawn in the accent
-itself, where an outline on it would not show; `s:LightEach(key, fn[, ring])`
+`f:LightRing` with an outline standing 3 px off a part drawn in the accent
+itself, where an outline on it would not show; `f:LightEach(key, fn[, ring])`
 lights the parts `fn()` returns as the row is hovered (what comes and goes
 with the page on screen). A light whose part is not showing stays dark. A
 setting that paints every surface lights every surface it paints: Theme >
-Accent rings the scene's accent parts (the guide window's open tab, the
+Accent rings the band's accent parts (the guide window's open tab, the
 current goal's bar and glyph, the progress bar, the heads-up card's stripe,
 ring, headline and badge, the cards' primary buttons, the rare alert's time
-bar, the arrow) and every part of the settings window in the accent at that
+bar) and every part of the settings window in the accent at that
 moment (the emblem, the open page's row, the open tab's underline, the
 sliders' fills, the switches that are on, the chips, a focused box's ring)
 and the gamepad's focus ring. Every
@@ -6858,69 +6920,83 @@ it was when the window first opened), and go the next.
 **The pinned preview** (`Polestar_Options/UI/Preview.lua`, `UI.Preview`). A
 tab's `preview(host)` is called the first time the tab shows, with a host
 frame in the shell's preview slot (`W.ShellPreview`, between the tab band and
-the scrolling rows); it returns a frame `f` with `f:Layout(width, height) ->
-height`, laid out across the whole main column and pinned there: the rows
-scroll under it, and the scroll area is anchored anew when its height changes
-(`Layout` runs again after every setting change while the window is shown,
-and on a new size or font). The preview is the page's hero: its stage stands
-on a backdrop at least 40% of the window's height (`height`, the room the
-page lays its scene out in), at most 55% of the body's; the stage is as tall
-as the height its page returns, centred on the hero. It is never cut off:
-past 55% it is shown whole at the scale that fits, laid out for the width
-that scale gives, and its caption says by how much ("Shown at 81% to fit").
-The window draws its chrome over it: "Preview" and the frame's `f.caption`
-(a string or a function) at the top left, the Live mark and the backdrop's
-chip at the top right. A preview draws the real elements with the current
-values in a sandbox of its own (the module's own builder or paint code, never
-the live instance) at their true size, and repaints itself only while shown.
+the scrolling rows); it returns a frame `f`, laid out across the whole main
+column and pinned there: the rows scroll under it, and the scroll area is
+anchored anew when its height changes (`Layout` runs again after every
+setting change while the window is shown, and on a new size or font). It
+takes at most 55% of the body's height (`P.MAX`) and is never cut off. A
+preview draws the real elements with the current values in a sandbox of its
+own (the module's own builder or paint code, never the live instance) at
+their true size, and repaints itself only while shown.
 
-Every page draws its preview on the one stage, `P.Stage(parent, opts)`: a
-backdrop under the page's parts (`s.Content`), the player's pick for every
-preview through the chip (`PolestarDB.optionsBackdrop`, not a setting): the
-zone they stand in (the default), painted from their own client's world map
-art (dimmed, cooled and half desaturated, a vignette on all four edges, so
-its lettering sits back), the night sky, or the plain ground; `opts.fixed`
-keeps the page's `opts.backdrop` for a scene that is a painting of its own
-(the map pins', the route lines': no chip there). `opts.watch` lists the
-setting prefixes that repaint it (`s:Paint()`) at once while it shows and on
-its next show otherwise; a theme change repaints every stage. A stage's
-helpers: `s:TrueScale()` (a part at its true size on screen, whatever the
-window's Menu scale; the stage's own scale-to-fit still applies),
-`s:SideBySide(items)` (surfaces at their true size in rows, centred on the
-hero, each row's feet on one line, each surface on a soft floor shadow with
-its caption under it, all smaller alike only where they would not fit),
-`s:Floor(frame)` / `s:NoFloor(frame)` (that shadow alone), `s:Fit` (one part
-as large as the stage holds below the chrome), `s:Snap` and `P.Snap` (a point
-on a whole physical pixel), `s:Hot`, `s:Light`, and `s:Animate(fn)` (runs
-only while the stage shows). A page that crops its scene (the Guide window
-page's window, scrolled to the part a hovered row edits) calls
-`s:SetCut(true)` while the scene runs past the stage's foot, and the stage
-fades it out over its last 28 px. A cropped guide window (its own page's or
-a scene's) leaves out a part the crop would cut through (no text cut in two
-at the foot or, scrolled, the top), its ground running on under the fade. A
-scene's world: `P.Mob(s, opts)` draws a mob as the game shows one, its
-nameplate (name, health bar, level, a raid mark) over its spot on the ground
-(its ring while it is your target, or in a colour of the scene's), placed
-with `m:Stand(x, y, k)`.
+Every Look tab's preview is a band, `P.Band(parent, opts)`: the element the
+tab sets and nothing else, at its real size (1:1 on the game's UI scale,
+`f:TrueScale()`), centred on the element itself on the window's plain ground
+(`bg`), the band only as tall as it: 20 over and under, the element, its
+states' labels (12px Label, textMuted, 10 under its foot, `f:Label`), and at
+most one hint line. The page sets `f:Content(width) -> w, h, place(left, top,
+k), labels` (its natural size, what puts it there at scale k, its labels'
+centres). `opts.picker` (`{ choices, get, set }`) puts a centred 220 x 28
+dropdown 14 over the element (a tab that sets several elements: the one
+shown, the window's shared popup menu); `opts.play` a small Play button
+hanging right of the element, its foot on the element's (8 under its right
+end on a band too narrow), so the element stays centred (`opts.playLabel`
+names what it plays instead: a tracker's "In a fight"); `opts.watch` the
+setting prefixes that lay it out again at once while it shows and on its
+next show otherwise (a theme change too). An element wider than the band
+less 24 a side, or taller than its room (55% of the body less the band's
+parts), is placed at the k that fits, every part alike, never over 1, and
+the hint line says so ("Shown at 86% to fit"); else the hint line is the
+hotspots' one-time hint until the first click on a part; else there is
+none. No chrome: no "Preview" label, no Live mark, no backdrop to pick (the
+old pick, `PolestarDB.optionsBackdrop`, is cleared the first time the window
+opens); the slot's own hairline under it. `P.Snap(f, v)` puts a point on a
+whole physical pixel.
 
-The Look pages' scenes: Theme, the guide window (drawn by the Guide window
-page's own code, `UI.GuideWindowScene`) with the heads-up card on its top
-edge, a rare alert, the arrow and the two kinds of button (the Names tab: a
-card of every subject's name in its colour); Guide window, the window alone;
-Arrow, its three states; Map pins and Route lines, their paintings and a
-minimap; Buttons, the whole set over the world it acts on (the mob the
-target button names, your target with its ring and its raid mark while Mark
-target is on, and the rare the rare button names, further off), the travel
-button under the arrow (the Hearthstone's other button, a plain frame in its
-look under Nav's own dial), the floating and the minimap button; Alerts & toasts, the rare alert and the
-transport banner at the top of the world, the arrow under them pointing to
-what they are about and the guide window at the right, cropped at the
-hero's foot (the rare in the world beside them), the heads-up and class
-quest cards each alone, every one together
-on Essentials (the alerts in their line while they line up); Trackers, each
-tab's own surface, every one together on Essentials (the journey and the XP
-bar's mark with the trackers). A page too narrow for a part of its scene
-leaves it out.
+Map pins and Route lines draw on the map hero, `P.MapHero(f[, scene,
+mapLabel])`: a sharp 1:1 crop of a zone's world map (`P.SharpArt`,
+`UI.ZoneArt` at its tiles' own size, a hairline and a soft inner shade,
+`P.InnerShade`) and the game's 140 px minimap (its ring over the client's own
+minimap tiles by file id under a round mask, the player's arrow in the
+middle), side by side, labelled; `P.HERO_SCENE` is Map pins' scene (Elwynn,
+in the map's pixels), `P.HeroWorld` takes a scene's point to world yards.
+Route lines' scene is the Barrens (up the road to the Crossroads, a flight to
+Ratchet, the boat out), its rides' colours the line under the map
+(`mapLabel`). The Guide window band crops: a window taller than its room is
+cut there, faded into the band's ground over 28 px (`UI.GuideWindowScene`,
+which also draws Theme's guide window, cut under its goals) and scrolled to
+the part the hovered row edits (`f:Focus`; the parts' places from the
+window's own `GF.Placed()`); a part the crop would cut through is left out
+(no text cut in two at the foot or, scrolled, the top), its ground running on
+under the fade. The window there is the guide window itself: a copy drawn by
+its own code (`UI.GuideFrame.Copy`, below) and fed a sample step.
+
+The Look pages' bands: Theme (Essentials, Colour, Text, Frames), its three
+surfaces side by side (the guide window cut under its goals and
+faded into the panel; the heads-up card; the rare alert), at 86% to fit in
+the default window; its Names tab, a card of every subject's name in its
+colour. Guide window, the window alone. Arrow, the dial on its way, closing
+in and in combat (Look: arrived too; Text: on its way alone). Map pins
+(Essentials, Pins), the map hero, its preset cards the same scene on a sharp
+crop; Icons, the icon pack's marks on the same map. Route lines, the map
+hero with the Barrens route. Buttons, Essentials' dropdown of the action
+button set as laid out, the floating button and the minimap button; Action
+buttons, the set out of combat and in combat (its dropdown or the travel
+button's row picks the travel button, alone); Launcher & minimap, the two
+side by side. Alerts & toasts, each alert alone with Play on its own tab,
+Essentials' dropdown of them (the rare alert and the transport banner in
+their line while alerts line up). Trackers, Essentials' dropdown of the
+trackers, the journey and the level mark (a hovered row picks the one its
+setting draws); Travel, the flight timer and the journey; Instances & XP,
+the instance tracker and the level mark on an XP bar; Party panel, the
+panel alone. A band shows a part's hotspot only while the part shows.
+
+A registered page's own frame (`f:Layout(width) -> height`) keeps that
+contract: laid out across the column, shown whole at the scale that fits past
+55% (laid out again for the width that scale gives, so its parts keep their
+proportions), and one 12px line under it: its `f.caption` (a string or a
+function), with the fit note when it shrank; without a caption, the fit note,
+else the hotspots' one-time hint.
 
 One setting may show on two pages: a convenience on its home page and on
 Quality of Life, where players look for it (the quest automation toggles,
@@ -7121,12 +7197,37 @@ Reading flow: `docs/DESIGN.md` ("Intent" and "The Guide Window").
   `GuideFrameMenu.lua` (the menu and Nearby), `GuideFrameWindow.lua`
   (position, size, scale, opacity, the lock, moving and resizing, the
   combat and instance rules) and `GuideFrameStatus.lua` (the XP and party
-  lines). They share the module table (`UI.GuideFrame`): the core's
-  helpers are fields on it, and `GF.Bind(fn)` hands each file the window's
-  parts and sizes as its own locals (when the file loads, once the window
-  is built, and when a skin's sizes are read), so per-frame code reads
-  upvalues as before. What the window shows now comes through `GF.View()`,
-  `GF.State()` and `GF.TipOpen()`.
+  lines). Each file adds its part with `GF.Part(fn)` as it loads, and
+  `fn(GF)` builds that part into a window's table: the live window's
+  (`UI.GuideFrame`, `GF.live`) at once, then each copy's, part by part in the
+  same order. `GF.Copy(parent, content)` makes a copy (the settings
+  preview's, `UI/Looks/GuideWindow.lua`): unnamed, in `parent`, with no
+  event, message, setting or hook of its own, taking no click, wheel or
+  tooltip (its frame sees the pointer's hover, `GF.MouseOff`), without the
+  frames other modules put in the live window (the class card, the journey,
+  the step browser, name targets, gear picks) or what the session raises
+  (the banner's notices, off-route timers, the party line); its host draws it
+  (`copy.Draw()`: every setting applied anew, its content filled in and laid
+  out) and places `copy.frame`. Within a window the core's helpers are
+  fields on its table, and `GF.Bind(fn)` hands each file the window's parts
+  and sizes as its own locals (when the file binds, once the window is built,
+  and when a skin's sizes are read), so per-frame code reads upvalues as
+  before. What a window draws is one interface (`GF.CONTENT`): the Engine's
+  read API (GetGuide, GetTabs, GetStepIndex, GetLiveStep, GetStepCount,
+  GetStepView, StepNumber, StepTotal, GetProgress, GetAlong,
+  GetWhileHereList; a gate, notice or action it lacks is nothing to show or
+  do) and five lines worked out from it: StepHint and Pace
+  (`Core/Levels.lua`), XPStats and RestParts (QoL), Target (Nav, else the
+  Engine's waypoint). The live window reads the Engine and those modules
+  straight (`GF.Engine()`, `GF.Derived()`), so its step change pays nothing
+  for the interface; a copy reads its host's provider of all of it
+  (`copy.content`; the settings preview's sample). `GF.UseContent(content)`
+  hands the live window a provider too (a test drawing both windows from one
+  sample), nil the Engine again. The skin hooks
+  run for every guide window, each handed its own parts (`GF.SkinParts()`;
+  `Theme.GuideParts()` is the live window's), and `psGuideWindow` marks a
+  guide window itself apart from a card painted as one. What the window
+  shows now comes through `GF.View()`, `GF.State()` and `GF.TipOpen()`.
 - **Guide window** (`UI/GuideFrame.lua`): tab strip (each tab's close button
   faint at rest, full under the pointer; right-click for Choose guide, Close
   tab, Move left/right; middle-click closes), a slim navigator (prev,
@@ -7187,22 +7288,37 @@ Reading flow: `docs/DESIGN.md` ("Intent" and "The Guide Window").
   with a 2 px accent edge and a "While you're here" label in the accent, then
   one goal row per line (`GF.HereRow`): the verb's glyph, `UI.GoalLine` of
   the later step's goal (a hand-in its `hereText`), wrapping, "Step N" under
-  it, the distance in textMuted and a close button. The panel slides 8 px in
+  it, the distance in textMuted and a close button. In the house look
+  (`Theme.House("raised")`) the panel is a raised card instead: the control
+  ground at 85% under a hairline (its frame made on the card's first
+  showing), no accent edge, the rows in Body. The panel slides 8 px in
   from the left as it fades in (`Anim.BASE`, ease-out) and slides back and
   fades faster (`Anim.FAST`) when its last line goes, before the window
   closes the gap; rows coming and going inside it do not slide it; under
   `ui.reduceMotion` it only fades. A row's left-click:
-  `Engine.AimWhileHere(i)`; right-click or its close button:
-  `Engine.DismissWhileHere(i)`; `WHILE_HERE_MOVED(yards, i)` moves its
-  distance. In the compact window the rows drop their "Step N" line; in the
+  `Engine.AimWhileHere(i)`; right-click: a menu with "Show in quest log"
+  (`ns.QuestLogMenuItem`, Quests/QuestLogLink.lua) and "Not now", or straight
+  away "Not now" when its quest is not in the log or the client can't open the
+  log there; "Not now" and its close button: `Engine.DismissWhileHere(i)`;
+  `WHILE_HERE_MOVED(yards, i)` moves its
+  distance. `WHILE_HERE_CHANGED` with the panel shown before and after at the
+  same height lays out only the panel (`GF.LayoutHere`) and repaints the
+  strings' shades; a panel that comes, goes or changes height lays out the
+  window (`GF.Layout`). In the compact window the rows drop their "Step N" line; in the
   transparent style the ground is the accent alone at `GF.HERE_CLEAR` (0.18)
-  under the outlined text. With the window hidden, the toast (UI/WhileHere.lua,
+  (the house look: the scrim at `clearShade`, 0.32) under the outlined text.
+  With the window hidden, the toast (UI/WhileHere.lua,
   `UI.WhileHereToast`) says a new line once, slides down into place as it
   fades in, and leaves after 8 s (`toasts.whilehere.seconds`, Stays for in
   the Guide page's Dynamic Questing section; held under the cursor) or with
   the line. It has no look of its own (0.3.8): the theme's and the shared
   toast style (`UI.Toasts.Attach(..., { shared = true })`); only its time and
-  its place (`toasts.whilehere.point`, a mover) are the player's.
+  its place (`toasts.whilehere.point`, a mover) are the player's. In the
+  house look (`Theme.House("toastBand")`) a band over the card says it in the
+  alerts' anatomy (`W.Night`, the glyph in a ring, the rim): 360 wide,
+  "While you're here · 15 yd" over the line, which wraps onto a second one;
+  made on its first showing there and laid out again on a look change.
+  `UI.WhileHereToast.Size()` gives the movers' box the look's size.
   An object named like one of its quests while it gives another too (one
   poster for two WANTED quests) is headed by the first goal note that names
   it, else "The object here" (`UI.GroupName`, #942). A click
@@ -7281,9 +7397,10 @@ Reading flow: `docs/DESIGN.md` ("Intent" and "The Guide Window").
   watch runs only while the cursor is over it), to `combatAlpha` in a
   fight with Fade out, and hides on a flight with `hideTaxi`; the step
   change slide and the folding of finished goals can be turned off or
-  sped up. `GF.ApplyLook(key)` redraws only what a key touches;
-  `GF.Metrics()` hands the sizes to the page's preview, which lays out a
-  demo step card by them in its own frame, never the live window.
+  sped up. `GF.ApplyLook(key)` redraws only what a key touches. The page's
+  preview is a copy of the window drawn by its own code (`GF.Copy`, fed a
+  sample step), never the live window; `GF.Metrics()` hands the sizes to its
+  Essentials presets' pictures.
 - **Quick settings** (`UI/QuickSettings.lua`, core): the guide window
   menu's first entry opens a 280 px popover by the menu button with the
   settings changed mid-play (`ui.locked`, `ui.opacity`, `nav.arrow`,

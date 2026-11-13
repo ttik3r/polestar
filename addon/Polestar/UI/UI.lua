@@ -778,20 +778,22 @@ end
 
 -- Step i of the active guide as the player counts it: steps that do not
 -- exist for the character (another class's or race's, Engine.StepNumber)
--- left out (#942); whether it is such a step; how many the player sees.
-function UI.StepNo(i)
-	local E = ns.Engine
+-- left out (#942); whether it is such a step; how many the player sees. `E`:
+-- what to ask instead of the Engine (a guide window's content, which answers
+-- as the Engine does).
+function UI.StepNo(i, E)
+	E = E or ns.Engine
 	if E and E.StepNumber and type(i) == "number" then return (E.StepNumber(i)) end
 	return i
 end
-function UI.StepHidden(i)
-	local E = ns.Engine
+function UI.StepHidden(i, E)
+	E = E or ns.Engine
 	if not (E and E.StepNumber and type(i) == "number") then return false end
 	local _, hidden = E.StepNumber(i)
 	return hidden == true
 end
-function UI.StepTotal()
-	local E = ns.Engine
+function UI.StepTotal(E)
+	E = E or ns.Engine
 	if E and E.StepTotal then return E.StepTotal() end
 	return E and E.GetStepCount and E.GetStepCount() or 0
 end
@@ -917,20 +919,33 @@ end
 
 -- The window's toggle (its key, /polestar, the menu's Guide window) asks to
 -- see the guide: from hidden it brings Polestar back, turning the window on
--- when it was off.
+-- when it was off. A window that is on but that another addon keeps out of
+-- sight (ns.OutOfSight) stays on: turning it off would take away only the
+-- action buttons, the one part still seen. The toggle says why the window is
+-- not seen instead, as it and /polestar show do after showing one that stays
+-- out of sight.
+local function windowOutOfSight()
+	local GF = UI.GuideFrame
+	return GF ~= nil and ns.OutOfSight(GF.frame)
+end
 ns.On("TOGGLE_FRAME", function()
 	if ns.Hidden() then
 		ns.SetHidden(false)
 		if not ns.Get("ui.shown") then ns.Set("ui.shown", true) end
-		return
+	else
+		local GF = UI.GuideFrame
+		if GF and GF.ToggleInside and GF.ToggleInside() then return end
+		if not (ns.Get("ui.shown") and windowOutOfSight()) then
+			ns.Set("ui.shown", not ns.Get("ui.shown"))
+			if not ns.Get("ui.shown") then return end
+		end
 	end
-	local GF = UI.GuideFrame
-	if GF and GF.ToggleInside and GF.ToggleInside() then return end
-	ns.Set("ui.shown", not ns.Get("ui.shown"))
+	if windowOutOfSight() then ns.SayOutOfSight() end
 end)
 ns.On("SHOW_FRAME", function()
 	ns.SetHidden(false)
 	ns.Set("ui.shown", true)
+	if windowOutOfSight() then ns.SayOutOfSight() end
 end)
 ns.On("SHOW_PICKER", function() if UI.ShowPicker then UI.ShowPicker() end end)
 ns.On("SHOW_OPTIONS", function(section) if UI.ShowOptions then UI.ShowOptions(section) end end)

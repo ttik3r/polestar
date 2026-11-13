@@ -62,6 +62,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 	font-size: clamp(9px, 0.95vw, 13px); line-height: 1.35; text-shadow: 0 1px 1px #000; pointer-events: none;
 }
 .chat p { margin: 0; }
+.chat[hidden] { display: none; }
 .popups { position: absolute; left: 50%; top: 14%; transform: translateX(-50%); display: grid; gap: 8px; }
 .popup { background: rgba(10, 12, 20, 0.94); border: 1px solid #4a4f60; padding: 14px 18px; min-width: 320px; text-align: center; }
 .popup p { margin: 0 0 10px; }

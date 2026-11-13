@@ -540,6 +540,16 @@
 		if (b) act({ type: 'quest', op: b.dataset.op, quest: Number(b.dataset.quest) });
 	});
 
+	// The chat on the game screen, shown or hidden: this browser remembers it
+	// (shown when it cannot).
+	const CHAT_KEY = 'polestarPlay.chatShown';
+	const showChat = (on) => { $('#chat').hidden = !on; $('#chat-shown').checked = on; };
+	try { showChat(localStorage.getItem(CHAT_KEY) !== '0'); } catch { showChat(true); }
+	$('#chat-shown').addEventListener('change', (e) => {
+		showChat(e.target.checked);
+		try { localStorage.setItem(CHAT_KEY, e.target.checked ? '1' : '0'); } catch { /* kept for this page only */ }
+	});
+
 	// Session
 	$('#eui').addEventListener('change', (e) => call('/api/eui', { on: e.target.checked }));
 	$('#reload').addEventListener('click', () => call('/api/reload'));
