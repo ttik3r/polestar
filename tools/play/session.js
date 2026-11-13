@@ -288,6 +288,21 @@ C_Map.GetMapArtID = function(id) local m = ART[id]; return m and m.artID end`);
 		for (const part of ['Polestar_Options', 'Polestar_SkinAPI', 'Polestar_Looks']) {
 			if (fs.existsSync(path.join(ADDONS, part, `${part}.toc`))) lines.push(`stub.packs.${part} = stub.packs.${part} or { ${tocFiles(part).map(luaString).join(', ')} }`);
 		}
+		// The layouts and skins in addon/ are installed, as in the client: each shows in the AddOns list
+		// with its TOC's title, notes and X- fields (Theme.InstalledLayouts, Theme.InstalledSkins), and
+		// one that loads on demand loads from its TOC when Polestar chooses it.
+		for (const part of fs.existsSync(ADDONS) ? fs.readdirSync(ADDONS).sort() : []) {
+			if (!/^Polestar_(Layout|Skin)_/.test(part)) continue;
+			const toc = path.join(ADDONS, part, `${part}.toc`);
+			if (!fs.existsSync(toc)) continue;
+			const meta = {};
+			for (const m of fs.readFileSync(toc, 'utf8').matchAll(/^## ([\w-]+):\s*(.*?)\s*$/gm)) meta[m[1]] = m[2];
+			const demand = meta.LoadOnDemand === '1';
+			const fields = Object.entries(meta).filter(([k]) => k.startsWith('X-')).map(([k, v]) => `[${luaString(k)}] = ${luaString(v)}`);
+			lines.push(`stub.addons[#stub.addons + 1] = { name = ${luaString(part)}, title = ${luaString(meta.Title || part)}, notes = ${meta.Notes ? luaString(meta.Notes) : 'nil'}, demand = ${demand} }`);
+			lines.push(`stub.addonMeta[${luaString(part)}] = { ${fields.join(', ')} }`);
+			if (demand) lines.push(`stub.packs.${part} = { ${tocFiles(part).map(luaString).join(', ')} }`);
+		}
 		lines.push(d.metrics);
 		dof(path.join(ROOT, 'tools', 'preview', 'stub.lua'));
 		lines.push('preview.enableTooltips()');

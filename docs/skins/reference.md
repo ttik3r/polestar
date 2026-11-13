@@ -225,7 +225,8 @@ A layout is the guide window's structure apart from its look (capability
 | Field | Type | Meaning |
 |---|---|---|
 | `hooks` | table | Structure hooks only: `guideLayout`, `guideRender`, `guidePlace`, `guideAnchor`, `guideTakes`, `guidePerson`, `guideInset`, `guideUpRow`, `guideShows`, and `guideTitle` (which title bar parts show), `guideRow` (a goal row's lines and columns) and `guideProgress` (where the progress shows) ([The guide window](#the-guide-window)). Same arguments and answers as a skin's. A colour a layout's hook sets is a token of the skin in use (`Theme.Color`, `Theme.Accent`). |
-| `onApply`, `onLeave` | function(id) | Run when the layout comes into use and when it leaves. |
+| `onApply`, `onLeave` | function(id), function(id, parts, live) | `onApply` runs when the layout comes into use. `onLeave` runs when it leaves, once for each guide window it dressed: the live window's parts with `live` true, then each copy's that draws with the layout in use (the settings preview) with `live` false; once with no parts before the window is built. Each call gives that window back its own look; the live window's also takes back what the layout made outside any guide window. A guide window's frame carries `psGuideWindow = true`. |
+| `preset` | table | Its card in the guide window's Presets (capability `layouts.preset`): `{ label, help, set }`. `label` (1-40 characters, the layout's `name` when unset) and `help` (at most 200) are text; `set` holds look settings as a skin's `preset` does, and may name the skin the layout is drawn for (`ui.skin`), never `ui.layout`. Picking the card chooses the layout (`Polestar.Theme.SetLayout(id)`, loading its addon), then writes `set`; picking one of Polestar's own cards goes back to Polestar's own layout, `set`'s values still in place back to their defaults. The card is checked while the layout is in use. |
 | `defaults` | table | The layout's defaults for the guide window's settings: `{ ["guideWindow.tabs"] = false, ... }`. Each key is a `guideWindow.*` setting Polestar has; each value has the type of Polestar's default (a boolean for a switch, a number for a size, a string for a choice). A setting whose default is `false` takes `false`, a colour (`guideWindow.targetBarColor`, `progressColor`, `bgColor`), `true` (a switch off by default: `guideWindow.hideTaxi`) or a number (`guideWindow.bgOpacity`). |
 
 The player changes the guide window's parts in its settings (the tabs,
@@ -246,6 +247,24 @@ goes back to the layout's default. `Polestar.GetDefault(path)` is the
 default in use (the layout's, else Polestar's);
 `Polestar.GetBaseDefault(path)` is Polestar's own.
 
+The Presets card's picture is a copy of the guide window drawn with the
+layout's hooks, whatever layout is in use: a guide window says which
+layout it draws with, and `Theme.SkinHookFor(choice, surface, ...)` and
+`Theme.SkinHookValueFor(choice, surface, ...)` run that layout's hooks
+(`choice` nil: the layout in use; false: Polestar's own; an id: that
+layout's) with the skin's, handing over that window's parts. Polestar's
+own cards and their pictures never run a layout's hook. A layout addon
+that loads on demand names its card in its TOC, so it shows before the
+addon loads (its picture is then the label; drawing it loads nothing):
+
+```
+## X-Polestar-Layout-Preset: ledger = Ledger; ledger-wide = Ledger wide
+```
+
+A bare id takes the id as its label, and the card's help is the TOC's
+`Notes`. `Polestar.Theme.LayoutPresets()` lists the cards:
+`{ { id, label, help, set, loaded, addon }, ... }`.
+
 The refusals, beside the common ones: `a layout carries no tokens or
 colours (<field> is a skin's field)`, `hooks.<name> is a skin's (a layout
 hooks the guide window's structure only)`, `unknown hooks "<name>"`,
@@ -253,7 +272,12 @@ hooks the guide window's structure only)`, `unknown hooks "<name>"`,
 `defaults must be a table of setting = value`, `defaults key "<path>" is
 not a guide window setting (guideWindow.<name>)`, `defaults["<path>"] must
 be a <type>, like Polestar's default`, `defaults["<path>"] must be false or
-a colour`, `defaults["<path>"] must be false, true or a number`.
+a colour`, `defaults["<path>"] must be false, true or a number`, `preset must be
+a table { label, help, set }`, `unknown field preset.<name>`,
+`preset.label must be a string of 1-40 characters`, `preset.set must be a
+table of setting = value`, `preset.set["ui.layout"]: picking the card
+chooses the layout`, `preset.set["ui.skin"] must be a skin id`, and a
+skin preset's refusals for `set`'s other settings.
 
 A hook answers in this order: the layout's, else the skin's, else
 Polestar's own. With no layout chosen (`ui.layout` unset), every hook is
