@@ -187,8 +187,12 @@ do
 		upnext.Toggle:ClearAllPoints()
 		upnext.Toggle:SetPoint("TOPLEFT", upnext, "TOPLEFT", 0, 0)
 		upnext.Toggle:SetPoint("TOPRIGHT", upnext, "TOPRIGHT", 0, 0)
-		local y = -UP_TOGGLE
-		if upcomingOpen() then
+		-- A skin may leave out the "Up next" heading, its rows always open
+		-- (GF.Shows "upnextHead").
+		local head = GF.Shows("upnextHead", true)
+		upnext.Toggle:SetShown(head)
+		local y = head and -UP_TOGGLE or 0
+		if upcomingOpen() or not head then
 			for i = 1, #upRows do
 				local r = upRows[i]
 				if r:IsShown() then y = y - placeRow(r, upnext, y, width) end
@@ -469,7 +473,13 @@ function GF.Layout()
 		-- area gives up the difference and scrolls.
 		fit.h = y - fit.from
 		fit.from = nil
-		fit.room = min(capHeight(), fit.limit or math.huge) - (fit.outer + y - content)
+		-- A skin may keep the goals area whole, the window as tall as it
+		-- takes (GF.Shows "goalScroll" false).
+		if GF.Shows("goalScroll", true) then
+			fit.room = min(capHeight(), fit.limit or math.huge) - (fit.outer + y - content)
+		else
+			fit.room = math.huge
+		end
 		fitGoals()
 	else
 		sizeWindow(y)

@@ -392,7 +392,7 @@ fn api_version_and_capabilities_say_what_this_polestar_offers() {
 		for _, c in ipairs({ "skins", "schemes", "surfaces.window", "surfaces.toast", "surfaces.arrow", "surfaces.pin", "fonts", "preset",
 			"lightSchemes", "surfaces.guideTitle", "variants", "resolve", "shadow", "artTint", "media.dart", "guideParts",
 			"surfaces.card", "surfaces.actionButton", "surfaces.guideRow", "surfaces.guideLayout", "surfaces.guideRender",
-			"surfaces.guideProgress", "surfaces.guideAnchor", "surfaces.guideTakes", "surfaces.guidePerson", "surfaces.guideInset", "surfaces.guideUpRow", "media.pins", "arrow.parts", "pin.parts", "tokens.accent2", "tokens.glow",
+			"surfaces.guideProgress", "surfaces.guideAnchor", "surfaces.guideTakes", "surfaces.guidePerson", "surfaces.guideInset", "surfaces.guideUpRow", "surfaces.guideShows", "media.pins", "arrow.parts", "pin.parts", "tokens.accent2", "tokens.glow",
 			"tokens.pins", "skins.installed", "theme.functions", "kit.color", "kit.glow", "kit.tintArt" }) do
 			if not T.HasCapability(c) then caps[#caps + 1] = c end
 		end
@@ -404,7 +404,27 @@ fn api_version_and_capabilities_say_what_this_polestar_offers() {
 	assert!(out["n"].as_u64().unwrap() >= 40);
 	assert_eq!(
 		out["surfaces"]["hooks"],
-		json!(["actionButton", "arrow", "card", "guideAnchor", "guideInset", "guideLayout", "guideMenu", "guidePerson", "guidePlace", "guideProgress", "guideRender", "guideRow", "guideTab", "guideTakes", "guideTitle", "guideUpRow", "pin", "toast"])
+		json!([
+			"actionButton",
+			"arrow",
+			"card",
+			"guideAnchor",
+			"guideInset",
+			"guideLayout",
+			"guideMenu",
+			"guidePerson",
+			"guidePlace",
+			"guideProgress",
+			"guideRender",
+			"guideRow",
+			"guideShows",
+			"guideTab",
+			"guideTakes",
+			"guideTitle",
+			"guideUpRow",
+			"pin",
+			"toast"
+		])
 	);
 	assert_eq!(out["surfaces"]["paint"], json!(["button", "checkbox", "close", "dropdown", "editbox", "guide", "inset", "panel", "scrollbar", "sidebar", "tab", "tile", "toast", "window"]));
 }
@@ -1366,6 +1386,108 @@ fn a_skin_hears_each_up_next_row_with_its_step_and_its_touch_goes_with_it() {
 	assert!(seen.iter().all(|s| s["mine"] == json!(true) && s["step"].is_string()), "each with its step and number: {out}");
 	assert_eq!(out["skinned"][0], json!(format!("#{}", seen[0]["i"])), "the skin's touch is on the row: {out}");
 	assert_eq!(out["back"], out["house"], "without the skin, Polestar's rows");
+}
+
+// Skin API 2's guideShows: the window asks the skin whether a part shows its way, with Polestar's own choice as the
+// default. A skin answering against the default keeps the tip in compact mode, keeps the step's finished goals in
+// place as rows (no "N done" line), drops Up next's heading with its rows shown though Up next is folded, and keeps
+// the goals area whole past the window's cap (the window grows instead). A skin answering the default changes
+// nothing; without the skin, all of it is as it was.
+#[test]
+fn a_skin_answers_which_parts_the_guide_window_shows_against_the_default_and_the_default_changes_nothing() {
+	let out = run_ui(
+		r##"
+		local T = Polestar.Theme
+		local P = GF.parts
+		local asked, flip = {}, false
+		local ok, why = T.RegisterSkin("shows", { name = "Shows", addon = "Test_Shows", base = "polestar",
+			hooks = {
+				guideShows = function(name, default)
+					asked[name] = type(default)
+					if flip then return not default end
+					return default
+				end,
+			} })
+		Polestar.Set("ui.upcoming", 3)
+		Polestar.Set("ui.upcomingOpen", false)
+		uistub.openTabs(TABS, 1)
+		stub.advance(1)
+		local function snap()
+			local doneLine, doneRows = false, 0
+			for i = 1, GF.area.n do
+				local f = GF.area.items[i]
+				if f.psLine and f.psKey == "done" and f:IsShown() then doneLine = true end
+				if not f.psLine and f.psGoal and f.psGoal.status == "done" and f:IsShown() then doneRows = doneRows + 1 end
+			end
+			local upRows = 0
+			for _, r in ipairs(GF.upRows) do if r:IsShown() then upRows = upRows + 1 end end
+			return { doneLine = doneLine, doneRows = doneRows, head = P.upnext.Toggle:IsShown(), upRows = upRows }
+		end
+		local function tipIn(compactOn)
+			Polestar.Set("ui.compact", compactOn)
+			GF.Render()
+			stub.advance(0.5)
+			local shown = P.tip:IsShown()
+			Polestar.Set("ui.compact", false)
+			GF.Render()
+			stub.advance(0.5)
+			return shown
+		end
+		local function tall()
+			Polestar.Set("ui.maxHeight", 0.1)
+			GF.Render()
+			stub.advance(0.5)
+			local h = math.floor(F:GetHeight() + 0.5)
+			Polestar.Set("ui.maxHeight", 0.5)
+			GF.Render()
+			stub.advance(0.5)
+			return h
+		end
+		local house = snap()
+		house.tipCompact, house.tip, house.capped = tipIn(true), tipIn(false), tall()
+		Polestar.Set("ui.skin", "shows")
+		GF.Render()
+		stub.advance(0.5)
+		local same = snap()
+		same.tipCompact, same.tip, same.capped = tipIn(true), tipIn(false), tall()
+		flip = true
+		GF.Render()
+		stub.advance(0.5)
+		local flipped = snap()
+		flipped.tipCompact, flipped.capped = tipIn(true), tall()
+		Polestar.Set("ui.showNotes", false)
+		flipped.notesOff = tipIn(true)
+		Polestar.Set("ui.showNotes", true)
+		flip = false
+		Polestar.Set("ui.skin", "polestar")
+		GF.Render()
+		stub.advance(0.5)
+		local back = snap()
+		back.tipCompact, back.tip, back.capped = tipIn(true), tipIn(false), tall()
+		emit({ ok = ok, why = why or false, house = house, same = same, flipped = flipped, back = back, asked = asked,
+			cap = T.HasCapability("surfaces.guideShows") })"##,
+	);
+	assert_eq!(out["ok"], true, "registered: {}", out["why"]);
+	assert_eq!(out["cap"], true);
+	for name in ["tip", "done", "upnextHead", "goalScroll"] {
+		assert_eq!(out["asked"][name], "boolean", "asked for {name} with a boolean default: {out}");
+	}
+	let h = &out["house"];
+	assert_eq!(
+		(h["tipCompact"].clone(), h["tip"].clone(), h["doneLine"].clone(), h["doneRows"].clone(), h["head"].clone(), h["upRows"].clone()),
+		(json!(false), json!(true), json!(true), json!(0), json!(true), json!(0)),
+		"the house: no tip in compact mode, done goals folded into a line, Up next folded under its heading: {out}"
+	);
+	assert_eq!(out["same"], out["house"], "a skin answering the default changes nothing: {out}");
+	let f = &out["flipped"];
+	assert_eq!(f["tipCompact"], true, "the tip kept in compact mode: {out}");
+	assert_eq!(f["notesOff"], false, "never with the player's tips off: {out}");
+	// The step's done accept as a row (its done "Go to" names the header's own place: never a row).
+	assert_eq!((f["doneLine"].clone(), f["doneRows"].clone()), (json!(false), json!(1)), "done goals kept in place as rows, no line: {out}");
+	assert_eq!(f["head"], false, "Up next without its heading: {out}");
+	assert!(f["upRows"].as_u64().unwrap_or(0) > 0, "its rows shown though Up next is folded: {out}");
+	assert!(n(&f["capped"]) > n(&h["capped"]), "the goals area kept whole past the cap, the window taller: {out}");
+	assert_eq!(out["back"], out["house"], "without the skin, as it was: {out}");
 }
 
 // The settings window's Theme page with its picker's cards as a player gets them: the arrow (Nav, with Maps) for

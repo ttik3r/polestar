@@ -1326,6 +1326,20 @@ end
 
 local function upcomingOpen() return ns.Get("ui.upcomingOpen") and true or false end
 
+-- Whether the window shows part `name` its way (Skin API 2,
+-- hooks.guideShows(name, default)): the skin in use's answer when it is a
+-- boolean, else `default`, Polestar's own choice. Names: "tip" (the step's
+-- tip, default off in compact mode), "done" (finished goals kept in place
+-- as rows, default off: folded into one line), "upnextHead" (Up next's
+-- heading, default on; without it the rows always show), "goalScroll" (the
+-- goals area scrolls past the window's cap, default on), "classCardLater"
+-- (the class quest card on the chain's later steps, default on).
+function GF.Shows(name, default)
+	local ran, v = Theme.SkinHookValue("guideShows", name, default)
+	if ran and type(v) == "boolean" then return v end
+	return default
+end
+
 ---------------------------------------------------------------------------
 -- Along the way: open goals of `along` steps the route has passed
 -- (Engine.GetAlong), under the card until they are done
@@ -1658,6 +1672,8 @@ end
 local function fillUpcoming(E, index)
 	for i = 1, #upRows do upRows[i]:Hide() end
 	local want = compact() and 0 or (ns.Get("ui.upcoming") or 0)
+	-- Without its heading (GF.Shows "upnextHead"), Up next's rows always show.
+	local rowsShown = upcomingOpen() or not GF.Shows("upnextHead", true)
 	local n, count = 0, E.GetStepCount and E.GetStepCount() or 0
 	local i = index + 1
 	while n < want and i <= count do
@@ -1677,7 +1693,7 @@ local function fillUpcoming(E, index)
 			r.Icon:SetTexture(Theme.VerbIcon(UI.FirstVerb(v)))
 			r.Text:SetText(r.psSummary)
 			W.Color(r.Text, warn and "warning" or "textDim")
-			r:SetShown(upcomingOpen())
+			r:SetShown(rowsShown)
 			-- The skin in use's touch on the row (Skin API 2,
 			-- hooks.guideUpRow(row, view, index)).
 			Theme.SkinHook("guideUpRow", r, v, i)
@@ -2158,6 +2174,8 @@ local function fillCard(sameFocus)
 			end
 		end
 		-- The focus: its finished goals folded into "✓ N done", the rest as rows.
+		-- A skin may keep them in place as rows, no line (GF.Shows "done").
+		local inPlace = GF.Shows("done", false)
 		fold.serial = fold.serial + 1
 		local list = mineBefore
 		for _, goal in ipairs(goalsOf(g)) do list[#list + 1] = goal end
@@ -2167,7 +2185,7 @@ local function fillCard(sameFocus)
 			local gi = goal.index
 			local rec = fold.of[gi]
 			if goal.status == "done" then
-				if not rec and not model.folded[gi] then
+				if not rec and not model.folded[gi] and not inPlace then
 					local last = model.last[gi]
 					if sameFocus and last and last ~= "done" then
 						rec = fold.start(gi)
@@ -2192,7 +2210,7 @@ local function fillCard(sameFocus)
 			if fold.list[i].seen ~= fold.serial then fold.drop(fold.list[i]) end
 		end
 		local done = #doneList
-		if done > 0 or first then
+		if (done > 0 or first) and not inPlace then
 			local l = addLine("done", "check", "success", string.format(L["%d done"], max(done, 1)), doneList, L["Done"], model.doneOpen)
 			for i = 1, fold.n do fold.list[i].grow = nil end
 			if done == 0 then
@@ -2215,7 +2233,7 @@ local function fillCard(sameFocus)
 				addRow(goal, nil, false)
 			elseif k then
 				addRow(goal, nil, false, k)
-			elseif model.doneOpen then
+			elseif model.doneOpen or inPlace then
 				addRow(goal, nil, false)
 			end
 		end
@@ -2292,7 +2310,9 @@ local function fillCard(sameFocus)
 		area.items[i] = nil
 		i = i + 1
 	end
-	local shown = ns.Get("ui.showNotes") and not compact()
+	-- The tip: never with ui.showNotes off; a skin may keep it in compact
+	-- mode, or leave it out (GF.Shows "tip").
+	local shown = ns.Get("ui.showNotes") and GF.Shows("tip", not compact()) or false
 	local note = shown and view.note or nil
 	if note == "" then note = nil end
 	-- The step's picture (a file in its pack's addon folder, Guides.lua): one

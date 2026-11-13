@@ -251,6 +251,13 @@ check("skin moonlit", Theme.RegisterSkin("moonlit", {
 		-- piece it uses each time. Moonlit leaves them as Polestar paints them.
 		guideUpRow = function(row, view, index)
 		end,
+		-- Whether a part shows the skin's way: "tip" (in compact mode),
+		-- "done" (finished goals kept in place), "upnextHead", "goalScroll",
+		-- "classCardLater"; `default` is Polestar's own choice. A name the
+		-- skin does not know gets its default back. Moonlit keeps them all.
+		guideShows = function(name, default)
+			return default
+		end,
 		-- The cards on the guide window: "headsup" (a class quest or dungeon
 		-- heads-up) and "classcard" (the class quest card in the window);
 		-- parts: titles, bodies (the strings Polestar sizes), accents.
