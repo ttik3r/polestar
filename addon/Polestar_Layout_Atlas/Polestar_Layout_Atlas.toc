@@ -28,5 +28,6 @@
 ## Dependencies: Polestar
 ## LoadOnDemand: 1
 ## X-Polestar-Layout: atlas
+## X-Polestar-Layout-Preset: atlas = Atlas
 
 Atlas.lua

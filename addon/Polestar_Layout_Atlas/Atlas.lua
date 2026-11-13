@@ -174,6 +174,25 @@ local function hideAll(t, seen)
 	end
 end
 
+-- The guide window `f` sits in (a frame marked psGuideWindow), or nil.
+local function windowOf(f)
+	local p = f
+	for _ = 1, 16 do
+		if not p then return nil end
+		if type(p) == "table" and rawget(p, "psGuideWindow") then return p end
+		p = p.GetParent and p:GetParent() or nil
+	end
+	return nil
+end
+
+-- Whether the layout leaving the window of `parts` takes back what it did
+-- to `f`: `f` sits in that window, or in none and the window is the live one.
+function Core.leaves(f, parts, live)
+	local w = windowOf(f)
+	if w then return parts ~= nil and w == parts.window end
+	return live == true
+end
+
 -- Whether `f` sits in `window` (a part of the window a hook handed over).
 local function isUnder(f, window)
 	local p = f
@@ -971,7 +990,9 @@ local function headerBack(person)
 	person.Where:ClearAllPoints()
 	person.Where:SetPoint(unpack(was.where))
 	person.Where:SetJustifyH(was.justify)
-	person.Where:SetFont(was.whereFont[1], was.whereFont[2], was.whereFont[3])
+	-- Polestar's own role for it (UI/GuideFrame.lua), so a later repaint
+	-- keeps it: Theme.Font above gave the string the goal role.
+	Theme.Font(person.Where, "small")
 	person.Where:SetTextColor(Theme.Color("textDim"))
 	if person.Icon then person.Icon:SetAlpha(1) end
 end
@@ -983,7 +1004,6 @@ local function stepHeader(person, width)
 	if not own._header then
 		own._header = {
 			font = { person.Name:GetFont() },
-			whereFont = { person.Where:GetFont() },
 			wrap = person.Name:CanWordWrap(),
 			name = { person.Name:GetPoint(1) },
 			where = { person.Where:GetPoint(1) },
@@ -1551,16 +1571,20 @@ local function xpLook(xp)
 	xp.Icon:SetVertexColor(Theme.Accent())
 end
 
--- The XP row is handed over by name only (guidePlace): the layout leaving
--- gives the one it last saw its own look back.
-local lastXp
+-- The XP row is handed over by name only (guidePlace): the layout leaving a
+-- window gives the ones it saw in that window their own look back.
+local seenXp = setmetatable({}, { __mode = "k" })
 on("guidePlace", function(name, part)
 	if name == "xp" then
-		lastXp = part
+		seenXp[part] = true
 		xpLook(part)
 	end
 end)
-onLeave(function() xpBack(lastXp) end)
+onLeave(function(parts, live)
+	for xp in pairs(seenXp) do
+		if Core.leaves(xp, parts, live) then xpBack(xp) end
+	end
+end)
 
 ---------------------------------------------------------------------------
 -- Compact mode: dense. Polestar's own compact mode drops Up next, the tabs
@@ -1648,14 +1672,31 @@ local function spec(hooks)
 			["guideWindow.targetBar"] = false,
 			["guideWindow.reportButton"] = false,
 		},
+		-- Its card in the guide window's Presets, beside Polestar's own:
+		-- picking it chooses this layout and the Atlas skin. A Polestar
+		-- without layout presets gets the layout without it.
+		preset = Theme.HasCapability("layouts.preset") and {
+			label = "Atlas",
+			help = "The step on a timeline, Up next on a rail, cards above the window.",
+			set = { ["ui.skin"] = "atlas" },
+		} or nil,
 		-- Under another layout: Polestar's own parts get their look back; the
 		-- pieces Atlas made itself hide.
-		onLeave = function()
-			local parts = Theme.GuideParts and Theme.GuideParts()
-			if parts then
-				for _, fn in ipairs(leaving) do fn(parts) end
+		-- Called once for each guide window Atlas dressed (the live one, then
+		-- each copy drawing with the layout in use), with that window's
+		-- parts: its parts get their look back and the pieces Atlas made in
+		-- it hide. The live window's call also hides the pieces outside any
+		-- guide window (the cards above it).
+		onLeave = function(_, parts, live)
+			if parts == nil and live ~= false then
+				parts, live = Theme.GuideParts and Theme.GuideParts(), true
 			end
-			for _, s in pairs(stores) do hideAll(s) end
+			if parts then
+				for _, fn in ipairs(leaving) do fn(parts, live) end
+			end
+			for f, s in pairs(stores) do
+				if Core.leaves(f, parts, live) then hideAll(s) end
+			end
 		end,
 	}
 end
