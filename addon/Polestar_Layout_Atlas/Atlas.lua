@@ -1245,8 +1245,11 @@ on("guideProgress", function(foot, frac)
 end)
 
 ---------------------------------------------------------------------------
--- The rail: a line down the window's left from the current step's node (a
--- disc in the accent) to the steps in Up next (hollow nodes, fainter ahead).
+-- The rail: a line down the window's left from the steps before's nodes
+-- (each a disc in the success colour once done, hollow when skipped; the
+-- player's guideWindow.lastSteps, 1 by Atlas's default) through the current step's
+-- (a disc in the accent) to the steps in Up next (hollow nodes, fainter
+-- ahead).
 -- The card and Up next are set in from it (guideInset); each Up next row is
 -- its first goal on one line with its zone on the right (guideUpRow). The
 -- "after" line is not shown: the rail shows the next step already. Out of
@@ -1398,6 +1401,59 @@ local function hideNode(n)
 	if n then n.ring:Hide(); n.disc:Hide(); n.hole:Hide() end
 end
 
+-- A step before's node: a filled disc in the success colour once done; a
+-- skipped step's hollow, as a step not done.
+local function paintPast(n, status)
+	local br, bg, bb = Theme.Color("bg")
+	n.ring:SetSize(14, 14)
+	n.ring:SetVertexColor(br, bg, bb, 0)
+	n.disc:SetSize(8, 8)
+	n.hole:SetSize(6, 6)
+	if status == "done" then
+		local r, g, b = Theme.Color("success")
+		n.disc:SetVertexColor(r, g, b, 0.85)
+		n.hole:SetVertexColor(0, 0, 0, 0)
+	else
+		local r, g, b = Theme.Color("textMuted")
+		n.disc:SetVertexColor(r, g, b, 0.6)
+		n.hole:SetVertexColor(br, bg, bb, 1)
+	end
+end
+
+-- The steps before (parts.last, guideWindow.lastSteps: Polestar fills its
+-- Rows, oldest first, from the window's own step, and leaves them out in
+-- compact mode and where no step comes before): on the rail, each row's
+-- number, icon and text in Up next's columns, its first goal in the goal's
+-- words, "skipped" after a skipped step. Polestar places them again at
+-- every layout. -> the rows shown
+local function lastLines(last, person)
+	local rows = {}
+	local n = tonumber(rawget(last, "psCount")) or 0
+	local pool = rawget(last, "Rows")
+	if type(pool) ~= "table" then return rows end
+	for i = 1, n do
+		local r = pool[i]
+		if r and rawget(r, "psView") and rawget(r, "Text") and rawget(r, "Num") then rows[#rows + 1] = r end
+	end
+	if #rows == 0 then return rows end
+	-- Up next's columns: the rows stand out of the card by the card's inset
+	-- over Up next's.
+	last:ClearAllPoints()
+	last:SetPoint("BOTTOMLEFT", person, "TOPLEFT", -(CARD_X - UP_X), 0)
+	last:SetPoint("BOTTOMRIGHT", person, "TOPRIGHT", 0, 0)
+	local w = last:GetWidth()
+	for _, r in ipairs(rows) do
+		local text = stepLine(r.psView)
+		if rawget(r, "psStatus") == "skipped" then
+			text = text .. "  |c" .. Theme.Hex("textMuted") .. tr("skipped") .. "|r"
+		end
+		r.Text:SetText(text)
+		r.Text:SetTextColor(Theme.Color("textDim"))
+		if type(w) == "number" and w > 0 then r.Text:SetWidth(math.max(40, w - 59 - 14)) end
+	end
+	return rows
+end
+
 -- The rail and its nodes, on a layer of Atlas's own over the window.
 local function rail(parts)
 	local window, person = parts.window, parts.person
@@ -1415,6 +1471,21 @@ local function rail(parts)
 		return
 	end
 	layer:Show()
+	local last = parts.last
+	local past = (last and last:IsShown()) and lastLines(last, person) or {}
+	if not layer.pasts then layer.pasts = {} end
+	local top
+	for i = 1, math.max(#past, #layer.pasts) do
+		local pn = node(layer.pasts, i, layer)
+		local r = past[i]
+		if r then
+			paintPast(pn, rawget(r, "psStatus"))
+			placeNode(pn, r, "LEFT", RAIL - UP_X, 0)
+			top = top or pn.disc
+		else
+			hideNode(pn)
+		end
+	end
 	local cn = node(layer, "cur", layer)
 	paintNode(cn, true, 1)
 	placeNode(cn, person, "TOPLEFT", RAIL - CARD_X, -(10 + person.Name:GetStringHeight() / 2))
@@ -1437,11 +1508,12 @@ local function rail(parts)
 	end
 	layer.line:SetWidth(pixel(layer))
 	layer.line:ClearAllPoints()
-	layer.line:SetPoint("TOP", cn.disc, "CENTER", 0, 0)
+	top = top or cn.disc
+	layer.line:SetPoint("TOP", top, "CENTER", 0, 0)
 	layer.line:SetPoint("BOTTOM", bottom, "CENTER", 0, 0)
 	local r, g, b = Theme.Color("textMuted")
 	layer.line:SetVertexColor(r, g, b, 0.35)
-	layer.line:SetShown(bottom ~= cn.disc)
+	layer.line:SetShown(bottom ~= top)
 end
 on("guideLayout", function(parts) if parts.window then rail(parts) end end)
 
@@ -1647,6 +1719,7 @@ local function spec(hooks)
 			["guideWindow.progress"] = false,
 			["guideWindow.targetBar"] = false,
 			["guideWindow.reportButton"] = false,
+			["guideWindow.lastSteps"] = 1,
 		},
 		-- Under another layout: Polestar's own parts get their look back; the
 		-- pieces Atlas made itself hide.
