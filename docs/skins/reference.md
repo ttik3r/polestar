@@ -12,6 +12,7 @@ zero is in [getting started](getting-started.md).
   - [Reading the palette](#reading-the-palette)
   - [Asking about skins and schemes](#asking-about-skins-and-schemes)
   - [Installed skin addons](#installed-skin-addons)
+  - [Layouts](#layouts)
   - [Version and capabilities](#version-and-capabilities)
   - [Drawing preview cards](#drawing-preview-cards)
   - [Presets](#presets)
@@ -212,6 +213,62 @@ assert(ok == false and why:find("X-Polestar-Skin", 1, true), why)
 assert(Theme.LoadSkinAddon("halo") == true) -- registered already
 ```
 
+### Layouts
+
+A layout is the guide window's structure apart from its look (capability
+`layouts`). Any skin sits on top of it.
+
+`RegisterLayout(id, spec) -> ok, message`. The spec takes `api`, `name`,
+`addon`, `author`, `version` and `desc` as a skin's do
+([Common spec fields](#common-spec-fields)), and:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `hooks` | table | Structure hooks only: `guideLayout`, `guideRender`, `guidePlace`, `guideAnchor`, `guideTakes`, `guidePerson`, `guideInset`, `guideUpRow`, `guideShows` ([The guide window](#the-guide-window)). Same arguments and answers as a skin's. |
+| `onApply`, `onLeave` | function(id) | Run when the layout comes into use and when it leaves. |
+
+The refusals, beside the common ones: `a layout carries no tokens or
+colours (<field> is a skin's field)`, `hooks.<name> is a skin's (a layout
+hooks the guide window's structure only)`, `unknown hooks "<name>"`,
+`hooks.<name> has the wrong type`, `onApply must be a function`.
+
+A hook answers in this order: the layout's, else the skin's, else
+Polestar's own. With no layout chosen (`ui.layout` unset), every hook is
+the skin's, as before. The skin's tokens, painters and other hooks stay
+in use whatever the layout. A layout's hook, `onApply` or `onLeave` runs
+under `pcall`: the first error is noted (`/polestar debug`) and the
+layout is off for the session, the player's choice kept.
+
+A layout addon declares its ids in its TOC and may load on demand. Its
+folder is `Polestar_Layout_<Name>`, which the install check leaves alone
+as it does `Polestar_Skin_*` ([publishing](publishing.md#naming)):
+
+```
+## X-Polestar-Layout: ledger, ledger-wide
+## LoadOnDemand: 1
+```
+
+Polestar loads it (out of combat) at login when the saved `ui.layout` is
+one of its ids, and when the player picks one.
+
+| Function | Returns |
+|---|---|
+| `SetLayout(id)` | `ok, why`: saves `ui.layout`, loading the addon that declares `id` when it is installed and not loaded. `SetLayout()` goes back to Polestar's own layout. `why` as `LoadLayoutAddon`'s. |
+| `LayoutId()` | The layout in use, or nil for Polestar's own. |
+| `Layouts()` | The registered layouts' ids, sorted. |
+| `LayoutInfo(id)` | `{ id, name, addon, author, version, desc, api, hooks = { name, ... }, failed }` or nil. `failed` is the error that turned it off. |
+| `InstalledLayouts()` | Every installed addon that declares layouts, as `InstalledSkins()`. |
+| `LoadLayoutAddon(id)` | `ok, why`, as `LoadSkinAddon`; the last reason is `"no installed addon declares it (## X-Polestar-Layout)"`. |
+
+```lua
+local Theme = Polestar.Theme
+assert(Theme.HasCapability("layouts"))
+assert(Theme.RegisterLayout("ledger", { api = 2, name = "Ledger", addon = "Polestar_Layout_Ledger",
+	hooks = { guideInset = function(name) return name == "upnext" and 12 or 0 end } }))
+assert(Theme.SetLayout("ledger") and Theme.LayoutId() == "ledger")
+Theme.SetLayout()
+```
+
 ### Version and capabilities
 
 | | |
@@ -220,7 +277,7 @@ assert(Theme.LoadSkinAddon("halo") == true) -- registered already
 | `HasCapability(name)` | `true` when this Polestar offers capability `name` ([Capabilities](#capabilities)); `false` for anything else, including nil. |
 | `Capabilities()` | Every capability name, sorted, as a new table. |
 | `SkinSurfaces()` | The surfaces a skin can reach, sorted: `{ paint = { kind, ... }, hooks = { name, ... } }` (the [painter kinds](#surfaces-painters) and the [hooks](#surfaces-hooks)). |
-| `SkinHooks(surface)` | Whether the skin in use hooks `surface` (and has not failed). |
+| `SkinHooks(surface)` | Whether the layout or the skin in use hooks `surface` (and has not failed). |
 
 ```lua
 local Theme = Polestar.Theme
@@ -1351,6 +1408,7 @@ version 1, the API's preview before it.
 | `kit.gradient.horizontal` (**2**) | `kit.gradient`'s `"HORIZONTAL"` |
 | `arrow.parts` (**2**), `pin.parts` (**2**) | the parts the `arrow` and `pin` hooks are handed |
 | `skins.installed` (**2**) | `## X-Polestar-Skin`, `InstalledSkins`, `LoadSkinAddon`, `LoadInstalledSkins` |
+| `layouts` (**2**) | [Layouts](#layouts): `RegisterLayout`, `SetLayout`, `## X-Polestar-Layout` and the functions beside them |
 | `theme.functions` (**2**) | the [Theme functions](#other-theme-functions-a-skin-may-use) under the version promise |
 | `surfaces.window`, `surfaces.guide`, `surfaces.toast`, `surfaces.panel`, `surfaces.sidebar`, `surfaces.inset`, `surfaces.button`, `surfaces.tile`, `surfaces.dropdown`, `surfaces.editbox`, `surfaces.checkbox`, `surfaces.tab`, `surfaces.close`, `surfaces.scrollbar` | each painter kind |
 | `surfaces.arrow`, `surfaces.pin`, `surfaces.guideTitle` | those hooks |

@@ -21,6 +21,8 @@ local resolve, switchSkin, type, variantOf = I.resolve, I.switchSkin, I.type, I.
 -- and skins without touching Polestar.
 --   Theme.RegisterScheme(id, spec) -> ok, message
 --   Theme.RegisterSkin(id, spec)   -> ok, message
+--   Theme.RegisterLayout(id, spec) -> ok, message (the guide window's
+--   structure alone, under any skin: "Layouts" below)
 -- ok false: refused, message says why. ok true: message is nil, or says
 -- what was corrected (grounds darkened until the text reads). A skin's
 -- painters and hooks run under pcall: the first error is noted, the skin
@@ -53,8 +55,15 @@ local HOOKS = { arrow = true, pin = true, guideTitle = true, guideRow = true, gu
 	guideProgress = true, guideAnchor = true, guideTab = true, guidePlace = true, guideMenu = true, guideTakes = true, guidePerson = true,
 	guideInset = true, guideUpRow = true, guideShows = true, card = true, toast = true,
 	actionButton = true }
+-- The hooks a layout may set: the guide window's structure (where its parts
+-- sit, which show, how tall the step's header is), never its colours.
+local LAYOUT_HOOKS = { guideLayout = true, guideRender = true, guidePlace = true, guideAnchor = true, guideTakes = true,
+	guidePerson = true, guideInset = true, guideUpRow = true, guideShows = true }
+-- The registered layouts (Theme.RegisterLayout): id -> { id, name, addon,
+-- author, version, desc, api, hooks, onApply, onLeave }.
+local LAYOUTS, LAYOUT_FAILED = {}, {}
 -- The checks read them too (Polestar_SkinAPI/SkinCheck.lua).
-I.PAINT_KINDS, I.HOOKS = PAINT_KINDS, HOOKS
+I.PAINT_KINDS, I.HOOKS, I.LAYOUT_HOOKS, I.LAYOUTS = PAINT_KINDS, HOOKS, LAYOUT_HOOKS, LAYOUTS
 
 local CAPABILITIES = {}
 for _, c in ipairs({ "schemes", "skins", "tokens", "legibility", "fonts", "fontSizes", "textShadow", "icons", "media.band",
@@ -62,7 +71,7 @@ for _, c in ipairs({ "schemes", "skins", "tokens", "legibility", "fonts", "fontS
 	-- Skin API 2
 	"variants", "resolve", "shadow", "artTint", "media.dart", "tokens.accent2", "tokens.glow", "tokens.pins",
 	"kit.glow", "kit.gameArt", "kit.crossfade", "kit.tintArt", "kit.gradient.horizontal", "kit.color",
-	"media.pins", "arrow.parts", "pin.parts", "skins.installed", "theme.functions" }) do CAPABILITIES[c] = true end
+	"media.pins", "arrow.parts", "pin.parts", "skins.installed", "theme.functions", "layouts" }) do CAPABILITIES[c] = true end
 for kind in pairs(PAINT_KINDS) do CAPABILITIES["surfaces." .. kind] = true end
 for name in pairs(HOOKS) do CAPABILITIES["surfaces." .. name] = true end
 
@@ -138,6 +147,15 @@ function Theme.RegisterSkin(id, spec)
 	return ok, msg
 end
 
+-- Register layout `id` (spec: docs/skins/reference.md, "RegisterLayout").
+function Theme.RegisterLayout(id, spec)
+	local c = checks()
+	local ok, msg
+	if c then ok, msg = c.layout(id, spec) else ok, msg = false, MISSING end
+	if not ok then report("layout", id, spec, "refused: " .. tostring(msg)) end
+	return ok, msg
+end
+
 -- A registered skin's or scheme's public facts (name, addon, author,
 -- version, desc, base, scheme, the Skin API version it was written for), or
 -- nil.
@@ -205,39 +223,68 @@ I.onSwitch = function(id)
 	liveId, liveHooks = id, s and not s.builtin and s.hooks or nil
 end
 
--- A module's own art handed to the skin in use, after the module painted it
--- (the hooks above: Nav/Arrow.lua "arrow", Nav/Pins.lua "pin", UI/Toasts.lua
--- "card" and "toast", QoL/Buttons.lua "actionButton", the guide window's).
--- -> true when a hook ran
+-- The hooks of the layout in use (a registered layout's spec.hooks), set as
+-- the saved layout (ui.layout) changes: nil is Polestar's own layout.
+local layoutId, layoutHooks
+
+-- A layout's hook or its onApply or onLeave failed: noted, and the layout is
+-- off for the session (Polestar's own layout, or the skin's hooks, stand in
+-- from the next draw).
+local function failLayout(id, err)
+	if LAYOUT_FAILED[id] then return end
+	LAYOUT_FAILED[id] = tostring(err)
+	local l = LAYOUTS[id]
+	if ns.NoteError then ns.NoteError(format("layout %s (%s): %s", tostring(id), l and tostring(l.addon) or "?", tostring(err))) end
+	if layoutId == id then
+		layoutId, layoutHooks = nil, nil
+		if ns.After then ns.After(0, function() Theme.Refresh() end) end
+	end
+end
+
+-- The hook that answers for `surface`: the layout's, else the skin's.
+-- -> fn, whose (true: the layout's) | nil
+local function hookFor(surface)
+	local fn = layoutHooks and layoutHooks[surface]
+	if fn then return fn, true end
+	fn = liveHooks and liveHooks[surface]
+	if fn and not FAILED[liveId] then return fn, false end
+	return nil
+end
+
+-- A module's own art handed to the layout and the skin in use, after the
+-- module painted it (the hooks above: Nav/Arrow.lua "arrow", Nav/Pins.lua
+-- "pin", UI/Toasts.lua "card" and "toast", QoL/Buttons.lua "actionButton",
+-- the guide window's). The layout's hook runs where it has one, else the
+-- skin's. -> true when a hook ran
 function Theme.SkinHook(surface, ...)
-	local fn = liveHooks and liveHooks[surface]
-	if not fn or FAILED[liveId] then return false end
+	local fn, byLayout = hookFor(surface)
+	if not fn then return false end
 	local ok, err = pcall(fn, ...)
 	if not ok then
-		failSkin(liveId, err)
+		if byLayout then failLayout(layoutId, err) else failSkin(liveId, err) end
 		return false
 	end
 	return true
 end
 
--- The skin's hook for `surface` with its answer: -> true, its first result
--- when the hook ran (false and nothing when there is none or it failed, the
+-- The hook for `surface` with its answer: -> true, its first result when the
+-- hook ran (false and nothing when there is none or it failed, the layout or
 -- skin then off as with Theme.SkinHook).
 function Theme.SkinHookValue(surface, ...)
-	local fn = liveHooks and liveHooks[surface]
-	if not fn or FAILED[liveId] then return false end
+	local fn, byLayout = hookFor(surface)
+	if not fn then return false end
 	local ok, v = pcall(fn, ...)
 	if not ok then
-		failSkin(liveId, v)
+		if byLayout then failLayout(layoutId, v) else failSkin(liveId, v) end
 		return false
 	end
 	return true, v
 end
 
--- Whether the skin in use hooks `surface` (a module may skip the work of
--- handing over its parts when none does).
+-- Whether the layout or the skin in use hooks `surface` (a module may skip
+-- the work of handing over its parts when none does).
 function Theme.SkinHooks(surface)
-	return liveHooks ~= nil and liveHooks[surface] ~= nil and not FAILED[liveId]
+	return hookFor(surface) ~= nil
 end
 
 -- The guide window's parts for a skin's hooks and its own frames (Skin API 2,
@@ -279,13 +326,13 @@ end
 -- -> { { addon, title, notes, ids = { id, ... }, loaded, reason }, ... };
 -- reason is the client's ("DISABLED", "INTERFACE_VERSION", "DEP_MISSING"...)
 -- when it cannot load, nil when it is loaded or can load.
-function Theme.InstalledSkins()
+local function installed(key)
 	local A = C_AddOns
 	local out = {}
 	if not (A and A.GetNumAddOns and A.GetAddOnInfo and A.GetAddOnMetadata) then return out end
 	for i = 1, A.GetNumAddOns() do
 		local name, title, notes, loadable, reason = A.GetAddOnInfo(i)
-		local declared = type(name) == "string" and A.GetAddOnMetadata(name, "X-Polestar-Skin") or nil
+		local declared = type(name) == "string" and A.GetAddOnMetadata(name, key) or nil
 		if type(declared) == "string" then
 			local ids = {}
 			for id in declared:gmatch("[^,%s]+") do ids[#ids + 1] = id end
@@ -298,6 +345,7 @@ function Theme.InstalledSkins()
 	end
 	return out
 end
+function Theme.InstalledSkins() return installed("X-Polestar-Skin") end
 
 -- Loads (out of combat; in a fight, once it ends) installed skin addon rec,
 -- which is not loaded and can load. -> ok, why
@@ -368,6 +416,112 @@ if ns.On then
 			if not (ns.IsLoggedIn and not ns.IsLoggedIn()) then wantSaved() end
 		end
 	end)
+end
+
+---------------------------------------------------------------------------
+-- Layouts (capability "layouts"): the guide window's structure, apart from
+-- its look. A layout sets only the structure hooks (LAYOUT_HOOKS) and sits
+-- under any skin: its hook answers where it has one, else the skin's, else
+-- Polestar's own. The player's choice is ui.layout (nil: Polestar's own
+-- layout); Theme.SetLayout(id) sets it, Theme.SetLayout() goes back. A
+-- layout addon names its layouts in its TOC, as a skin addon does:
+--   ## X-Polestar-Layout: ledger        (several: "ledger, ledger-wide")
+-- and may load on demand: Polestar loads it at login when the saved layout
+-- is one of its own, and when the player picks one.
+---------------------------------------------------------------------------
+
+-- Every installed addon that declares layouts (as Theme.InstalledSkins).
+function Theme.InstalledLayouts() return installed("X-Polestar-Layout") end
+
+-- Load the installed addon that declares layout `id`, when it is not loaded
+-- and can be. -> ok (registered now, or already), why
+function Theme.LoadLayoutAddon(id)
+	if LAYOUTS[id] then return true end
+	for _, rec in ipairs(Theme.InstalledLayouts()) do
+		for _, x in ipairs(rec.ids) do
+			if x == id then
+				if rec.loaded then return false, "its addon " .. rec.addon .. " is loaded but did not register it" end
+				if rec.reason then return false, rec.reason end
+				local ok, why = loadSkinAddon(rec)
+				if not ok then return false, why end
+				if LAYOUTS[id] then return true end
+				return false, "its addon " .. rec.addon .. " loaded but did not register it"
+			end
+		end
+	end
+	return false, "no installed addon declares it (## X-Polestar-Layout)"
+end
+
+-- The layout in use follows ui.layout: the one leaving runs its onLeave, the
+-- one coming its onApply. -> true when the layout in use changed
+local function switchLayout()
+	local want = get("ui.layout")
+	local l = type(want) == "string" and not LAYOUT_FAILED[want] and LAYOUTS[want] or nil
+	local id = l and want or nil
+	if id == layoutId then return false end
+	local was = layoutId and LAYOUTS[layoutId]
+	layoutId, layoutHooks = id, l and l.hooks or nil
+	for _, step in ipairs({ { was, "onLeave" }, { l, "onApply" } }) do
+		local s, name = step[1], step[2]
+		if s and type(s[name]) == "function" then
+			local ok, err = pcall(s[name], s.id)
+			if not ok then failLayout(s.id, err) end
+		end
+	end
+	return true
+end
+-- The checks call it when the saved layout registers (its addon loaded late).
+I.layoutRegistered = function(id)
+	if get("ui.layout") == id and not (ns.IsLoggedIn and not ns.IsLoggedIn()) and switchLayout() then Theme.Refresh() end
+end
+
+-- The saved layout: its addon loaded when it is not yet, and put in use.
+local function wantLayout()
+	local id = get("ui.layout")
+	if type(id) == "string" and not LAYOUTS[id] then Theme.LoadLayoutAddon(id) end
+	if switchLayout() then Theme.Refresh() end
+end
+if ns.OnLogin then ns.OnLogin(wantLayout) end
+if ns.On then
+	ns.On("SETTING_CHANGED", function(path)
+		if path == "ui.layout" or path == "ui" or path == "" then
+			if not (ns.IsLoggedIn and not ns.IsLoggedIn()) then wantLayout() end
+		end
+	end)
+end
+
+-- Choose layout `id` (nil: Polestar's own layout), loading its addon when
+-- it is installed and not loaded. -> ok, why
+function Theme.SetLayout(id)
+	if id ~= nil and id ~= false then
+		local ok, why = Theme.LoadLayoutAddon(id)
+		if not ok then return false, why end
+	end
+	ns.Set("ui.layout", id or nil)
+	return true
+end
+
+-- The layout in use (nil: Polestar's own).
+function Theme.LayoutId() return layoutId end
+
+-- The registered layouts' ids, sorted.
+function Theme.Layouts()
+	local out = {}
+	for id in pairs(LAYOUTS) do out[#out + 1] = id end
+	table.sort(out)
+	return out
+end
+
+-- A registered layout's public facts (name, addon, author, version, desc,
+-- api, hooks: the surfaces it hooks, sorted), or nil.
+function Theme.LayoutInfo(id)
+	local l = LAYOUTS[id]
+	if not l then return nil end
+	local hooks = {}
+	for k in pairs(l.hooks or {}) do hooks[#hooks + 1] = k end
+	table.sort(hooks)
+	return { id = id, name = l.name, addon = l.addon, author = l.author, version = l.version, desc = l.desc, api = l.api,
+		hooks = hooks, failed = LAYOUT_FAILED[id] }
 end
 
 -- The built-in schemes and skins (their tokens are Theme.lua's tables;

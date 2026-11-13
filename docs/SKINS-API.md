@@ -115,6 +115,42 @@ art.
 - **Versions and capabilities**: `api`, `API_VERSION`, `HasCapability`, so
   a skin can use a newer feature where it exists and do without elsewhere.
 
+## Layouts: the guide window's structure, apart from its look
+
+A layout is the guide window's structure alone: where its parts sit, which
+of them show, how tall the step's header is. It carries no tokens, colours,
+fonts or painters, so a skin sits on top of any layout and keeps its look.
+
+```lua
+Polestar.Theme.RegisterLayout("ledger", {
+	api = 2, name = "Ledger", addon = "Polestar_Layout_Ledger",
+	hooks = {
+		guideInset = function(name) return name == "upnext" and 12 or 0 end,
+		guideShows = function(name, default) if name == "tip" then return false end return default end,
+	},
+})
+```
+
+- **Hooks**: only the structure hooks (`guideLayout`, `guideRender`,
+  `guidePlace`, `guideAnchor`, `guideTakes`, `guidePerson`, `guideInset`,
+  `guideUpRow`, `guideShows`), with the same arguments a skin's get.
+  Any other field or hook is refused.
+- **Who answers**: the layout's hook where it has one, else the skin's,
+  else Polestar's own. A skin that hooks the same surface keeps it under
+  Polestar's own layout.
+- **The choice**: the setting `ui.layout`, unset for Polestar's own layout.
+  `Polestar.Theme.SetLayout("ledger")` picks one (in chat: `/run
+  Polestar.Theme.SetLayout("ledger")`), `Polestar.Theme.SetLayout()` goes
+  back.
+- **Load on demand**: a folder `Polestar_Layout_<Name>` whose TOC says
+  `## X-Polestar-Layout: ledger` and `## LoadOnDemand: 1` loads at login
+  when the saved layout is its own, and when the player picks it.
+- **Errors**: a layout's hook, `onApply` or `onLeave` runs under `pcall`;
+  the first error is noted and the layout is off for the session.
+
+The functions and messages are in the
+[reference](skins/reference.md#layouts).
+
 ## More to read: the skins in the download
 
 Beside Moonlit, the release carries complete skins, each an addon of its

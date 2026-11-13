@@ -1,7 +1,7 @@
--- The Skin API's checks (docs/skins/reference.md): what a colour scheme or a
--- skin from another addon goes through as it registers (its fields, colours
--- and fonts, its text's legibility, its variants, shadow, art tint and
--- preset). Polestar loads this part (Polestar_SkinAPI, load on demand) with
+-- The Skin API's checks (docs/skins/reference.md): what a colour scheme, a
+-- skin or a layout from another addon goes through as it registers (its
+-- fields, colours and fonts, its text's legibility, its variants, shadow,
+-- art tint and preset; a layout's structure hooks). Polestar loads this part (Polestar_SkinAPI, load on demand) with
 -- the first scheme or skin another addon registers (Theme/SkinApi.lua), so a
 -- player who uses none never loads it. Polestar's own internals come through
 -- Polestar.ThemeInternal; the checks go back to it as I.register, and the
@@ -20,6 +20,8 @@ local pairs, shifted, type, report = I.pairs, I.shifted, I.type, I.report
 
 -- The surfaces a skin may paint and hook (Theme/SkinApi.lua's lists).
 local PAINT_KINDS, HOOKS = I.PAINT_KINDS, I.HOOKS
+-- The hooks a layout may set, and the layouts registered.
+local LAYOUT_HOOKS, LAYOUTS = I.LAYOUT_HOOKS, I.LAYOUTS
 local SKIN_MEDIA = { band = true, bandStars = true, medallion = true, dart = true, dartEdge = true, pinFill = true, pinRim = true }
 local ARROW_STYLES = { ["3d"] = true, flat = true, halo = true, hearth = true }
 local MAP_ICONS = { polestar = true, halo = true, hearth = true }
@@ -193,6 +195,9 @@ local SKIN_FIELDS = { api = true, name = true, addon = true, author = true, vers
 	mapIcons = true, paint = true, hooks = true, onApply = true, onLeave = true, strict = true, preset = true,
 	-- Skin API 2
 	variants = true, defaultVariant = true, resolve = true, shadow = true, artTint = true }
+-- A layout's (Theme.RegisterLayout): the window's structure, no look.
+local LAYOUT_FIELDS = { api = true, name = true, addon = true, author = true, version = true, desc = true, hooks = true,
+	onApply = true, onLeave = true }
 -- A variant's own (spec.variants, Skin API 2): what it changes of the skin.
 local VARIANT_FIELDS = { id = true, name = true, desc = true, base = true, scheme = true, tokens = true, media = true,
 	arrow = true, preset = true, artTint = true, shadow = true }
@@ -610,7 +615,47 @@ local function registerSkin(id, spec)
 	return true, note
 end
 
--- The checks, to Theme/SkinApi.lua's RegisterScheme and RegisterSkin; the
--- resolver (Theme.lua) reads a resolver's tokens and font with these.
-I.register = { scheme = registerScheme, skin = registerSkin }
+-- Register layout `id`: its facts, its structure hooks and its onApply and
+-- onLeave, nothing of a look (a skin's tokens, colours, fonts or painters).
+local function registerLayout(id, spec)
+	if type(spec) ~= "table" then return false, "the spec must be a table" end
+	for k in pairs(spec) do
+		if not LAYOUT_FIELDS[k] then
+			if SKIN_FIELDS[k] then
+				return false, format("a layout carries no tokens or colours (%s is a skin's field)", tostring(k))
+			end
+			return false, format("unknown field %q", tostring(k))
+		end
+	end
+	local ok, why = idCheck(id, LAYOUTS[id] and (LAYOUTS[id].addon or "Polestar"))
+	if ok then ok, why = metaCheck(spec) end
+	if not ok then return false, why end
+	if spec.hooks ~= nil then
+		if type(spec.hooks) ~= "table" then return false, "hooks must be a table" end
+		for k, v in pairs(spec.hooks) do
+			if not LAYOUT_HOOKS[k] then
+				if HOOKS[k] then
+					return false, format("hooks.%s is a skin's (a layout hooks the guide window's structure only)", tostring(k))
+				end
+				return false, format("unknown hooks %q", tostring(k))
+			end
+			if type(v) ~= "function" then return false, format("hooks.%s has the wrong type", tostring(k)) end
+		end
+	end
+	for _, k in ipairs({ "onApply", "onLeave" }) do
+		if spec[k] ~= nil and type(spec[k]) ~= "function" then return false, k .. " must be a function" end
+	end
+	local hooks = {}
+	for k, v in pairs(spec.hooks or {}) do hooks[k] = v end
+	LAYOUTS[id] = { id = id, name = spec.name, addon = spec.addon, author = spec.author, version = spec.version,
+		desc = spec.desc, api = spec.api or 1, hooks = hooks, onApply = spec.onApply, onLeave = spec.onLeave }
+	-- A saved choice waiting for this layout (its addon loaded late) shows now.
+	if I.layoutRegistered then I.layoutRegistered(id) end
+	return true
+end
+
+-- The checks, to Theme/SkinApi.lua's RegisterScheme, RegisterSkin and
+-- RegisterLayout; the resolver (Theme.lua) reads a resolver's tokens and
+-- font with these.
+I.register = { scheme = registerScheme, skin = registerSkin, layout = registerLayout }
 I.provide(readTokens, readFont)
