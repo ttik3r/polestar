@@ -1324,8 +1324,10 @@ on("guideUpRow", function(row, v)
 	row:Show()
 end)
 
--- Up next's rows fade ahead; each text stops short of its zone.
-local function upFit(frame)
+-- Up next's rows fade ahead; each text stops short of its zone. A row not
+-- yet laid out (no width) takes Up next's width (`width`, from guidePlace);
+-- with neither, its text keeps Polestar's width.
+local function upFit(frame, width)
 	local rows = upRows(frame)
 	for i, r in ipairs(rows) do
 		r:SetAlpha(onRail() and (FADE[i] or FADE[#FADE]) or 1)
@@ -1334,18 +1336,20 @@ local function upFit(frame)
 			local zw = (zone and zone:IsShown()) and math.min(zone:GetStringWidth() + 1, 110) or 0
 			if zone then zone:SetWidth(zw) end
 			local left = 59 -- Polestar's text column in the row
-			r.Text:SetWidth(math.max(40, (r:GetWidth() or 300) - left - 14 - (zw > 0 and zw + 8 or 0)))
+			local rw = r:GetWidth()
+			if not (type(rw) == "number" and rw > 0) then rw = tonumber(width) end
+			if rw and rw > 0 then r.Text:SetWidth(math.max(40, rw - left - 14 - (zw > 0 and zw + 8 or 0))) end
 		end
 	end
 end
 onLeave(function(parts) for _, r in ipairs(upRows(parts.upnext)) do r:SetAlpha(1) end end)
 
-on("guidePlace", function(name, part)
+on("guidePlace", function(name, part, width)
 	if name == "after" and onRail() then
 		part:Hide()
 		return true
 	end
-	if name == "upnext" then upFit(part) end
+	if name == "upnext" then upFit(part, width) end
 end)
 
 -- A node: a disc, with a ring of the window's ground round it (the current

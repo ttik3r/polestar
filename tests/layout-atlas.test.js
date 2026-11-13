@@ -256,3 +256,22 @@ emit({ text = first[1], sub = first[2], close = first[3], count = own or false, 
 	assert.equal(out.count, '2/12  ·  ', 'the count left of the distance');
 	assert.equal(out.shorter, true, 'the card gives up the step line');
 });
+
+test('an Up next row not laid out yet takes Up next width, not the narrowest', () => {
+	const out = hooks(`
+Polestar.Set("ui.upcoming", 3)
+Polestar.UI.GuideFrame.Layout()
+stub.advance(1)
+local rows = {}
+for _, r in ipairs({ parts.upnext:GetChildren() }) do if rawget(r, "psIndex") then rows[#rows + 1] = r end end
+local r = rows[1]
+if not r then return emit({ rows = 0 }) end
+r:Show()
+parts.upnext:Show()
+r.GetWidth = function() return 0 end
+h.guideUpRow(r, { goals = { { t = "turnin", text = "Turn in A New Threat", status = "pending" } } }, 1)
+h.guidePlace("upnext", parts.upnext, 320, 60)
+emit({ rows = #rows, text = math.floor(r.Text:GetWidth() + 0.5) })`);
+	assert.ok(out.rows > 0, 'Up next has rows');
+	assert.ok(out.text > 200, `the text is ${out.text} wide`);
+});
