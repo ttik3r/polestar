@@ -67,6 +67,21 @@ test('a scripted session: hub, a guide, a goal, a scheme change, the world map, 
 		const after = f.state.guide.goals.filter((x) => x.status === 'done').length + f.state.guide.step * 100;
 		assert.ok(after > before, 'the goal was completed');
 
+		// The walk: a stride toward the goal, then the goal; with an event
+		// every goal, each goal brings a banner or toast.
+		const kinds = [];
+		let w;
+		for (let i = 0; i < 4 && kinds[kinds.length - 1] !== 'goal'; i++) {
+			w = await act(play.url, { type: 'walk', strides: 1, every: 1, xp: true, restart: i === 0 });
+			assert.equal(w.errors.length, 0);
+			kinds.push(w.result.kind);
+		}
+		assert.ok(kinds.length <= 2 && kinds.every((k) => k === 'stride' || k === 'goal'), kinds.join(' '));
+		assert.equal(w.result.kind, 'goal');
+		assert.ok(['done', 'advanced'].includes(w.result.result), `walk goal ${w.result.result}`);
+		assert.ok(w.result.event, 'an event came with the goal');
+		assert.equal(w.result.level, w.state.player.level);
+
 		// The scheme, through the addon's own settings; the frame re-renders.
 		const svgBefore = f.svg;
 		f = await act(play.url, { type: 'set', path: 'ui.scheme', value: 'graphite' });

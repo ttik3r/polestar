@@ -871,6 +871,156 @@ function play.playGuide(limit)
 end
 
 ---------------------------------------------------------------------------
+-- The walk: the guide played a stride at a time, as a player walks it
+---------------------------------------------------------------------------
+
+-- XP for what the simulated player did: a turn-in's reward from the Codex
+-- (when it is built and loads), else a quarter of the level; a kill or loot
+-- goal a fifth (its pack of mobs), so levels come about as fast as a route's. Levels come up the way the client brings them (PLAYER_LEVEL_UP),
+-- so the class toast, the training banner and the dungeon heads-up follow.
+local function levelXP(level)
+	local L = Polestar.Levels
+	return L and L.LEVEL_XP and L.LEVEL_XP[level] or (400 + (level - 1) * 900)
+end
+
+local function questXP(q, level)
+	local Cx = Polestar.Codex
+	if Cx and Cx.Quest and (Cx.IsLoaded and (Cx.IsLoaded() or (Cx.Load and Cx.Load()))) then
+		local ok, rec = pcall(Cx.Quest, q)
+		if ok and rec and tonumber(rec.xp) then return tonumber(rec.xp), true end
+	end
+	return math.floor(levelXP(level) / 4), false
+end
+
+local function gainXP(n)
+	local w = stub.world
+	local max = (Polestar.Levels and Polestar.Levels.MAX_LEVEL) or 60
+	local ups = 0
+	local xp = w.xp + n
+	while w.level < max and xp >= levelXP(w.level) do
+		xp = xp - levelXP(w.level)
+		w.setLevel(w.level + 1)
+		ups = ups + 1
+	end
+	w.setXP(w.level >= max and 0 or xp, levelXP(w.level))
+	return ups
+end
+
+-- What a walk drops in, now and then: the banners and toasts a player meets.
+local function fakeHere()
+	local s = Polestar.Engine.GetStepIndex() or 1
+	return { step = s + 2, index = 1, here = "turnin", t = "turnin", quest = 0,
+		hereText = "Turn in \"A Delivery On The Way\" to the next giver", yards = 160 }
+end
+-- New class skills wait at the nearest class trainer (the panel's training
+-- banner, and a walk's event).
+function play.trainDue()
+	local E = Polestar.Engine
+	local t = E.NearestClassTrainer and E.NearestClassTrainer()
+	Polestar.Fire("TRAIN_DUE", stub.world.level, t or { npcName = "your class trainer" })
+end
+
+local EVENTS = {
+	{ "Quest skipped", function(GF) GF.notices.questSkip = { title = "Beached Sea Turtle" } end },
+	{ "Class training due", play.trainDue },
+	{ "Transport alert", function()
+		local A = Polestar.Nav and Polestar.Nav.alerts
+		if A then A.ShowNotice("Zeppelin to Orgrimmar", "Arrives in 0:45 at the tower", 12) end
+	end },
+	{ "While you're here", function()
+		local T = Polestar.UI.WhileHereToast
+		if T then T.Show(fakeHere()) end
+	end },
+}
+-- The class quest and dungeon heads-ups are not dropped in: they come with
+-- the levels, as in the game.
+
+local walk = nil
+local function walkRefresh()
+	local GF = Polestar.UI and Polestar.UI.GuideFrame
+	if GF and GF.Render then pcall(GF.Render) end
+	if GF and GF.Layout then pcall(GF.Layout) end
+end
+
+-- One tick of the walk. opts: strides (per walk to a goal), every (a random
+-- event every n goals, 0 none), seed, xp (false: no XP). -> { kind = "stride"
+-- | "goal" | "event" | "end", label, result, level, levels (gained), xp,
+-- step, event }
+function play.walkTick(opts)
+	opts = opts or {}
+	local E, w = Polestar.Engine, stub.world
+	if not walk or opts.restart then
+		walk = { stride = 0, goals = 0 }
+		math.randomseed(tonumber(opts.seed) or 1)
+		-- The walk is on the guide window: the welcome and the hub step aside.
+		pcall(closeSpecial)
+		if PolestarPicker and PolestarPicker:IsShown() then PolestarPicker:Hide() end
+	end
+	-- A new character's welcome comes up a moment after login, mid-walk.
+	if PolestarWelcome and PolestarWelcome:IsShown() then PolestarWelcome:Hide() end
+	local G, i = E.GetGuide(), E.GetStepIndex()
+	if not (G and i) then return { kind = "end", label = G and "The guide is done" or "No guide open" } end
+	local GF = Polestar.UI.GuideFrame
+	-- A dropped-in banner stays one goal, then goes.
+	if walk.dropped and walk.stride == 0 then
+		if GF and GF.notices then GF.notices.questSkip, GF.notices.train = nil, nil end
+		walk.dropped = nil
+		walkRefresh()
+	end
+	local wp = E.GetWaypoint()
+	local strides = math.max(0, math.min(12, tonumber(opts.strides) or 3))
+	local out = { step = i }
+	if wp and wp.map == w.map and type(wp.x) == "number" and walk.stride < strides then
+		local f = 1 / (strides - walk.stride + 1)
+		walk.stride = walk.stride + 1
+		w.moveTo(w.map, w.x + (wp.x - w.x) * f, w.y + (wp.y - w.y) * f)
+		syncZone()
+		stub.advance(2)
+		out.kind, out.label = "stride", "Walking to " .. (wp.label or "the goal")
+	else
+		walk.stride = 0
+		local before = {}
+		for q in pairs(w.completed) do before[q] = true end
+		local label = wp and wp.label or "the goal"
+		local r = play.doGoal()
+		walk.goals = walk.goals + 1
+		local gain = 0
+		if opts.xp ~= false then
+			for q in pairs(w.completed) do
+				if not before[q] then gain = gain + questXP(q, w.level) end
+			end
+			local view = E.GetStepView(i)
+			if r ~= "stuck" and view and wp and wp.goalIndex then
+				local g = view.goals[wp.goalIndex]
+				if g and (g.t == "kill" or (g.t == "collect" and g.fromKind ~= "object")) then gain = gain + math.floor(levelXP(w.level) / 5) end
+			end
+		end
+		-- A goal the simulator cannot do: after three tries the step is skipped,
+		-- as a player would, so the walk goes on.
+		walk.stuck = r == "stuck" and (walk.stuck or 0) + 1 or 0
+		if walk.stuck >= 3 and E.GetStepIndex() == i and E.Skip then
+			pcall(E.Skip)
+			stub.advance(0.6)
+			walk.stuck = 0
+			r = "skipped"
+		end
+		out.levels = gain > 0 and gainXP(gain) or 0
+		out.xp = gain
+		out.kind, out.label, out.result = "goal", label, r
+		local every = tonumber(opts.every) or 0
+		if every > 0 and walk.goals % every == 0 and GF and GF.notices then
+			local e = EVENTS[math.random(#EVENTS)]
+			pcall(e[2], GF)
+			walk.dropped = true
+			walkRefresh()
+			out.event = e[1]
+		end
+	end
+	out.level, out.step = w.level, E.GetStepIndex()
+	return out
+end
+
+---------------------------------------------------------------------------
 -- Serialization (SavedVariables, the character's world)
 ---------------------------------------------------------------------------
 
