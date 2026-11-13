@@ -1,9 +1,9 @@
 'use strict';
 // The Atlas look: its skin (addon/Polestar_Skin_Atlas, tokens only) and its
 // layout (addon/Polestar_Layout_Atlas, structure hooks only). The layout
-// registers through Theme.RegisterLayout; on a Polestar without it the file
-// does nothing. Its hooks are run here on the live window's parts, every hook
-// offered, to show they keep to the parts they are handed and never raise.
+// registers through Theme.RegisterLayout and is picked with SetLayout, any
+// skin's tokens on top. Its hooks are also run here one by one on the live
+// window's parts, to show they keep to the parts they are handed.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
@@ -29,23 +29,8 @@ emit({ inUse = T.SkinId(), notes = #notes, legible = T.Legibility(T.Palette()) >
 	assert.deepEqual(out, { inUse: 'atlas', notes: 0, legible: true });
 });
 
-test('the Atlas layout does nothing on a Polestar without layouts', () => {
-	const [out] = runAddon({
-		stubs: ['stub_world.lua'],
-		addons: ['Polestar'],
-		login: true,
-		script: `
-local had = Polestar.Theme.RegisterLayout ~= nil
-local chunk = assert(loadfile(${luaPath(LAYOUT)}))
-chunk("Polestar_Layout_Atlas", {})
-emit({ had = had })`,
-	}).emitted;
-	if (out.had) return; // a Polestar with layouts: the next tests cover it
-	assert.deepEqual(out, { had: false });
-});
-
-// Every hook the layout has, offered (all capabilities on), captured from a
-// stand-in RegisterLayout and run on the window's own parts.
+// Every hook the layout has, captured from a stand-in RegisterLayout and run
+// on the window's own parts.
 // A guide of two steps on screen (a test pack, as forge-addontest's).
 const GUIDE = `
 w = stub.world
@@ -70,12 +55,11 @@ stub.fire("QUEST_LOG_UPDATE"); stub.advance(0.6)`;
 const RUN_HOOKS = (compact) => `${GUIDE}
 local T = Polestar.Theme
 local spec
-local register, capability = T.RegisterLayout, T.HasCapability
+local register = T.RegisterLayout
 T.RegisterLayout = function(id, s) spec = s; spec.id = id; return true end
-T.HasCapability = function() return true end
 local chunk = assert(loadfile(${luaPath(LAYOUT)}))
 chunk("Polestar_Layout_Atlas", {})
-T.RegisterLayout, T.HasCapability = register, capability
+T.RegisterLayout = register
 Polestar.Set("ui.skin", "atlas")
 Polestar.Set("ui.shown", true)
 Polestar.Set("ui.compact", ${compact})
@@ -105,7 +89,7 @@ run("guideShows", "upnextHead", true)
 run("guideInset", "card")
 if parts.person then run("guidePerson", parts.person, 300, 20) end
 for _, r in ipairs(parts.rows or {}) do run("guideRow", r, view.goals[1], { current = true }) end
-if parts.upnext then for i, r in ipairs({ parts.upnext:GetChildren() }) do run("guideUpRow", r, view, i) end end
+if parts.upnext then for i, r in ipairs({ parts.upnext:GetChildren() }) do if rawget(r, "psIndex") then run("guideUpRow", r, view, i) end end end
 run("guideLayout", parts, 300, 200)
 run("guideProgress", parts.foot, 0.4)
 run("guideAnchor")
@@ -129,12 +113,60 @@ test('the Atlas layout hooks run in compact mode without raising', () => {
 	assert.ok(out.ran > 5, `hooks ran: ${out.ran}`);
 });
 
-test('the Atlas layout registers through Theme.RegisterLayout', { todo: 'needs Theme.RegisterLayout (feat/timeline-040)' }, () => {
+// The real thing: the layout addon registers, SetLayout picks it, the window
+// draws in normal and compact mode with nothing failed, another skin's tokens
+// colour it, and SetLayout() gives Polestar's own layout back.
+test('the Atlas layout registers, draws under another skin and leaves', () => {
 	const [out] = runAddon({
 		stubs: ['stub_world.lua'],
-		addons: ['Polestar', 'Polestar_Skin_Atlas', 'Polestar_Layout_Atlas'],
-		login: true,
-		script: `emit({ has = Polestar.Theme.RegisterLayout ~= nil, layouts = Polestar.Theme.LayoutInfo and Polestar.Theme.LayoutInfo("atlas") ~= nil or false })`,
+		addons: ['Polestar', 'Polestar_Skin_Atlas', 'Polestar_Skin_Beacon', 'Polestar_Layout_Atlas'],
+		script: `${GUIDE}
+local T = Polestar.Theme
+local function hex(c) return string.format("%02x%02x%02x", math.floor(c[1] * 255 + 0.5), math.floor(c[2] * 255 + 0.5), math.floor(c[3] * 255 + 0.5)) end
+local function draw()
+	Polestar.UI.GuideFrame.Layout()
+	if Polestar.UI.GuideFrame.Render then Polestar.UI.GuideFrame.Render() end
+	stub.advance(1)
+end
+local refused = {}
+for _, l in ipairs(Polestar.DebugLog(800)) do
+	if tostring(l):find("Polestar_Layout_Atlas", 1, true) then refused[#refused + 1] = tostring(l) end
+end
+Polestar.Set("ui.shown", true)
+Polestar.Set("ui.skin", "beacon")
+draw()
+local beacon = hex(T.Palette().accent)
+local info = T.LayoutInfo("atlas")
+local out = { registered = info ~= nil, refused = #refused, hooks = info and table.concat(info.hooks, ",") or "" }
+out.set = T.SetLayout("atlas") and true or false
+draw()
+out.inUse = { T.LayoutId() or false, T.SkinId(), hex(T.Palette().accent) == beacon }
+local nav = T.GuideParts().nav
+local function rule() return nav.Rule:IsShown() and true or false end
+out.rule = { rule() }
+Polestar.Set("ui.compact", true)
+draw()
+Polestar.Set("ui.compact", false)
+Polestar.Set("ui.skin", "atlas")
+draw()
+out.atlasAccent = hex(T.Palette().accent)
+out.failed = T.LayoutInfo("atlas").failed or false
+T.SetLayout()
+Polestar.Set("ui.skin", "beacon")
+draw()
+out.back = T.LayoutId() or false
+out.rule[2] = rule()
+emit(out)`,
 	}).emitted;
-	assert.deepEqual(out, { has: true, layouts: true });
+	assert.equal(out.registered, true);
+	assert.equal(out.refused, 0, 'registered as given');
+	for (const h of ['guideLayout', 'guideRender', 'guidePlace', 'guideRow', 'guideTitle', 'guideProgress']) {
+		assert.ok(out.hooks.split(',').includes(h), `hooks ${h}: ${out.hooks}`);
+	}
+	assert.equal(out.set, true);
+	assert.deepEqual(out.inUse, ['atlas', 'beacon', true], "the layout in use, Beacon's tokens on top");
+	assert.equal(out.atlasAccent, 'e6ba66', "the Atlas skin's own accent");
+	assert.equal(out.failed, false, 'no hook failed in normal or compact mode');
+	assert.equal(out.back, false, "Polestar's own layout again");
+	assert.deepEqual(out.rule, [false, true], 'the header has no rule under Atlas, its rule back after');
 });

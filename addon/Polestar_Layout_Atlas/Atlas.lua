@@ -273,6 +273,9 @@ local function header(parts)
 	own.emblem:SetPoint("LEFT", nav, "LEFT", 10, 0)
 	own.emblem:Show()
 	for _, b in ipairs({ nav.Report, nav.Nearby, nav.Lookup, nav.Skip }) do b:Hide() end
+	-- Polestar shows its rule again after guideTitle (guideWindow.rules); a
+	-- restyle on leaving shows it again.
+	if nav.Rule then nav.Rule:Hide() end
 	local path, size, flags = probe("note")
 	nav.Steps.Count:SetFont(path, size + 2, flags)
 	local cw = math.max(40, math.ceil(nav.Steps.Count:GetUnboundedStringWidth()) + 1)
@@ -826,14 +829,6 @@ on("guideAnchor", function()
 	if own and own.stack and own.stack:IsShown() then return own.stack end
 end)
 
--- The heads-up card's questions (where Polestar asks them): compact, 5 above
--- the window, above it only, the class glyph on its reward.
-on("card", function(_, kind)
-	if kind == "headsupCompact" or kind == "hereCompact" or kind == "headsupAboveOnly" then return true end
-	if kind == "headsupGap" then return GAP end
-	if kind == "headsupRewardGlyph" then return Theme.Media("icon-train") end
-end)
-
 -- The class quest card's own "Later" row: the × does it.
 on("guideShows", function(what, shown)
 	if what == "classCardLater" then return false end
@@ -1159,6 +1154,7 @@ end
 
 -- An Up next row (guideUpRow; Polestar sets the row again at every fill).
 on("guideUpRow", function(row, v)
+	if type(rawget(row, "Text")) ~= "table" then return end
 	local own = store(row)
 	if not onRail() then
 		if own.zone then own.zone:Hide() end
@@ -1438,7 +1434,7 @@ end)
 -- Registration
 ---------------------------------------------------------------------------
 
-local FIRST = { guidePlace = true, guideTakes = true, guideInset = true, guidePerson = true, guideAnchor = true, card = true }
+local FIRST = { guidePlace = true, guideTakes = true, guideInset = true, guidePerson = true, guideAnchor = true }
 
 local function join(name, list)
 	if name == "guideShows" then
@@ -1469,23 +1465,45 @@ local function join(name, list)
 	end
 end
 
-local hooks = {}
-for _, name in ipairs(order) do
-	if has(name) then hooks[name] = join(name, chains[name]) end
+-- The hooks a layout may set (docs/skins/reference.md, "Layouts"). The
+-- title bar, the goal rows and the progress came later: a Polestar that
+-- refuses them gets the layout without them.
+local LAYOUT_HOOKS = { guideLayout = true, guideRender = true, guidePlace = true, guideAnchor = true, guideTakes = true,
+	guidePerson = true, guideInset = true, guideUpRow = true, guideShows = true }
+local LATER_HOOKS = { guideTitle = true, guideRow = true, guideProgress = true }
+
+local function hooksOf(withLater)
+	local hooks = {}
+	for _, name in ipairs(order) do
+		if (LAYOUT_HOOKS[name] or (withLater and LATER_HOOKS[name])) and has(name) then
+			hooks[name] = join(name, chains[name])
+		end
+	end
+	return hooks
 end
 
-check("layout atlas", Theme.RegisterLayout("atlas", {
-	api = 2,
-	name = "Atlas",
-	addon = ADDON,
-	hooks = hooks,
-	-- Under another layout: Polestar's own parts get their look back; the
-	-- pieces Atlas made itself hide.
-	onLeave = function()
-		local parts = Theme.GuideParts and Theme.GuideParts()
-		if parts then
-			for _, fn in ipairs(leaving) do fn(parts) end
-		end
-		for _, s in pairs(stores) do hideAll(s) end
-	end,
-}))
+local function spec(hooks)
+	return {
+		api = 2,
+		name = "Atlas",
+		addon = ADDON,
+		author = "TTik3r",
+		desc = "The step on a timeline, Up next on a rail that fades ahead, cards above the window.",
+		hooks = hooks,
+		-- Under another layout: Polestar's own parts get their look back; the
+		-- pieces Atlas made itself hide.
+		onLeave = function()
+			local parts = Theme.GuideParts and Theme.GuideParts()
+			if parts then
+				for _, fn in ipairs(leaving) do fn(parts) end
+			end
+			for _, s in pairs(stores) do hideAll(s) end
+		end,
+	}
+end
+
+local ok, message = Theme.RegisterLayout("atlas", spec(hooksOf(true)))
+if not ok and tostring(message):find("is a skin's", 1, true) then
+	ok, message = Theme.RegisterLayout("atlas", spec(hooksOf(false)))
+end
+check("layout atlas", ok, message)
