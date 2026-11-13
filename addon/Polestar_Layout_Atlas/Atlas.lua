@@ -1245,8 +1245,11 @@ on("guideProgress", function(foot, frac)
 end)
 
 ---------------------------------------------------------------------------
--- The rail: a line down the window's left from the current step's node (a
--- disc in the accent) to the steps in Up next (hollow nodes, fainter ahead).
+-- The rail: a line down the window's left from the last step's node (a
+-- disc in the success colour once done, hollow when skipped; the player's
+-- guideWindow.lastStep, on by Atlas's default) through the current step's
+-- (a disc in the accent) to the steps in Up next (hollow nodes, fainter
+-- ahead).
 -- The card and Up next are set in from it (guideInset); each Up next row is
 -- its first goal on one line with its zone on the right (guideUpRow). The
 -- "after" line is not shown: the rail shows the next step already. Out of
@@ -1398,6 +1401,48 @@ local function hideNode(n)
 	if n then n.ring:Hide(); n.disc:Hide(); n.hole:Hide() end
 end
 
+-- The last step's node: a filled disc in the success colour once done; a
+-- skipped step's hollow, as a step not done.
+local function paintPast(n, status)
+	local br, bg, bb = Theme.Color("bg")
+	n.ring:SetSize(14, 14)
+	n.ring:SetVertexColor(br, bg, bb, 0)
+	n.disc:SetSize(8, 8)
+	n.hole:SetSize(6, 6)
+	if status == "done" then
+		local r, g, b = Theme.Color("success")
+		n.disc:SetVertexColor(r, g, b, 0.85)
+		n.hole:SetVertexColor(0, 0, 0, 0)
+	else
+		local r, g, b = Theme.Color("textMuted")
+		n.disc:SetVertexColor(r, g, b, 0.6)
+		n.hole:SetVertexColor(br, bg, bb, 1)
+	end
+end
+
+-- The last step's line (parts.last, guideWindow.lastStep: Polestar fills
+-- it, from the window's own step, and leaves it out in compact mode and on
+-- a guide's first step): on the rail, its number, icon and text in Up
+-- next's columns, its first goal in the goal's words, "skipped" after a
+-- skipped step. Polestar places it again at every layout.
+local function lastLine(last, person)
+	local v = rawget(last, "psView")
+	if not (v and rawget(last, "Text") and rawget(last, "Num")) then return end
+	-- Up next's columns: the line stands out of the card by the card's
+	-- inset over Up next's.
+	last:ClearAllPoints()
+	last:SetPoint("BOTTOMLEFT", person, "TOPLEFT", -(CARD_X - UP_X), 0)
+	last:SetPoint("BOTTOMRIGHT", person, "TOPRIGHT", 0, 0)
+	local text = stepLine(v)
+	if rawget(last, "psStatus") == "skipped" then
+		text = text .. "  |c" .. Theme.Hex("textMuted") .. tr("skipped") .. "|r"
+	end
+	last.Text:SetText(text)
+	last.Text:SetTextColor(Theme.Color("textDim"))
+	local w = last:GetWidth()
+	if type(w) == "number" and w > 0 then last.Text:SetWidth(math.max(40, w - 59 - 14)) end
+end
+
 -- The rail and its nodes, on a layer of Atlas's own over the window.
 local function rail(parts)
 	local window, person = parts.window, parts.person
@@ -1415,6 +1460,17 @@ local function rail(parts)
 		return
 	end
 	layer:Show()
+	local last = parts.last
+	local pn = node(layer, "past", layer)
+	local top
+	if last and last:IsShown() then
+		lastLine(last, person)
+		paintPast(pn, rawget(last, "psStatus"))
+		placeNode(pn, last, "LEFT", RAIL - UP_X, 0)
+		top = pn.disc
+	else
+		hideNode(pn)
+	end
 	local cn = node(layer, "cur", layer)
 	paintNode(cn, true, 1)
 	placeNode(cn, person, "TOPLEFT", RAIL - CARD_X, -(10 + person.Name:GetStringHeight() / 2))
@@ -1437,11 +1493,12 @@ local function rail(parts)
 	end
 	layer.line:SetWidth(pixel(layer))
 	layer.line:ClearAllPoints()
-	layer.line:SetPoint("TOP", cn.disc, "CENTER", 0, 0)
+	top = top or cn.disc
+	layer.line:SetPoint("TOP", top, "CENTER", 0, 0)
 	layer.line:SetPoint("BOTTOM", bottom, "CENTER", 0, 0)
 	local r, g, b = Theme.Color("textMuted")
 	layer.line:SetVertexColor(r, g, b, 0.35)
-	layer.line:SetShown(bottom ~= cn.disc)
+	layer.line:SetShown(bottom ~= top)
 end
 on("guideLayout", function(parts) if parts.window then rail(parts) end end)
 
@@ -1647,6 +1704,7 @@ local function spec(hooks)
 			["guideWindow.progress"] = false,
 			["guideWindow.targetBar"] = false,
 			["guideWindow.reportButton"] = false,
+			["guideWindow.lastStep"] = true,
 		},
 		-- Under another layout: Polestar's own parts get their look back; the
 		-- pieces Atlas made itself hide.
