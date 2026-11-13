@@ -364,6 +364,9 @@ local function installed(key)
 	if not (A and A.GetNumAddOns and A.GetAddOnInfo and A.GetAddOnMetadata) then return out end
 	for i = 1, A.GetNumAddOns() do
 		local name, title, notes, loadable, reason = A.GetAddOnInfo(i)
+		-- An addon that loads on demand and is not loaded yet: the client
+		-- says loadable false, reason "DEMAND_LOADED". It can load.
+		if reason == "DEMAND_LOADED" then loadable, reason = true, nil end
 		local declared = type(name) == "string" and A.GetAddOnMetadata(name, key) or nil
 		if type(declared) == "string" then
 			local ids = {}

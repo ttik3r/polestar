@@ -2063,3 +2063,63 @@ fn a_failing_layout_hook_leaves_the_skin_s_hook_running() {
 	assert_eq!(out["skin"], "glow", "the skin stays");
 	assert_eq!(out["failed"], true);
 }
+
+// The client gives an addon that loads on demand and is not loaded yet as loadable false, reason "DEMAND_LOADED"
+// (the stub does the same). Such an addon can load: a layout and a skin each picked from one load it and come into
+// use, and neither is listed with a reason.
+#[test]
+fn a_layout_and_a_skin_picked_from_load_on_demand_addons_not_loaded_yet_load() {
+	let out = emitted(&RunAddon {
+		before: r##"
+stub.addons = {
+	{ name = "Polestar" },
+	{ name = "Polestar_Layout_Ledger", title = "Ledger", demand = true },
+	{ name = "Polestar_Skin_Ember", title = "Ember", demand = true },
+}
+stub.addonMeta["Polestar_Layout_Ledger"] = { ["X-Polestar-Layout"] = "ledger" }
+stub.addonMeta["Polestar_Skin_Ember"] = { ["X-Polestar-Skin"] = "ember" }
+fakeAddons = {
+	Polestar_Layout_Ledger = function()
+		Polestar.Theme.RegisterLayout("ledger", { api = 2, name = "Ledger", addon = "Polestar_Layout_Ledger",
+			hooks = { guideInset = function() return 8 end } })
+	end,
+	Polestar_Skin_Ember = function()
+		Polestar.Theme.RegisterSkin("ember", { api = 2, name = "Ember", addon = "Polestar_Skin_Ember", base = "hearth" })
+	end,
+}
+local load = C_AddOns.LoadAddOn
+function C_AddOns.LoadAddOn(name)
+	local fn = fakeAddons[name]
+	if fn and not stub.addonsLoaded[name] then
+		stub.addonsLoaded[name] = true
+		fn()
+		return true, nil
+	end
+	return load(name)
+end"##
+			.into(),
+		addons: vec![Addon::files("Polestar", FILES)],
+		stubs: vec!["stub_world.lua"],
+		login: true,
+		script: r##"
+local T = Polestar.Theme
+local _, _, _, loadable, reason = C_AddOns.GetAddOnInfo("Polestar_Layout_Ledger")
+local out = { client = { loadable, reason } }
+out.layoutRec = T.InstalledLayouts()[1].reason or false
+out.skinRec = T.InstalledSkins()[1].reason or false
+out.layout = { T.SetLayout("ledger") }
+out.layoutId = T.LayoutId() or false
+Polestar.Set("ui.skin", "ember")
+out.skin = { T.SkinId(), T.SkinKey() }
+emit(out)"##
+			.into(),
+		..Default::default()
+	})
+	.remove(0);
+	assert_eq!(out["client"], json!([false, "DEMAND_LOADED"]), "as the client gives it before LoadAddOn");
+	assert_eq!(out["layoutRec"], false, "a load-on-demand layout addon can load: no reason");
+	assert_eq!(out["skinRec"], false, "a load-on-demand skin addon can load: no reason");
+	assert_eq!(out["layout"], json!([true]), "picked: its addon loads");
+	assert_eq!(out["layoutId"], "ledger");
+	assert_eq!(out["skin"], json!(["ember", "hearth"]), "picked: its addon loads and the skin is in use");
+}
