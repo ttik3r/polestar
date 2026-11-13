@@ -226,7 +226,7 @@ A layout is the guide window's structure apart from its look (capability
 |---|---|---|
 | `hooks` | table | Structure hooks only: `guideLayout`, `guideRender`, `guidePlace`, `guideAnchor`, `guideTakes`, `guidePerson`, `guideInset`, `guideUpRow`, `guideShows`, and `guideTitle` (which title bar parts show), `guideRow` (a goal row's lines and columns) and `guideProgress` (where the progress shows) ([The guide window](#the-guide-window)). Same arguments and answers as a skin's. A colour a layout's hook sets is a token of the skin in use (`Theme.Color`, `Theme.Accent`). |
 | `onApply`, `onLeave` | function(id) | Run when the layout comes into use and when it leaves. |
-| `defaults` | table | The layout's defaults for the guide window's settings: `{ ["guideWindow.tabs"] = false, ... }`. Each key is a `guideWindow.*` setting Polestar has; each value has the type of Polestar's default (a boolean for a switch, a number for a size, a string for a choice). A setting whose default is `false` takes `false`, a colour (`guideWindow.targetBarColor`, `progressColor`, `bgColor`) or a number (`guideWindow.bgOpacity`). |
+| `defaults` | table | The layout's defaults for the guide window's settings: `{ ["guideWindow.tabs"] = false, ... }`. Each key is a `guideWindow.*` setting Polestar has; each value has the type of Polestar's default (a boolean for a switch, a number for a size, a string for a choice). A setting whose default is `false` takes `false`, a colour (`guideWindow.targetBarColor`, `progressColor`, `bgColor`), `true` (a switch off by default: `guideWindow.hideTaxi`) or a number (`guideWindow.bgOpacity`). |
 
 The player changes the guide window's parts in its settings (the tabs,
 the step count, the skip and report buttons, the target bar beside the
@@ -253,7 +253,7 @@ hooks the guide window's structure only)`, `unknown hooks "<name>"`,
 `defaults must be a table of setting = value`, `defaults key "<path>" is
 not a guide window setting (guideWindow.<name>)`, `defaults["<path>"] must
 be a <type>, like Polestar's default`, `defaults["<path>"] must be false or
-a colour`, `defaults["<path>"] must be false or a number`.
+a colour`, `defaults["<path>"] must be false, true or a number`.
 
 A hook answers in this order: the layout's, else the skin's, else
 Polestar's own. With no layout chosen (`ui.layout` unset), every hook is
@@ -1137,8 +1137,11 @@ assert(Theme.RegisterSkin("ref-hooks", {
 
 `Theme.GuideParts()` hands over the guide window's frames, to place things
 by and to restyle (capability `guideParts`): `window`, `strip` (the tabs),
-`nav` (the step bar), `body`, `card` (the step), `person` (its header),
-`goals` (the scroll of goal rows), `rows` (the goal rows, pooled), `tip`,
+`nav` (the step bar), `body`, `card` (the step), `last` (the steps before this one over the header, as many as
+`guideWindow.lastSteps` asks, 0 to 5, and never more than come before:
+`psCount` the rows shown, `Rows` the rows, pooled, the oldest first, each
+with `psIndex` the step, `psStatus` `"done"`, `"skipped"` or the step's
+status, `Num`, `Icon`, `Text`), `person` (its header), `goals` (the scroll of goal rows), `rows` (the goal rows, pooled), `tip`,
 `after` ("Then:"), `along`, `upnext`, `empty` (no guide), `band` (the house
 band), `banner`, `foot` (the progress), `line` (its bar), `here` (While
 you're here). One table, the same every time; nil before the window is

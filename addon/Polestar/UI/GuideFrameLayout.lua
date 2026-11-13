@@ -65,6 +65,31 @@ local function layoutCard(width)
 		sec:SetPoint("TOPLEFT", card, "TOPLEFT", PAD, -(y + 8))
 		y = y + 8 + sec:GetStringHeight()
 	end
+	-- The steps before (guideWindow.lastSteps), one row each over the
+	-- header, the oldest on top.
+	local last = card.Last
+	if last:IsShown() then
+		local n = last.psCount or 0
+		last:ClearAllPoints()
+		last:SetPoint("TOPLEFT", card, "TOPLEFT", 0, -y)
+		last:SetPoint("TOPRIGHT", card, "TOPRIGHT", 0, -y)
+		last:SetHeight(n * UP_ROW)
+		for i = 1, n do
+			local r = last.Rows[i]
+			r:ClearAllPoints()
+			r:SetPoint("TOPLEFT", last, "TOPLEFT", 0, -(i - 1) * UP_ROW)
+			r:SetPoint("TOPRIGHT", last, "TOPRIGHT", 0, -(i - 1) * UP_ROW)
+			r:SetHeight(UP_ROW)
+			r.Num:ClearAllPoints()
+			r.Num:SetPoint("LEFT", r, "TOPLEFT", PAD - 10, -UP_ROW / 2)
+			r.Icon:ClearAllPoints()
+			r.Icon:SetPoint("LEFT", r, "TOPLEFT", TEXT_X - 2, -UP_ROW / 2)
+			r.Text:ClearAllPoints()
+			r.Text:SetPoint("LEFT", r, "TOPLEFT", TEXT_X - 2 + 13 + 9, -UP_ROW / 2)
+			r.Text:SetWidth(max(40, width - TEXT_X - 14 - PAD))
+		end
+		y = y + n * UP_ROW
+	end
 	if person:IsShown() then
 		local nameW = cw - ICON - 10
 		person.Name:SetWidth(nameW)

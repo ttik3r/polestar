@@ -190,7 +190,7 @@ GF.LOOK = {
 	targetBar = true, targetBarColor = false, targetBarWidth = 2,
 	progress = true, progressPct = true, progressHeight = 3, progressColor = false,
 	bgColor = false, bgOpacity = false, border = true, idleAlpha = 1, combatAlpha = 0.35, veil = 0.68, shade = 0.2,
-	stepAnim = true, animSpeed = 1, foldAnim = true, rules = true, hideTaxi = false,
+	stepAnim = true, animSpeed = 1, foldAnim = true, rules = true, hideTaxi = false, lastSteps = 0,
 }
 ns.RegisterDefaults("guideWindow", GF.LOOK)
 
@@ -1669,6 +1669,83 @@ local function navigatorFor(guide, index)
 	nav.Steps:SetWidth(24 + cw + 24)
 end
 
+-- The steps before: up to guideWindow.lastSteps (0 to 5, 0 by default:
+-- off) of the steps before the one on screen that the route holds, one
+-- dimmed row each over the step's header, the oldest on top and the
+-- newest right over the step (never more than there are; none in compact
+-- mode). Each says whether it was done or skipped; a click goes back to
+-- it. card.Last holds them: Rows (pooled, GF.LastRow), psCount.
+function GF.LastRow(i)
+	local last = card.Last
+	local r = last.Rows[i]
+	if r then return r end
+	r = CreateFrame("Button", nil, last)
+	r:SetHeight(UP_ROW)
+	W.Hover(r)
+	r.Num = GF.SizeAs(T(r, "number", "textMuted"), "up")
+	r.Num:SetJustifyH("RIGHT")
+	r.Num:SetWidth(22)
+	r.Icon = r:CreateTexture(nil, "ARTWORK")
+	r.Icon:SetSize(13, 13)
+	W.Color(r.Icon, "textMuted")
+	r.Text = GF.SizeAs(T(r, "label", "textMuted"), "up")
+	r.Text:SetJustifyH("LEFT")
+	r.Text:SetWordWrap(false)
+	r:SetAlpha(0.7)
+	r:SetScript("OnClick", function(self)
+		local E = Engine()
+		if E and E.Goto and self.psIndex then E.Goto(self.psIndex) end
+	end)
+	r:SetScript("OnEnter", function(self)
+		W.Tooltip(self, tooltipAnchor(), self.psTitle or "", { { L["Click to jump to this step"], Theme.Accent() } })
+		GF.HoverIn()
+	end)
+	r:SetScript("OnLeave", function(self) W.HideTooltip(self) end)
+	last.Rows[i] = r
+	return r
+end
+
+local function fillLast(E, index)
+	local last = card.Last
+	local want = compact() and 0 or floor(tonumber(ns.Get("guideWindow.lastSteps")) or 0)
+	want = max(0, min(5, want))
+	-- The steps, newest first, then drawn oldest first.
+	local found, views = {}, {}
+	if want > 0 and type(index) == "number" then
+		for s = index - 1, 1, -1 do
+			local sv = E.GetStepView(s)
+			if sv and sv.status ~= "na" and not sv.along and not UI.StepHidden(s) then
+				local k = #found + 1
+				found[k], views[k] = s, sv
+				if #found >= want then break end
+			end
+		end
+	end
+	local n = #found
+	for i = 1, n do
+		local s, v, r = found[n + 1 - i], views[n + 1 - i], GF.LastRow(i)
+		local skipped = v.skipped or v.status == "skipped"
+		r.psIndex, r.psView = s, v
+		r.psStatus = skipped and "skipped" or v.status
+		r.psSummary = UI.StepSummary(v)
+		r.psTitle = v.title or r.psSummary
+		r.Num:SetText(UI.StepNo(s))
+		r.Icon:SetTexture(Theme.VerbIcon(UI.FirstVerb(v)))
+		local text = r.psSummary
+		if skipped then text = text .. "  |c" .. Theme.Hex("textMuted") .. L["skipped"] .. "|r" end
+		r.Text:SetText(text)
+		W.Color(r.Text, "textMuted")
+		r:Show()
+	end
+	for i = n + 1, #last.Rows do
+		local r = last.Rows[i]
+		r.psIndex, r.psView, r.psStatus, r.psSummary, r.psTitle = nil, nil, nil, nil, nil
+		r:Hide()
+	end
+	last.psCount = n
+	last:SetShown(n > 0)
+end
+
 local function fillUpcoming(E, index)
 	for i = 1, #upRows do upRows[i]:Hide() end
 	local want = compact() and 0 or (ns.Get("ui.upcoming") or 0)
@@ -2393,6 +2470,7 @@ local function render()
 	fillAlong(E)
 	GF.FillHere(E)
 	fillUpcoming(E, index)
+	fillLast(E, index)
 	showSteps(true)
 	GF.Layout()
 	followCurrent(focusChanged)
@@ -2741,6 +2819,12 @@ local function build()
 	card.Section:SetJustifyH("LEFT")
 	card.Section:SetWordWrap(false)
 	card.Section:Hide()
+	-- The steps before, over the header (fillLast, layoutCard).
+	local last = CreateFrame("Frame", nil, card)
+	last.Rows = {}
+	last.psCount = 0
+	last:Hide()
+	card.Last = last
 	-- Blizzard: a gold separator under the person, above the goals.
 	person.Rule = person:CreateTexture(nil, "ARTWORK")
 	person.Rule:SetTexture(Theme.Media("white"))
@@ -3004,7 +3088,7 @@ local function build()
 	GF.parts = {
 		strip = strip, nav = nav, body = body, card = card, person = person, tip = tip, after = after,
 		along = along, upnext = upnext, empty = empty, band = band, banner = banner, foot = foot, line = foot.Line, here = GF.here,
-		goals = goals,
+		goals = goals, last = last,
 	}
 	GF.chrome = chrome
 	handOver()
