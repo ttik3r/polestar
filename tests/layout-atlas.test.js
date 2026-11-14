@@ -395,3 +395,93 @@ emit(out)`,
 	assert.equal(out.compact.n, 0, 'compact mode leaves them out');
 	assert.equal(out.house.n, 0, "Polestar's own layout: 0 by default");
 });
+
+// Under Atlas nothing extra sits in the window: Along the way, a banner
+// notice (Looking ahead) and the party line each go on a card above it, and
+// leave no heading or gap behind; under Polestar's own layout each stays in
+// the window as before.
+const OUTSIDE = (layout) => `${GUIDE}
+local T, GF = Polestar.Theme, Polestar.UI.GuideFrame
+local E = Polestar.Engine
+E.GetAlong = function()
+	return { { index = 1, title = "Boars", goals = {
+		{ index = 1, step = 1, t = "loot", text = "Collect Chunk of Boar Meat", status = "active", optional = true, progress = { cur = 6, max = 10 }, map = 1429, x = 0.48, y = 0.44 },
+		{ index = 2, step = 1, t = "loot", text = "Collect Stolen Blasting Powder", status = "active", progress = { cur = 3, max = 16 }, map = 1429, x = 0.5, y = 0.5 },
+	} } }
+end
+Polestar.Party = Polestar.Party or {}
+Polestar.Party.StepLine = function() return "2 of 3 on this step" end
+Polestar.Set("ui.shown", true)
+${layout ? `T.SetLayout("${layout}")` : 'T.SetLayout()'}
+E.Goto(3)
+local function draw()
+	GF.Layout()
+	if GF.Render then GF.Render() end
+	GF.UpdateParty()
+	GF.Layout()
+	stub.advance(1)
+	GF.Layout()
+end
+draw()
+local parts = T.GuideParts()
+local placed = {}
+for _, p in ipairs(GF.Placed()) do placed[p[1]] = true end
+local rows = {}
+for _, r in ipairs(GF.alongRows) do
+	if r:IsShown() then
+		local meta
+		for _, c in ipairs({ r:GetChildren() }) do
+			if rawget(c, "Text") and c:IsShown() then meta = c.Text:GetText() end
+		end
+		rows[#rows + 1] = { r.Text:GetText(), meta or false }
+	end
+end
+local stack = {}
+local own = parts.window
+for _, c in ipairs({ own:GetChildren() }) do
+	if rawget(c, "cards") then for _, b in ipairs(c.cards) do if b:IsShown() then stack[#stack + 1] = b end end end
+end
+emit({
+	along = { placed.along or false, parts.along:IsShown(), parts.along.Label:GetText() },
+	banner = { placed.banner or false, parts.banner:IsShown(), parts.banner.psKind or false, parts.banner.Text:GetText() or "" },
+	party = { placed.party or false, GF.party:IsShown() },
+	rows = rows, cards = #stack,
+})`;
+
+const outside = (layout) => runAddon({
+	stubs: ['stub_world.lua'],
+	addons: ['Polestar', 'Polestar_Skin_Atlas', 'Polestar_Layout_Atlas'],
+	script: OUTSIDE(layout),
+}).emitted[0];
+
+test('under Atlas Along the way is a card above the window: no heading in it, the count by the distance, optional kept', () => {
+	const out = outside('atlas');
+	assert.equal(out.along[0], false, 'not in the window');
+	assert.equal(out.along[1], true, 'shown on its card');
+	assert.equal(out.along[2], 'ALONG THE WAY');
+	assert.equal(out.rows.length, 2);
+	assert.match(out.rows[0][0], /Chunk of Boar Meat/);
+	assert.doesNotMatch(out.rows[0][0], /6\/10/, 'the count leaves the line');
+	assert.match(out.rows[0][0], /optional/, 'the optional tag stays');
+	assert.match(String(out.rows[0][1]), /^6\/10  ·  \d+ yd$/, `meta: ${out.rows[0][1]}`);
+	assert.ok(out.cards >= 3, `cards above: ${out.cards}`);
+});
+
+test('under Atlas the Looking ahead banner is a heads-up card above the window', () => {
+	const out = outside('atlas');
+	assert.deepEqual(out.banner.slice(0, 3), [false, true, 'away']);
+	assert.match(out.banner[3], /Looking ahead/);
+});
+
+test('under Atlas the party line is a card above the window', () => {
+	assert.deepEqual(outside('atlas').party, [false, true]);
+});
+
+test("Polestar's own layout keeps Along the way, the banner and the party line in the window", () => {
+	const out = outside(null);
+	assert.deepEqual(out.along, [true, true, 'Along the way']);
+	assert.match(out.rows[0][0], /6\/10/, 'the count stays in the line');
+	assert.deepEqual(out.banner.slice(0, 3), [true, true, 'away']);
+	assert.deepEqual(out.party, [true, true]);
+	assert.equal(out.cards, 0);
+});

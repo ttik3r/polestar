@@ -1,8 +1,9 @@
 -- Atlas: a layout for Polestar's guide window (Skin API 2, Theme.RegisterLayout).
 -- The step is a node on a timeline: its title and area, its goals with their
 -- action icons and quests, the tip under them; Up next is a rail that fades
--- ahead. While you're here, Optional and Training due are cards stacked above
--- the window, the class quest is a heads-up above them, and the Journey is a
+-- ahead. Nothing else sits in the window: banner notices, While you're here,
+-- Along the way, Optional, Training due and the party line are cards stacked
+-- above it, the class quest is a heads-up above them, and the Journey is a
 -- card joined below. Compact mode is dense: no Up next, no XP row, no Journey,
 -- the tip as a strip at the foot.
 --
@@ -129,6 +130,18 @@ end
 function Core.training()
 	local E = P.Engine
 	return E and E.TrainingAdvice and E.TrainingAdvice() or {}
+end
+
+-- Along the way read: the open goals the window lists under the step
+-- (Engine.GetAlong), each by its row's step and goal (-> goal view or nil).
+function Core.alongGoals()
+	local E, out = P.Engine, {}
+	for _, s in ipairs(E and E.GetAlong and E.GetAlong() or {}) do
+		for _, g in ipairs(s.goals or {}) do
+			if g.step and g.index then out[g.step .. ":" .. g.index] = g end
+		end
+	end
+	return out
 end
 
 -- XP-to-next read: Polestar's own line on the XP row ("about 9 min to 5").
@@ -349,8 +362,12 @@ end)
 on("guideLayout", function() return Core.setting("guideWindow.progress") == false and 8 or 0 end)
 
 ---------------------------------------------------------------------------
--- The cards above the window, bottom up: Training due, Optional, While
--- you're here, the class quest card; 5 apart, each on the window's own
+-- The cards above the window, top down, by how far each is from the step
+-- on screen: a banner notice (it asks for an answer: the way back, a tab to
+-- reopen), the class quest card, While you're here (later steps' work, to
+-- get ahead), Along the way (earlier steps' work still owed while the route
+-- moves on), Optional (this step's extras), Training due, the party line
+-- (the group on this very step, its wait). 5 apart, each on the window's own
 -- ground (a frame painted as the guide window, so the skin in use colours
 -- it), each with a close ×. The class quest heads-up sits on top of them
 -- (guideAnchor). The Journey is a card joined to the window's foot.
@@ -547,6 +564,197 @@ onLeave(function(parts)
 	if parts.here then
 		hereLook(parts.here, false)
 		hereRowsBack(parts.here)
+	end
+end)
+
+-- Along the way: the open goals of along steps the route has passed (and
+-- pinned quests'), Polestar's own part on a card of its own, its heading in
+-- caps as the other cards' ("ALONG THE WAY", "ALONG THE WAY, UNTIL STEP 30",
+-- "STILL TO DO"), no rule over it. Its rows as While you're here's: the
+-- count beside the distance ("6/10  ·  80 yd"), the "optional" tag kept in
+-- the line; a click points the arrow (Polestar's own row does it).
+local ALONG_EVERY = 0.25
+local alongViews -- step:goal -> goal view, read once a render (guideRender)
+
+local function alongLook(along, on)
+	local own = store(along)
+	if along.Rule and along.Rule.SetAlpha then along.Rule:SetAlpha(on and 0 or 1) end
+	local label = along.Label
+	if not label then return end
+	if on then
+		-- Polestar sets the heading at each render; a layout again finds it upper.
+		local text = label:GetText() or ""
+		if text ~= own._upper then own._label = text end
+		capsLabel(label)
+		own._upper = string.upper(own._label or "")
+		label:SetText(own._upper)
+		infoIcon(along, label, tr("Still open from steps you have passed"))
+	elseif own._label then
+		Theme.Font(label, "small")
+		label:SetText(own._label)
+		label:SetTextColor(Theme.Color("textMuted"))
+		own._label, own._upper = nil, nil
+		if own.info then own.info:Hide() end
+	end
+end
+
+local function alongRowList(along)
+	local list = {}
+	for _, r in ipairs({ along:GetChildren() }) do
+		if rawget(r, "Text") and rawget(r, "Icon") and r:IsShown() then list[#list + 1] = r end
+	end
+	table.sort(list, function(a, b)
+		local _, _, _, _, ya = a:GetPoint(1)
+		local _, _, _, _, yb = b:GetPoint(1)
+		return (ya or 0) > (yb or 0)
+	end)
+	return list
+end
+
+-- A row's right side: its count and the distance to its goal, kept fresh.
+local function alongMeta(r)
+	local own = store(r)
+	local m = own.meta
+	if not m then
+		m = CreateFrame("Frame", nil, r)
+		m:SetAllPoints(r)
+		m.Text = m:CreateFontString(nil, "OVERLAY")
+		m.Text:SetJustifyH("RIGHT")
+		m.Text:SetWordWrap(false)
+		m:SetScript("OnUpdate", function(self, elapsed)
+			self.psElapsed = (self.psElapsed or 0) + elapsed
+			if self.psElapsed < ALONG_EVERY then return end
+			self.psElapsed = 0
+			if self.psPaint then self.psPaint() end
+		end)
+		own.meta = m
+	end
+	return m
+end
+
+-- -> the height the rows took on (a line the meta's room wrapped)
+local function alongRows(along)
+	local shift = 0
+	for _, r in ipairs(alongRowList(along)) do
+		local own = store(r)
+		local m = alongMeta(r)
+		if shift ~= 0 then
+			local _, rel, _, x, y = r:GetPoint(1)
+			r:ClearAllPoints()
+			r:SetPoint("TOPLEFT", rel, "TOPLEFT", x or 0, (y or 0) - shift)
+			r:SetPoint("TOPRIGHT", rel, "TOPRIGHT", 0, (y or 0) - shift)
+		end
+		-- From Polestar's own line (UI.SetCounted keeps it), so a second
+		-- layout finds the count it took out at the first.
+		local text = type(r.Text.psCounted) == "string" and r.Text.psCounted or r.Text:GetText() or ""
+		local count = text:match(HERE_COUNT)
+		if count then
+			r.Text:SetText((text:gsub("%s*" .. HERE_COUNT, "", 1)))
+			own._text = true
+		end
+		r.Text:SetTextColor(Theme.Color("text"))
+		own._color = true
+		local view = alongViews and r.psStep and r.psGoal and alongViews[r.psStep .. ":" .. r.psGoal] or nil
+		local function paint()
+			local yards = view and Core.yardsTo(view)
+			local dist = yards and Core.distanceText(yards)
+			local meta = count and dist and (count .. "  \194\183  " .. dist) or count or dist
+			m.Text:SetText(meta or "")
+			return meta
+		end
+		m.Text:SetFont(r.Text:GetFont())
+		m.Text:SetTextColor(Theme.Color("textMuted"))
+		m.Text:ClearAllPoints()
+		m.Text:SetPoint("TOPRIGHT", r, "TOPRIGHT", -OPT_PAD, -math.floor(((r:GetHeight() or 24) - (r.Text:GetLineHeight() or 12)) / 2 + 0.5))
+		m.psPaint = view and paint or nil
+		local meta = paint()
+		m:SetShown(meta ~= nil)
+		local w = r.Text:GetWidth() or 0
+		if meta and w > 0 then
+			-- Room for the widest the meta grows to as the distance changes.
+			r.Text:SetWidth(math.max(40, w - math.ceil(m.Text:GetStringWidth()) - 18))
+		end
+		local need = math.ceil(r.Text:GetStringHeight() or 0) + 8
+		local h = r:GetHeight() or 0
+		if need > h then
+			r:SetHeight(need)
+			shift = shift + (need - h)
+		end
+	end
+	return shift
+end
+
+local function alongRowsBack(along)
+	for _, r in ipairs({ along:GetChildren() }) do
+		local own = stores[r]
+		if own then
+			if own._text and type(r.Text.psCounted) == "string" then r.Text:SetText(r.Text.psCounted) end
+			if own._color then r.Text:SetTextColor(Theme.Color("textDim")) end
+			own._text, own._color = nil, nil
+			if own.meta then
+				own.meta.psPaint = nil
+				own.meta:Hide()
+			end
+		end
+	end
+end
+
+on("guideRender", function() alongViews = nil end)
+
+onLeave(function(parts)
+	if parts.along then
+		alongLook(parts.along, false)
+		alongRowsBack(parts.along)
+	end
+end)
+
+-- A banner notice (Looking ahead, the tab just closed and its Reopen, a quest
+-- left, a step skipped, the bags, a newer Polestar...) as a heads-up card on
+-- top of the stack: Polestar's own banner, its text, its action link, Later
+-- and its × as they are; the card's ground in place of its tint and rule.
+local function bannerLook(banner, on)
+	for _, t in ipairs({ banner.Fill, banner.Rule }) do
+		if t and t.SetAlpha then t:SetAlpha(on and 0 or 1) end
+	end
+end
+
+onLeave(function(parts) if parts.banner then bannerLook(parts.banner, false) end end)
+
+-- The party's place on this guide (and "Go on without them") on a card:
+-- Polestar's own line under a "PARTY" label, no rule over it.
+local seenParty = setmetatable({}, { __mode = "k" })
+local function partyLook(party, on)
+	if on then seenParty[party] = true end
+	if party.Rule and party.Rule.SetAlpha then party.Rule:SetAlpha(on and 0 or 1) end
+end
+
+-- The card that holds the party line: its label, the line under it.
+local function partyCard(stack, party)
+	local c = stack.party
+	if not c then
+		c = CreateFrame("Frame", nil, stack)
+		c.Label = c:CreateFontString(nil, "OVERLAY")
+		stack.party = c
+	end
+	capsLabel(c.Label)
+	c.Label:SetText(string.upper(tr("Party")))
+	c.Label:ClearAllPoints()
+	c.Label:SetPoint("TOPLEFT", c, "TOPLEFT", OPT_PAD, -8)
+	local top = 8 + math.ceil(c.Label:GetStringHeight())
+	party:SetParent(c)
+	party:ClearAllPoints()
+	party:SetPoint("TOPLEFT", c, "TOPLEFT", 0, -top)
+	party:SetPoint("TOPRIGHT", c, "TOPRIGHT", 0, -top)
+	party:Show()
+	c:SetHeight(top + (party:GetHeight() or 28) + 2)
+	return c
+end
+
+-- The party line is not among the parts handed over: the layout leaving a
+-- window gives the ones it saw in that window their rule back.
+onLeave(function(parts, live)
+	for party in pairs(seenParty) do
+		if Core.leaves(party, parts, live) then partyLook(party, false) end
 	end
 end)
 
@@ -850,6 +1058,26 @@ on("guidePlace", function(name, part, width, height)
 		slots.journey = part
 		return true
 	end
+	-- Every other banner notice: a heads-up card on top of the stack.
+	if name == "banner" then
+		bannerLook(part, true)
+		part:SetHeight(height)
+		slots.banner = part
+		return true
+	end
+	if name == "along" then
+		alongViews = alongViews or Core.alongGoals()
+		alongLook(part, true)
+		part:SetHeight(height + alongRows(part))
+		slots.along = part
+		return true
+	end
+	if name == "party" then
+		partyLook(part, true)
+		part:SetHeight(height)
+		slots.party = part
+		return true
+	end
 end)
 
 local function layoutStack(parts)
@@ -858,16 +1086,23 @@ local function layoutStack(parts)
 	local step = stepOf[window]
 	if closedOn.here and closedOn.here ~= step then closedOn.here = nil end
 	if closedOn.opt and closedOn.opt ~= step then closedOn.opt = nil end
+	if closedOn.along and closedOn.along ~= step then closedOn.along = nil end
+	if closedOn.party and closedOn.party ~= step then closedOn.party = nil end
 	local list = {}
 	local function add(f, close) list[#list + 1] = { f = f, close = close } end
 	local function relay() Core.relayout() end
 	local s = slots
+	-- A banner notice keeps its own × (and Later): none of the card's.
+	if s.banner and isUnder(s.banner, window) then add(s.banner, nil) end
 	if s.class and isUnder(s.class, window) then
 		local key = s.classKey
 		add(s.class, function() if key then classShut[key] = true end relay() end)
 	end
 	if s.here and isUnder(s.here, window) then
 		if closedOn.here == step then s.here:Hide() else add(s.here, function() closedOn.here = step relay() end) end
+	end
+	if s.along and isUnder(s.along, window) then
+		if closedOn.along == step then s.along:Hide() else add(s.along, function() closedOn.along = step relay() end) end
 	end
 	local optional = layoutOptional(stack, window, step)
 	if optional then add(optional, function() closedOn.opt = step relay() end) end
@@ -876,6 +1111,12 @@ local function layoutStack(parts)
 	elseif stack.train then
 		stack.train:Hide()
 	end
+	if s.party and isUnder(s.party, window) and closedOn.party ~= step then
+		add(partyCard(stack, s.party), function() closedOn.party = step relay() end)
+	elseif s.party then
+		s.party:Hide()
+	end
+	if not (s.party and stack.party and s.party:GetParent() == stack.party) and stack.party then stack.party:Hide() end
 	slots = {}
 	local width = window:GetWidth() or 300
 	local y = 0
@@ -891,7 +1132,7 @@ local function layoutStack(parts)
 		b.Close.psClose = list[i].close
 		b.Close.Icon:SetVertexColor(Theme.Color("textMuted"))
 		b.Close:SetFrameLevel(b:GetFrameLevel() + 5)
-		b.Close:Show()
+		b.Close:SetShown(list[i].close ~= nil)
 		f:SetParent(b)
 		f:SetFrameLevel(b:GetFrameLevel() + 1)
 		f:ClearAllPoints()
