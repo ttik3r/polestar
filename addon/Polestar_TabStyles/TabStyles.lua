@@ -238,6 +238,89 @@ ns.UI.GuideFrame.Part(function(GF)
 		paintIconTab(b, i == active)
 	end
 
+	-- The window's lines along the edge the tabs stand on (its border, and
+	-- in the house look the inner light and the outer shade) are cut under
+	-- the active tab, so the tab and the window read as one shape: each line
+	-- is hidden (texture alpha, which a repaint leaves alone) and drawn again
+	-- as two pieces that stop at the tab's sides, in the line's own colour.
+	local cuts = setmetatable({}, { __mode = "k" }) -- line -> { l, r, on }
+
+	local function edgeLines(bottom)
+		local out = {}
+		local border = rawget(F, "psBorder")
+		if border then out[#out + 1] = border[bottom and 2 or 1] end
+		local skin = rawget(F, "psSkin")
+		local e = skin and skin.edge
+		if e then
+			if not bottom then out[#out + 1] = e[1] end
+			out[#out + 1] = e[bottom and 3 or 2]
+		end
+		return out
+	end
+
+	local function mirror(t)
+		local c = cuts[t]
+		if not (c and c.on) then return end
+		local r, g, b, a = t:GetVertexColor()
+		for _, piece in ipairs({ c.l, c.r }) do
+			piece:SetVertexColor(r, g, b, a)
+			piece:SetShown(t:IsShown())
+		end
+	end
+
+	local function uncut()
+		for t, c in pairs(cuts) do
+			if c.on then
+				c.on = false
+				c.l:Hide(); c.r:Hide()
+				t:SetAlpha(1)
+			end
+		end
+	end
+
+	local function cutUnder(b, bottom)
+		local live = {}
+		local px = Theme.Pixel(F)
+		local bl, br = b:GetLeft(), b:GetRight()
+		for _, t in ipairs(bl and br and not F.psBare and edgeLines(bottom) or {}) do
+			local tl = t:GetLeft()
+			if tl then
+				local c = cuts[t]
+				if not c then
+					local layer, sub = t:GetDrawLayer()
+					c = { l = F:CreateTexture(nil, layer, nil, sub), r = F:CreateTexture(nil, layer, nil, sub) }
+					c.l:SetTexture(Theme.Media("white")); c.r:SetTexture(Theme.Media("white"))
+					cuts[t] = c
+					for _, m in ipairs({ "SetVertexColor", "Show", "Hide", "SetShown" }) do
+						hooksecurefunc(t, m, function() mirror(t) end)
+					end
+				end
+				local h = t:GetHeight()
+				c.l:ClearAllPoints()
+				c.l:SetPoint("TOPLEFT", t, "TOPLEFT", 0, 0)
+				c.l:SetPoint("TOPRIGHT", t, "TOPLEFT", max(0, bl + px - tl), 0)
+				c.l:SetHeight(h)
+				c.r:ClearAllPoints()
+				c.r:SetPoint("TOPLEFT", t, "TOPLEFT", br - px - tl, 0)
+				c.r:SetPoint("TOPRIGHT", t, "TOPRIGHT", 0, 0)
+				c.r:SetHeight(h)
+				c.on = true
+				t:SetAlpha(0)
+				mirror(t)
+				live[t] = true
+			end
+		end
+		for t, c in pairs(cuts) do
+			if c.on and not live[t] then c.on = false; c.l:Hide(); c.r:Hide(); t:SetAlpha(1) end
+		end
+		-- The tab's own sides and cap in the window border's colour, so the
+		-- two outlines meet in one colour.
+		local border = rawget(F, "psBorder")
+		local line = border and border[bottom and 2 or 1]
+		local token = (line and line:IsShown()) and "windowBorder" or "border"
+		for _, e in ipairs(rawget(b, "Edges") or {}) do W.Color(e, token) end
+	end
+
 	local function renderEdge(tabs, active)
 		local e = edgeOf()
 		local bottom = GF.BarsBottom()
@@ -265,8 +348,9 @@ ns.UI.GuideFrame.Part(function(GF)
 			fillTab(b, i, tabs[i], active)
 			b:SetSize(EDGE_W, b.psActive and EDGE_ON_H or EDGE_H)
 			b:ClearAllPoints()
-			-- The active tab covers the window's edge under it, one pixel in.
-			b:SetPoint(foot .. "LEFT", e, foot .. "LEFT", x, b.psActive and (bottom and 1 or -1) or 0)
+			-- The tabs stand on the window's edge; under the active one the
+			-- window's lines are cut (cutUnder).
+			b:SetPoint(foot .. "LEFT", e, foot .. "LEFT", x, 0)
 			b.Bar:ClearAllPoints()
 			b.Bar:SetPoint(cap .. "LEFT", b, cap .. "LEFT", 0, 0)
 			b.Bar:SetPoint(cap .. "RIGHT", b, cap .. "RIGHT", 0, 0)
@@ -284,6 +368,11 @@ ns.UI.GuideFrame.Part(function(GF)
 		for _, b in ipairs(e.tabs) do ground(b) end
 		ground(e.Add)
 		e:Show()
+		local on = active and e.tabs[active]
+		if on and on:IsShown() then cutUnder(on, bottom) else uncut() end
+		for i, b in ipairs(e.tabs) do
+			if i ~= active then for _, t in ipairs(rawget(b, "Edges") or {}) do W.Color(t, "border") end end
+		end
 	end
 
 	local function renderSide(tabs, active)
@@ -414,7 +503,7 @@ ns.UI.GuideFrame.Part(function(GF)
 		if style and style ~= "underline" then tabs, active = GF.TabsOf(Engine()) end
 		if style and style ~= "underline" and not tabs then style = nil end
 		if style == "switcher" then renderSwitch(tabs, active) else hide(own.switch) end
-		if style == "edge" then renderEdge(tabs, active) else hide(own.edge) end
+		if style == "edge" then renderEdge(tabs, active) else hide(own.edge); uncut() end
 		if style == "strip" then renderSide(tabs, active) else hide(own.side) end
 	end
 
