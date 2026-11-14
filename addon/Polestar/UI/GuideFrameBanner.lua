@@ -355,6 +355,7 @@ ns.UI.GuideFrame.Part(function(GF)
 		banner.Jump.psDefault = (kind == "group" or kind == "lost" or kind == "dungeon" or kind == "dungeonRun") or nil -- the gamepad's first focus (UI/GamepadGuide.lua)
 		banner.Text:SetWidth(width - PAD * 2 - 21 - 24)
 		banner.Later:Hide()
+		local oneLine = false -- no link row under the text
 		if kind == "skipped" then
 			banner.Icon:SetTexture(Theme.Media("skip"))
 			local lines = {}
@@ -605,13 +606,16 @@ ns.UI.GuideFrame.Part(function(GF)
 			local title = n.free == 0 and L["Your bags are full."]
 				or string.format(n.free == 1 and L["Bags nearly full: %d slot left."] or L["Bags nearly full: %d slots left."], n.free)
 			local j, Q = n.junk, ns.QoL
+			-- One line: the bags, then the cheapest junk with its Delete link
+			-- under it; without junk, the bags alone.
 			if j then
 				local worth = j.value < math.huge and Q.Money(j.value) or "?"
-				banner.Text:SetText(title .. "\n" .. string.format(L["Cheapest junk: %s (%s)"], Q.Space.ItemText(j), worth))
+				banner.Text:SetText(title .. "  \194\183  " .. string.format(L["Cheapest junk: %s (%s)"], Q.Space.ItemText(j), worth))
 				placeLink(banner.Jump, n.armed and L["Click again to delete it"] or L["Delete it"], 0, -4)
 			else
-				banner.Text:SetText(title .. "\n" .. L["No junk to make room with. Ctrl+Alt-click an item to mark it as junk."])
+				banner.Text:SetText(title)
 				banner.Jump:Hide()
+				oneLine = true
 			end
 			banner.Close:Show()
 		elseif kind == "wear" then
@@ -632,7 +636,7 @@ ns.UI.GuideFrame.Part(function(GF)
 			placeLink(banner.Jump, n.kind == "old" and L["How to update"] or L["Update"], 0, -4)
 			banner.Close:SetShown(n.closable)
 		end
-		local h = floor(9 + banner.Text:GetStringHeight() + 4 + 18 + 9 + 0.5)
+		local h = floor(9 + banner.Text:GetStringHeight() + (oneLine and 0 or 4 + 18) + 9 + 0.5)
 		banner:SetHeight(h)
 		return h
 	end

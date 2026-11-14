@@ -16,7 +16,7 @@
 -- has it (capability "surfaces.<hook>"), so on an older one the part it would
 -- change stays Polestar's own.
 
-local ADDON = ...
+local ADDON, A = ...
 local Theme = Polestar and Polestar.Theme
 if not (Theme and Theme.RegisterLayout and (Theme.API_VERSION or 0) >= 2) then return end
 
@@ -390,6 +390,7 @@ local OPT_ROW, OPT_PAD = 23, 14
 -- stays closed on that step.
 local stepOf = setmetatable({}, { __mode = "k" })
 local closedOn = {} -- card -> the step it was closed on
+A.closedOn = closedOn -- for /polestar atlas test (Test.lua)
 
 -- The parts the window handed over at this layout (guidePlace), taken up by
 -- the cards at guideLayout.
@@ -1122,6 +1123,11 @@ on("guidePlace", function(name, part, width, height)
 		part:SetHeight(height)
 		slots.journey = part
 		return true
+	end
+	-- Full bags stay Polestar's own banner, in the window.
+	if name == "banner" and part.psKind == "bags" then
+		bannerLook(part, false)
+		return false
 	end
 	-- Every other banner notice: a heads-up card on top of the stack.
 	if name == "banner" then

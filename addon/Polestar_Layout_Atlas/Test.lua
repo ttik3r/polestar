@@ -9,6 +9,7 @@
 -- /reload turns it off too. Mirrors the playground's card previews
 -- (tools/play/driver.lua, previewCards).
 
+local _, A = ...
 local P = Polestar
 if not (P and P.RegisterCommand and P.UI and P.UI.GuideFrame) then return end
 
@@ -88,6 +89,8 @@ local function start()
 	if not (P.Engine.GetGuide and P.Engine.GetGuide()) then return P.Print("Atlas test: load a guide first.") end
 	local r = {}
 	active = { restores = r }
+	-- Cards closed with their × on this step come back for the test.
+	if A and A.closedOn then wipe(A.closedOn) end
 	GF.UseContent(provider())
 	patch(r, P.RoutePlan, "Carried", function()
 		return { { quest = 0, title = "The Absent Minded Prospector", status = "missed", xp = 410 },
@@ -129,10 +132,12 @@ local function nextBanner()
 end
 
 P.RegisterCommand("atlas", function(rest)
-	if (rest or ""):lower() ~= "test" then return P.Print("Usage: /polestar atlas test") end
+	rest = (rest or ""):lower()
+	if rest == "test off" then return stop() end
+	if rest ~= "test" then return P.Print("Usage: /polestar atlas test (again for the next banner), /polestar atlas test off") end
 	if not active then start() end
 	if active then nextBanner() end
-end, "test: show every Atlas card at once on fake data")
+end, "test: every Atlas card at once on fake data; test off ends it")
 
 -- A step change brings the real content back.
 if P.On then P.On("STEP_CHANGED", function() if active then stop() end end) end
