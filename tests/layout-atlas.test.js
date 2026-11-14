@@ -486,23 +486,34 @@ test("Polestar's own layout keeps Along the way, the banner and the party line i
 	assert.equal(out.cards, 0);
 });
 
-// The target bar on the step's title stands clear of the rail's current
-// node: on the rail centred between the node's ring and the title, in
-// compact mode (no rail) back at Polestar's place.
-test("the step's target bar stands clear of the rail's current node", () => {
+// The arrow on the step's title: on the rail a yellow edge round the current
+// node in place of the target bar; without it the node keeps its plain halo;
+// in compact mode (no rail) the bar is back.
+test("on the rail the arrow on the step's title is a yellow edge round its node, not the bar", () => {
 	const out = hooks(`
 local person = parts.person
-local function at()
-	local point, _, rel, x = person.Mark:GetPoint(1)
-	return { point = point, rel = rel, x = x }
+local ring
+local function find()
+	for _, child in ipairs({ parts.window:GetChildren() }) do
+		for _, t in ipairs({ child:GetRegions() }) do
+			if t:GetDrawLayer() == "OVERLAY" and select(2, t:GetDrawLayer()) == 1 and t:IsShown() and math.floor(t:GetWidth()) >= 14 then return t end
+		end
+	end
 end
+person.Mark:Show()
 h.guideLayout(parts)
-local rail = at()
+ring = find()
+local aimed = { tex = person.Mark:GetTexture() ~= nil, w = ring and ring:GetWidth(), c = ring and { ring:GetVertexColor() } }
+person.Mark:Hide()
+local plain = { w = ring and ring:GetWidth() }
 Polestar.Set("ui.compact", true)
 h.guideLayout(parts)
-emit({ rail = rail, compact = at() })`);
-	assert.equal(out.rail.point, 'TOP');
-	assert.equal(out.rail.rel, 'TOPLEFT');
-	assert.equal(out.rail.x, 6, 'between the ring (x 1) and the title (x 11)');
-	assert.deepEqual(out.compact, { point: 'TOPLEFT', rel: 'TOPLEFT', x: 0 });
+emit({ aimed = aimed, plain = plain, compactTex = person.Mark:GetTexture() ~= nil })`);
+	assert.ok(out.aimed.w, 'the current node is drawn');
+	assert.equal(out.aimed.tex, false, 'the bar is not drawn on the rail');
+	assert.equal(out.aimed.w, 14, 'a 2px edge round the 10px node');
+	const [r, g, b] = out.aimed.c;
+	assert.ok(r > 0.9 && g > 0.7 && b < 0.6, `yellow: ${out.aimed.c}`);
+	assert.equal(out.plain.w, 16, 'not aimed: the plain halo');
+	assert.equal(out.compactTex, true, 'compact mode draws the bar');
 });
