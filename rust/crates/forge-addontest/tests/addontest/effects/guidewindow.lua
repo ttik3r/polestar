@@ -105,6 +105,10 @@ return {
 		["guideWindow.animSpeed"] = function() return slide().dur end,
 		["guideWindow.tabHeight"] = one("strip"),
 		["guideWindow.tabs"] = one("strip"),
+		["guideWindow.tabStyle"] = { with = { ["guideWindow.tabs"] = true }, probe = function()
+			local function shown(f) return f and f:IsShown() or false end
+			return { P.strip:IsShown(), shown(P.tabSwitch), shown(P.tabEdge), shown(P.tabSide) }
+		end },
 		["guideWindow.navHeight"] = one("nav"),
 		["guideWindow.barTextSize"] = one("count"),
 		["guideWindow.stepCount"] = one("steps"),
@@ -112,6 +116,7 @@ return {
 		["guideWindow.skipButton"] = one("skip"),
 		["guideWindow.reportButton"] = one("report"),
 		["guideWindow.titleSize"] = one("name"),
+		["guideWindow.lastSteps"] = function() return { P.last.psCount, snapshot().height } end,
 		["guideWindow.goalSize"] = one("rowText"),
 		["guideWindow.detailSize"] = function() return size(P.person.Where) end,
 		["guideWindow.glyphSize"] = one("icon"),

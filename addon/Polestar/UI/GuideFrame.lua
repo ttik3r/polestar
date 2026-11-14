@@ -83,22 +83,52 @@
 
 local ADDON, ns = ...
 
--- The live window's table, and every file's part in load order.
-local GF, partsOf = { live = true }, {}
+-- The live window's table, every file's part in load order and the copies
+-- made so far. A part a load-on-demand addon adds later (Polestar_TabStyles)
+-- joins the copies that exist too, after their build.
+local GF, partsOf, copies = { live = true }, {}, setmetatable({}, { __mode = "k" })
 ns.UI.GuideFrame = GF
 function GF.Part(fn)
 	partsOf[#partsOf + 1] = fn
 	fn(GF)
+	for copy in pairs(copies) do fn(copy) end
 end
 -- A copy of the window, unnamed, in `parent`, drawing `content` (a provider
--- of GF.CONTENT): built, not drawn. -> its table (copy.frame, copy.parts,
--- copy.rows, ... as the live window's)
-function GF.Copy(parent, content)
-	local copy = { live = false, parent = parent, content = content }
+-- of GF.CONTENT): built, not drawn. opts.layout: the layout it draws with
+-- (GF.layoutChoice). -> its table (copy.frame, copy.parts, copy.rows, ... as
+-- the live window's)
+function GF.Copy(parent, content, opts)
+	local copy = { live = false, parent = parent, content = content, layoutChoice = opts and opts.layout }
 	for _, fn in ipairs(partsOf) do fn(copy) end
 	copy.Build()
+	-- A copy drawing with the layout in use is a window the layout leaves
+	-- (Theme's switch hands its parts to the layout's onLeave, as the live
+	-- window's): GF.copies, held weakly.
+	if copy.layoutChoice == nil then
+		GF.copies = GF.copies or setmetatable({}, { __mode = "k" })
+		GF.copies[copy] = true
+	end
+	copies[copy] = true
 	return copy
 end
+
+-- The layout's and the skin's hooks for this window (Theme.SkinHookFor):
+-- GF.layoutChoice is the layout it draws with, nil the one in use (the live
+-- window, the settings' preview), false Polestar's own (a built-in preset's
+-- card), an id that layout's (a layout's preset card). The hooks get this
+-- window's parts. With the layout in use they go through Theme.SkinHook and
+-- Theme.SkinHookValue, as every other surface's do.
+GF.Part(function(GF)
+	local Theme = ns.Theme
+	function GF.Hook(surface, ...)
+		if GF.layoutChoice == nil then return Theme.SkinHook(surface, ...) end
+		return Theme.SkinHookFor(GF.layoutChoice, surface, ...)
+	end
+	function GF.HookValue(surface, ...)
+		if GF.layoutChoice == nil then return Theme.SkinHookValue(surface, ...) end
+		return Theme.SkinHookValueFor(GF.layoutChoice, surface, ...)
+	end
+end)
 
 GF.Part(function(GF)
 	local UI, Theme, W, Anim = ns.UI, ns.Theme, ns.Widgets, ns.Anim
@@ -264,13 +294,13 @@ GF.Part(function(GF)
 	---------------------------------------------------------------------------
 
 	GF.LOOK = {
-		tabs = true, tabHeight = 1, navHeight = 1, stepCount = true, guideTitle = true, skipButton = true, reportButton = true,
+		tabs = true, tabStyle = "underline", tabHeight = 1, navHeight = 1, stepCount = true, guideTitle = true, skipButton = true, reportButton = true,
 		barTextSize = 1, titleSize = 1, goalSize = 1, detailSize = 1, noteSize = 1, upSize = 1,
 		outline = "outline", padding = 0, rowSpacing = 0, lineSpacing = 0, glyphSize = 1, checkSize = 1,
 		targetBar = true, targetBarColor = false, targetBarWidth = 2,
 		progress = true, progressPct = true, progressHeight = 3, progressColor = false,
 		bgColor = false, bgOpacity = false, border = true, idleAlpha = 1, combatAlpha = 0.35, veil = 0.68, shade = 0.2,
-		stepAnim = true, animSpeed = 1, foldAnim = true, rules = true, hideTaxi = false,
+		stepAnim = true, animSpeed = 1, foldAnim = true, rules = true, hideTaxi = false, lastSteps = 0,
 	}
 	if GF.live then ns.RegisterDefaults("guideWindow", GF.LOOK) end
 
@@ -854,7 +884,7 @@ GF.Part(function(GF)
 			r.psRowInfo = info
 		end
 		info.current, info.done, info.skipped = current and true or false, done, skipped
-		Theme.SkinHook("guideRow", r, goal, info)
+		GF.Hook("guideRow", r, goal, info)
 	end
 
 	local function layoutBar(b, tw)
@@ -1096,7 +1126,7 @@ GF.Part(function(GF)
 			local below, rel = fit.below, fit.rel
 			for i = 1, fit.n do
 				local f, at = below[i], -(y + rel[i])
-				f:SetPoint("TOPLEFT", body, "TOPLEFT", 0, at)
+				f:SetPoint("TOPLEFT", body, "TOPLEFT", f.psInset or 0, at)
 				f:SetPoint("TOPRIGHT", body, "TOPRIGHT", 0, at)
 			end
 			y = y + fit.h
@@ -1445,6 +1475,20 @@ GF.Part(function(GF)
 	end
 
 	local function upcomingOpen() return ns.Get("ui.upcomingOpen") and true or false end
+
+	-- Whether the window shows part `name` its way (Skin API 2,
+	-- hooks.guideShows(name, default)): the skin in use's answer when it is a
+	-- boolean, else `default`, Polestar's own choice. Names: "tip" (the step's
+	-- tip, default off in compact mode), "done" (finished goals kept in place
+	-- as rows, default off: folded into one line), "upnextHead" (Up next's
+	-- heading, default on; without it the rows always show), "goalScroll" (the
+	-- goals area scrolls past the window's cap, default on), "classCardLater"
+	-- (the class quest card on the chain's later steps, default on).
+	function GF.Shows(name, default)
+		local ran, v = GF.HookValue("guideShows", name, default)
+		if ran and type(v) == "boolean" then return v end
+		return default
+	end
 
 	---------------------------------------------------------------------------
 	-- Along the way: open goals of `along` steps the route has passed
@@ -1811,9 +1855,89 @@ GF.Part(function(GF)
 		nav.Steps:SetWidth(24 + cw + 24)
 	end
 
+	-- The steps before: up to guideWindow.lastSteps (0 to 5, 0 by default:
+	-- off) of the steps before the one on screen that the route holds, one
+	-- dimmed row each over the step's header, the oldest on top and the
+	-- newest right over the step (never more than there are; none in compact
+	-- mode). Each says whether it was done or skipped; a click goes back to
+	-- it. `E`: what the window draws from (a copy's provider: the preview's
+	-- sample step). card.Last holds them: Rows (pooled, GF.LastRow), psCount.
+	function GF.LastRow(i)
+		local last = card.Last
+		local r = last.Rows[i]
+		if r then return r end
+		r = CreateFrame("Button", nil, last)
+		r:SetHeight(UP_ROW)
+		W.Hover(r)
+		r.Num = GF.SizeAs(T(r, "number", "textMuted"), "up")
+		r.Num:SetJustifyH("RIGHT")
+		r.Num:SetWidth(22)
+		r.Icon = r:CreateTexture(nil, "ARTWORK")
+		r.Icon:SetSize(13, 13)
+		W.Color(r.Icon, "textMuted")
+		r.Text = GF.SizeAs(T(r, "label", "textMuted"), "up")
+		r.Text:SetJustifyH("LEFT")
+		r.Text:SetWordWrap(false)
+		r:SetAlpha(0.7)
+		r:SetScript("OnClick", function(self)
+			local E = Engine()
+			if E and E.Goto and self.psIndex then E.Goto(self.psIndex) end
+		end)
+		r:SetScript("OnEnter", function(self)
+			W.Tooltip(self, tooltipAnchor(), self.psTitle or "", { { L["Click to jump to this step"], Theme.Accent() } })
+			GF.HoverIn()
+		end)
+		r:SetScript("OnLeave", function(self) W.HideTooltip(self) end)
+		last.Rows[i] = r
+		return r
+	end
+
+	function GF.FillLast(E, index)
+		local last = card.Last
+		local want = compact() and 0 or floor(tonumber(ns.Get("guideWindow.lastSteps")) or 0)
+		want = max(0, min(5, want))
+		-- The steps, newest first, then drawn oldest first.
+		local found, views = {}, {}
+		if want > 0 and type(index) == "number" then
+			for s = index - 1, 1, -1 do
+				local sv = E.GetStepView(s)
+				if sv and sv.status ~= "na" and not sv.along and not UI.StepHidden(s, E) then
+					local k = #found + 1
+					found[k], views[k] = s, sv
+					if #found >= want then break end
+				end
+			end
+		end
+		local n = #found
+		for i = 1, n do
+			local s, v, r = found[n + 1 - i], views[n + 1 - i], GF.LastRow(i)
+			local skipped = v.skipped or v.status == "skipped"
+			r.psIndex, r.psView = s, v
+			r.psStatus = skipped and "skipped" or v.status
+			r.psSummary = UI.StepSummary(v)
+			r.psTitle = v.title or r.psSummary
+			r.Num:SetText(UI.StepNo(s, E))
+			r.Icon:SetTexture(Theme.VerbIcon(UI.FirstVerb(v)))
+			local text = r.psSummary
+			if skipped then text = text .. "  |c" .. Theme.Hex("textMuted") .. L["skipped"] .. "|r" end
+			r.Text:SetText(text)
+			W.Color(r.Text, "textMuted")
+			r:Show()
+		end
+		for i = n + 1, #last.Rows do
+			local r = last.Rows[i]
+			r.psIndex, r.psView, r.psStatus, r.psSummary, r.psTitle = nil, nil, nil, nil, nil
+			r:Hide()
+		end
+		last.psCount = n
+		last:SetShown(n > 0)
+	end
+
 	local function fillUpcoming(E, index)
 		for i = 1, #upRows do upRows[i]:Hide() end
 		local want = compact() and 0 or (ns.Get("ui.upcoming") or 0)
+		-- Without its heading (GF.Shows "upnextHead"), Up next's rows always show.
+		local rowsShown = upcomingOpen() or not GF.Shows("upnextHead", true)
 		local n, count = 0, E.GetStepCount and E.GetStepCount() or 0
 		local i = index + 1
 		while n < want and i <= count do
@@ -1833,7 +1957,10 @@ GF.Part(function(GF)
 				r.Icon:SetTexture(Theme.VerbIcon(UI.FirstVerb(v)))
 				r.Text:SetText(r.psSummary)
 				W.Color(r.Text, warn and "warning" or "textDim")
-				r:SetShown(upcomingOpen())
+				r:SetShown(rowsShown)
+				-- The skin in use's touch on the row (Skin API 2,
+				-- hooks.guideUpRow(row, view, index)).
+				GF.Hook("guideUpRow", r, v, i)
 			end
 			i = i + 1
 		end
@@ -2025,13 +2152,17 @@ GF.Part(function(GF)
 	-- The goals a group shows as rows, as painted (UI.ReadingGoal): never one
 	-- that does not apply or is folded into another (a quest started by an item
 	-- is one row); a "Go to" naming the step's own place (`header`) only when
-	-- nothing else shows, since the header already says it.
+	-- nothing else shows, since the header already says it; never one the skin
+	-- in use shows on a card of its own (Skin API 2, hooks.guideTakes(goal):
+	-- true takes it out of the window's list).
 	-- -> rows (goal views), the hidden header goal
 	local function shownGoals(v, group)
 		local list, others = {}, 0
 		for _, gi in ipairs(group.goals or {}) do
 			local goal = v.goals[gi]
-			if goal and goal.status ~= "na" and not goal.folded then
+			local ran, taken
+			if goal then ran, taken = GF.HookValue("guideTakes", goal) end
+			if goal and goal.status ~= "na" and not goal.folded and not (ran and taken == true) then
 				list[#list + 1] = UI.ReadingGoal(v, goal)
 				if not goal.header then others = others + 1 end
 			end
@@ -2349,6 +2480,8 @@ GF.Part(function(GF)
 				end
 			end
 			-- The focus: its finished goals folded into "✓ N done", the rest as rows.
+			-- A skin may keep them in place as rows, no line (GF.Shows "done").
+			local inPlace = GF.Shows("done", false)
 			fold.serial = fold.serial + 1
 			local list = mineBefore
 			for _, goal in ipairs(goalsOf(g)) do list[#list + 1] = goal end
@@ -2358,7 +2491,7 @@ GF.Part(function(GF)
 				local gi = goal.index
 				local rec = fold.of[gi]
 				if goal.status == "done" then
-					if not rec and not model.folded[gi] then
+					if not rec and not model.folded[gi] and not inPlace then
 						local last = model.last[gi]
 						if sameFocus and last and last ~= "done" then
 							rec = fold.start(gi)
@@ -2383,7 +2516,7 @@ GF.Part(function(GF)
 				if fold.list[i].seen ~= fold.serial then fold.drop(fold.list[i]) end
 			end
 			local done = #doneList
-			if done > 0 or first then
+			if (done > 0 or first) and not inPlace then
 				local l = addLine("done", "check", "success", string.format(L["%d done"], max(done, 1)), doneList, L["Done"], model.doneOpen)
 				for i = 1, fold.n do fold.list[i].grow = nil end
 				if done == 0 then
@@ -2406,7 +2539,7 @@ GF.Part(function(GF)
 					addRow(goal, nil, false)
 				elseif k then
 					addRow(goal, nil, false, k)
-				elseif model.doneOpen then
+				elseif model.doneOpen or inPlace then
 					addRow(goal, nil, false)
 				end
 			end
@@ -2483,7 +2616,9 @@ GF.Part(function(GF)
 			area.items[i] = nil
 			i = i + 1
 		end
-		local shown = ns.Get("ui.showNotes") and not compact()
+		-- The tip: never with ui.showNotes off; a skin may keep it in compact
+		-- mode, or leave it out (GF.Shows "tip").
+		local shown = ns.Get("ui.showNotes") and GF.Shows("tip", not compact()) or false
 		local note = shown and view.note or nil
 		if note == "" then note = nil end
 		-- The step's picture (a file in its pack's addon folder, Guides.lua): one
@@ -2564,6 +2699,7 @@ GF.Part(function(GF)
 		fillAlong(E)
 		GF.FillHere(E)
 		fillUpcoming(E, index)
+		GF.FillLast(E, index)
 		showSteps(true)
 		GF.Layout()
 		followCurrent(focusChanged)
@@ -2584,7 +2720,7 @@ GF.Part(function(GF)
 	-- the step on screen, nil when there is none.
 	function GF.Render()
 		render()
-		if F then Theme.SkinHook("guideRender", state == "steps" and view or nil, GF.SkinParts()) end
+		if F then GF.Hook("guideRender", state == "steps" and view or nil, GF.SkinParts()) end
 	end
 
 	-- The step the window shows (the catch-up's while it goes over the steps).
@@ -2929,6 +3065,11 @@ GF.Part(function(GF)
 		card.Section:SetJustifyH("LEFT")
 		card.Section:SetWordWrap(false)
 		card.Section:Hide()
+		-- The steps before, over the header (GF.FillLast, layoutCard).
+		card.Last = CreateFrame("Frame", nil, card)
+		card.Last.Rows = {}
+		card.Last.psCount = 0
+		card.Last:Hide()
 		-- Blizzard: a gold separator under the person, above the goals.
 		person.Rule = person:CreateTexture(nil, "ARTWORK")
 		person.Rule:SetTexture(Theme.Media("white"))
@@ -3202,12 +3343,15 @@ GF.Part(function(GF)
 		GF.parts = {
 			strip = strip, nav = nav, body = body, card = card, person = person, tip = tip, after = after,
 			along = along, upnext = upnext, empty = empty, band = band, banner = banner, foot = foot, line = foot.Line, here = GF.here,
-			goals = goals,
+			goals = goals, last = card.Last,
 		}
 		GF.chrome = chrome
 		-- The parts a skin's hooks get (Skin API 2; Theme.GuideParts hands out
 		-- the live window's): this window's, its frame and goal rows with them.
 		local skinParts = { window = F, rows = rows }
+		-- Marks a guide window's frame: a layout tells its own pieces by the
+		-- window they sit in.
+		F.psGuideWindow = true
 		for k, v in pairs(GF.parts) do skinParts[k] = v end
 		function GF.SkinParts() return skinParts end
 		handOver()
@@ -3372,8 +3516,8 @@ GF.Part(function(GF)
 			if has ~= strip.psHasTabs then
 				strip.psHasTabs = has
 				GF.Layout()
-			elseif GF.StripShown() then
-				GF.RenderTabs()
+			else
+				GF.RenderTabStyle()
 			end
 		end))
 

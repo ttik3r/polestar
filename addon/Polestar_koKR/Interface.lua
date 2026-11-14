@@ -4765,3 +4765,6 @@ L["Nothing to apply: the parts ticked are the same as yours."] = "적용할 것�
 -- L["Westfall"] = "서부 몰락지대"
 -- L["Durotar"] = "듀로타"
 -- L["Orgrimmar"] = "오그리마"
+-- L["The target button and the step key ping the mob they target, so your group sees it behind rocks and buildings. Never in a raid unless you lead or assist. The rare buttons always ping."] = "대상 버튼과 단계 키가 지정한 몹에 핑을 찍어, 파티원이 바위나 건물 뒤에서도 볼 수 있게 합니다. 공격대에서는 공격대장이나 부공격대장일 때만 찍습니다. 희귀 버튼은 항상 핑을 찍습니다."
+-- L["Preview"] = "미리보기"
+-- L["Brill"] = "브릴"

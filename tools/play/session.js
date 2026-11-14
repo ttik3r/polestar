@@ -283,29 +283,34 @@ C_Map.GetMapArtID = function(id) local m = ART[id]; return m and m.artID end`);
 		// Polestar's own load-on-demand addons, where the addon has them, load from their TOC when Polestar
 		// asks (C_AddOns.LoadAddOn), as in the client and forge-addontest's run.rs: the settings window
 		// (Polestar_Options, UI/OptionsLoader.lua), the Skin API's checks (Polestar_SkinAPI, with the first
-		// skin or scheme another addon registers) and the game looks with Hearth (Polestar_Looks,
-		// Theme.LoadLooks, the first time one is painted). Without them a game look draws as Polestar's own.
-		for (const part of ['Polestar_Options', 'Polestar_SkinAPI', 'Polestar_Looks']) {
+		// skin or scheme another addon registers), the game looks with Hearth (Polestar_Looks,
+		// Theme.LoadLooks, the first time one is painted) and the guide window's other tab styles
+		// (Polestar_TabStyles, the first time one is drawn). Without them a game look draws as Polestar's
+		// own and the tabs stay above the step bar.
+		for (const part of ['Polestar_Options', 'Polestar_SkinAPI', 'Polestar_Looks', 'Polestar_TabStyles']) {
 			if (fs.existsSync(path.join(ADDONS, part, `${part}.toc`))) lines.push(`stub.packs.${part} = stub.packs.${part} or { ${tocFiles(part).map(luaString).join(', ')} }`);
 		}
-		// The skins in the download (addon/Polestar_Skin_*), installed as in the client: listed with their TOC's
-		// `X-Polestar-Skin` (Theme/SkinApi.lua finds them by it), loaded on demand when picked under Theme.
-		for (const part of fs.readdirSync(ADDONS).filter((n) => /^Polestar_Skin_/.test(n) && n !== 'Polestar_Skin_Example').sort()) {
+		// The layouts and skins in the download (addon/Polestar_Layout_*, addon/Polestar_Skin_*), installed as in the
+		// client: each shows in the AddOns list with its TOC's title, notes and X- fields (Theme.InstalledLayouts,
+		// Theme.InstalledSkins find them by `X-Polestar-Layout` and `X-Polestar-Skin`), and one that loads on demand
+		// loads from its TOC when Polestar chooses it.
+		const lookPart = (n) => /^Polestar_(Layout|Skin)_/.test(n) && n !== 'Polestar_Skin_Example';
+		for (const part of fs.readdirSync(ADDONS).filter(lookPart).sort()) {
 			const toc = path.join(ADDONS, part, `${part}.toc`);
 			if (!fs.existsSync(toc)) continue;
 			const meta = {};
-			for (const line of fs.readFileSync(toc, 'utf8').split(/\r?\n/)) {
-				const m = /^## ([A-Za-z-]+):\s*(.*)$/.exec(line);
-				if (m) meta[m[1]] = m[2].trim();
-			}
-			lines.push(`stub.addons[#stub.addons + 1] = { name = ${luaString(part)}, title = ${luaString(meta.Title || part)}, reason = "DEMAND_LOADED" }`);
-			lines.push(`stub.addonMeta[${luaString(part)}] = { ["X-Polestar-Skin"] = ${luaString(meta['X-Polestar-Skin'] || '')}, Title = ${luaString(meta.Title || part)}, Version = ${luaString(meta.Version || '')} }`);
-			lines.push(`stub.packs.${part} = stub.packs.${part} or { ${tocFiles(part).map(luaString).join(', ')} }`);
+			for (const m of fs.readFileSync(toc, 'utf8').matchAll(/^## ([\w-]+):\s*(.*?)\s*$/gm)) meta[m[1]] = m[2];
+			const demand = meta.LoadOnDemand === '1';
+			const fields = Object.entries(meta).filter(([k]) => k.startsWith('X-')).map(([k, v]) => `[${luaString(k)}] = ${luaString(v)}`);
+			fields.push(`Title = ${luaString(meta.Title || part)}`, `Version = ${luaString(meta.Version || '')}`);
+			lines.push(`stub.addons[#stub.addons + 1] = { name = ${luaString(part)}, title = ${luaString(meta.Title || part)}, notes = ${meta.Notes ? luaString(meta.Notes) : 'nil'}${demand ? ', reason = "DEMAND_LOADED"' : ''} }`);
+			lines.push(`stub.addonMeta[${luaString(part)}] = { ${fields.join(', ')} }`);
+			if (demand) lines.push(`stub.packs.${part} = stub.packs.${part} or { ${tocFiles(part).map(luaString).join(', ')} }`);
 		}
 		// Our other folders in the AddOns list too, each with its TOC's version, as the client lists them: once the
 		// list is not empty, Polestar's install check (Core/Data.lua) reads it, and a folder missing from it or of
 		// another version would read as a mixed install.
-		for (const part of fs.readdirSync(ADDONS).filter((n) => /^Polestar/.test(n) && !/^Polestar_Skin_/.test(n)).sort()) {
+		for (const part of fs.readdirSync(ADDONS).filter((n) => /^Polestar/.test(n) && !/^Polestar_(Layout|Skin)_/.test(n)).sort()) {
 			const toc = path.join(ADDONS, part, `${part}.toc`);
 			if (!fs.existsSync(toc)) continue;
 			const meta = {};
@@ -477,6 +482,7 @@ end`);
 			case 'goal': return 'return play.doGoal()';
 			case 'step': return 'return play.playStep()';
 			case 'guide': return 'return play.playGuide()';
+			case 'walk': return `return play.walkTick(${luaValue({ strides: n(a.strides, 3), every: n(a.every, 0), seed: n(a.seed, 1), xp: a.xp !== false, restart: !!a.restart, cards: !!a.cards, card: n(a.card, 0), ...(Array.isArray(a.preview) ? { preview: a.preview } : {}) })})`;
 			case 'gotoStep': return `Polestar.Engine.Goto(${n(a.step, 1)})`;
 			case 'prevStep': return 'Polestar.Engine.Prev()';
 			case 'nextStep': return 'Polestar.Engine.Next()';
@@ -530,9 +536,7 @@ if not g then return "noguide" end
 local to = g.next or (g.nextChoices and g.nextChoices[1]) or G.Suggest()
 if to == g.id then to = nil end
 Polestar.Fire("GUIDE_OUTLEVELED", g.id, to)`;
-			case 'train': return `local E = Polestar.Engine
-local t = E.NearestClassTrainer and E.NearestClassTrainer()
-Polestar.Fire("TRAIN_DUE", stub.world.level, t or { npcName = "your class trainer" })`;
+			case 'train': return 'play.trainDue()';
 			case 'clearBanners': return 'Polestar.Fire("CLASS_TRAINED"); local GF = Polestar.UI.GuideFrame; if GF.notices then GF.notices.outlevel = nil end; GF.Layout()';
 			case 'doneStep': return `local E = Polestar.Engine
 local i = E.GetStepIndex()

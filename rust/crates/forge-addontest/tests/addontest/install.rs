@@ -42,6 +42,7 @@ const RELEASE: &[&str] = &[
 	"Polestar_Nav_Kalimdor",
 	"Polestar_Options",
 	"Polestar_Looks",
+	"Polestar_TabStyles",
 	"Polestar_deDE",
 	"Polestar_zhCN",
 ];
@@ -126,6 +127,19 @@ fn a_copy_without_the_game_looks_folder_is_named_at_login_as_a_missing_settings_
 	let said = said(&out);
 	assert_eq!(said.len(), 1, "one line: {said:?}");
 	assert!(is_match(&said[0], r"Polestar_Looks not installed"), "{}", said[0]);
+}
+
+// The guide window's other tab styles (Polestar_TabStyles) ship in every release too, but a copy without them
+// keeps the tabs above the step bar and says so when a style of theirs is picked: nothing at login.
+#[test]
+fn a_copy_without_the_tab_styles_folder_says_nothing_at_login_and_an_old_one_is_named() {
+	let without: Vec<String> = RELEASE.iter().filter(|n| **n != "Polestar_TabStyles").map(|s| s.to_string()).collect();
+	let out = login(&without);
+	assert_eq!(out["missing"], "");
+	assert!(said(&out).is_empty(), "{:?}", said(&out));
+	let out = login(&with(&["Polestar_TabStyles=0.3.4"]));
+	assert_eq!(out["stale"], "Polestar_TabStyles 0.3.4");
+	assert!(is_match(&said(&out)[0], r"Polestar_TabStyles 0\.3\.4"), "{:?}", said(&out));
 }
 
 #[test]

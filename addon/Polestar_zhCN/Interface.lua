@@ -4774,3 +4774,6 @@ L["Nothing to apply: the parts ticked are the same as yours."] = "无可应用�
 -- L["Westfall"] = "西部荒野"
 -- L["Durotar"] = "杜隆塔尔"
 -- L["Orgrimmar"] = "奥格瑞玛"
+-- L["The target button and the step key ping the mob they target, so your group sees it behind rocks and buildings. Never in a raid unless you lead or assist. The rare buttons always ping."] = "目标按钮和步骤快捷键会对所选中的怪物发送信号，让队友隔着岩石和建筑也能看到它。团队中只有团长或助理才会发送。稀有怪按钮总是会发送信号。"
+-- L["Preview"] = "预览"
+-- L["Brill"] = "布瑞尔"

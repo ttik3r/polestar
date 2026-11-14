@@ -4772,3 +4772,6 @@ L["Nothing to apply: the parts ticked are the same as yours."] = "Нечего �
 -- L["Westfall"] = "Западный Край"
 -- L["Durotar"] = "Дуротар"
 -- L["Orgrimmar"] = "Оргриммар"
+-- L["The target button and the step key ping the mob they target, so your group sees it behind rocks and buildings. Never in a raid unless you lead or assist. The rare buttons always ping."] = "Кнопка цели и клавиша шага отмечают пингом выбранного противника, чтобы группа видела его за скалами и зданиями. В рейде — только если вы лидер или помощник. Кнопки редкой цели отмечают всегда."
+-- L["Preview"] = "Предпросмотр"
+-- L["Brill"] = "Брилл"

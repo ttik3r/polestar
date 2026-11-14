@@ -1584,13 +1584,15 @@ local function paintMenuRow(row, lit)
 	local face = rawget(row, "Face")
 	if face then W.Color(face, item.color or (on and "text" or "textDim"), off) end
 	if item.icon then W.Color(row.Icon, item.color or (on and "text" or "textDim"), off) end
+	if W.MenuRows then W.MenuRows.paint(row, item, lit) end
 end
+W.PaintMenuRow = paintMenuRow
 
 -- Items with confirm = true need a second click: the first relabels the row
 -- and keeps the menu open.
 local function menuRowClick(self)
 	local item = self.psItem
-	if not item or item.disabled then return end
+	if not item or item.disabled or item.heading then return end
 	if item.confirm and not self.psArmed then
 		self.psArmed = true
 		self.Text:SetText(L["Click again to confirm"])
@@ -1674,7 +1676,7 @@ local function buildMenu()
 			rows = function()
 				local out = {}
 				for _, r in ipairs(menu.rows) do
-					if r:IsShown() and not (r.psItem and r.psItem.disabled) then out[#out + 1] = r end
+					if r:IsShown() and not (r.psItem and (r.psItem.disabled or r.psItem.heading)) then out[#out + 1] = r end
 				end
 				return out
 			end,
@@ -1788,7 +1790,16 @@ function layoutMenu()
 				nsep = nsep + 1
 				local sep = menu.seps[nsep]
 				if not sep then
-					sep = W.Divider(menu)
+					-- A hairline in the divider wash; a skin that clears section
+					-- lines (divider = CLEAR) still gets a faint one between groups.
+					sep = menu:CreateTexture(nil, "BORDER")
+					sep:SetTexture(WHITE)
+					W.Painter(sep, function(tex)
+						local r, g, b, al = Theme.Wash("divider")
+						if (al or 0) < 0.05 then r, g, b = Theme.Color("textMuted"); al = 0.22 end
+						tex:SetVertexColor(r, g, b, al)
+						tex:SetHeight(Theme.Pixel(menu))
+					end)
 					menu.seps[nsep] = sep
 				end
 				if sep:GetParent() ~= holder then sep:SetParent(holder) end
@@ -1828,6 +1839,8 @@ function layoutMenu()
 			else
 				row.Icon:Hide()
 			end
+			local textX, extra = anyIcon and 32 or 12, 0
+			if W.MenuRows then textX, extra = W.MenuRows.place(row, item, textX) end
 			paintMenuRow(row, false)
 			row.Check:SetShown(item.checked and true or false)
 			W.Color(row.Check, "accent")
@@ -1844,7 +1857,7 @@ function layoutMenu()
 			row.Check:ClearAllPoints()
 			row.Check:SetPoint("RIGHT", row, "RIGHT", item.preview and -32 or -10, 0)
 			local shownText = (item.font and face) or row.Text
-			width = max(width, shownText:GetStringWidth() + (anyIcon and 32 or 12) + 36 + (anyPreview and 26 or 0) + (long and 10 or 0))
+			width = max(width, shownText:GetStringWidth() + textX + 36 + extra + (anyPreview and 26 or 0) + (long and 10 or 0))
 			if holds(item, needle) then
 				row:ClearAllPoints()
 				row:SetHeight(rowH)
@@ -1890,6 +1903,8 @@ function layoutMenu()
 end
 
 -- items: { { text, icon, checked, disabled, onClick, tip, color, confirm, preview }, { separator = true }, ... }
+-- (W.MenuRows, when an addon sets it, places and paints rows of its own kinds:
+-- { place = fn(row, item, textX) -> textX, extra width; paint = fn(row, item, lit) })
 -- opts: { point = "TOPRIGHT", relPoint = "BOTTOMRIGHT", x = 0, y = -4, minWidth = 168 }
 function W.ShowMenu(anchor, items, opts)
 	if not menu then buildMenu() end

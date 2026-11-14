@@ -4802,3 +4802,6 @@ L["Nothing to apply: the parts ticked are the same as yours."] = "Nichts anzuwen
 -- L["Westfall"] = "Westfall"
 -- L["Durotar"] = "Durotar"
 -- L["Orgrimmar"] = "Orgrimmar"
+-- L["The target button and the step key ping the mob they target, so your group sees it behind rocks and buildings. Never in a raid unless you lead or assist. The rare buttons always ping."] = "Der Ziel-Button und die Schrittetaste pingen den Mob, den sie anvisieren, damit deine Gruppe ihn hinter Felsen und Gebäuden sieht. Im Schlachtzug nie, außer du bist Leiter oder Assistent. Die Rare-Knöpfe pingen immer."
+-- L["Preview"] = "Vorschau"
+-- L["Brill"] = "Brill"
