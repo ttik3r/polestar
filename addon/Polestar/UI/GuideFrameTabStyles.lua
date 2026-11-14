@@ -1,5 +1,5 @@
--- The guide window's tab styles (guideWindow.tabStyle) and its close button
--- (UI/GuideFrame.lua). "underline" is the strip above the navigator
+-- The guide window's tab styles (guideWindow.tabStyle) (UI/GuideFrame.lua).
+-- "underline" is the strip above the navigator
 -- (UI/GuideFrameTabs.lua); "switcher" (the navigator's title as a menu of
 -- the open guides), "edge" (small icon tabs on the window's top edge) and
 -- "strip" (an icon column down its left edge) live in Polestar_TabStyles
@@ -26,23 +26,16 @@ local function loadStyles()
 end
 
 ns.UI.GuideFrame.Part(function(GF)
-	local W = ns.Widgets
 	local Theme = ns.Theme
 	local F, strip, nav
 	-- This window's style frames: a table once its parts exist, each made the
 	-- first time it is drawn (a window on underline with tabs off makes none).
 	local own
 
-	local function hideWindow()
-		local click = nav and nav.Close and nav.Close:GetScript("OnClick")
-		if click then click(nav.Close) end
-	end
-	GF.HideWindow = hideWindow
-
 	-- A style's frame joins the window: among its parts for a skin's hooks
 	-- (Skin API 2; Theme.GuideParts hands it out from now on, nil before),
 	-- the chrome that fades with the bars, in the skin's colours.
-	local PART_KEY = { switch = "tabSwitch", edge = "tabEdge", side = "tabSide", x = "windowClose" }
+	local PART_KEY = { switch = "tabSwitch", edge = "tabEdge", side = "tabSide" }
 	local function register()
 		if not GF.parts then return end
 		local skinParts = GF.SkinParts and GF.SkinParts()
@@ -66,20 +59,6 @@ ns.UI.GuideFrame.Part(function(GF)
 		return f
 	end
 
-	-- The window's close: a glyph right of the menu, past a hairline.
-	local function closeOf()
-		if own.x then return own.x end
-		local x = W.IconButton(nav, "close", 22, L["Hide window"], hideWindow, 10)
-		x.psOnEnter = function(self) W.Color(self.Icon, "danger") end
-		x:Hide()
-		own.rule = W.Divider(nav, true)
-		own.rule:SetHeight(18)
-		own.rule:Hide()
-		return GF.AdoptTabFrame("x", x)
-	end
-
-	local function hide(f) if f then f:Hide() end end
-
 	GF.Bind(function(p)
 		F, strip, nav = p.F, p.strip, p.nav
 		if nav and F and not own and GF.chrome then
@@ -102,36 +81,15 @@ ns.UI.GuideFrame.Part(function(GF)
 		return s
 	end
 
-	-- The window's close and the menu. A skin's close square (the guideTitle
-	-- hook) keeps the skin's place, the menu its inset (menuRight); the edge
-	-- style's × is a tab of its own, the switcher has none ("…" has Hide
-	-- window). Otherwise the underline and strip styles' own × sits right of
-	-- "…" past a hairline.
-	function GF.PlaceClose()
-		if not (own and nav) then return end
+	-- The style's frames, made on its first use, and how far they reach past
+	-- the window's edges (GF.Layout): before the layout's hooks run, so a
+	-- skin's guideLayout dresses them and sees the reach from the first time.
+	-- The window has no × of its own: "…" has Hide window.
+	function GF.PlaceTabStyle()
+		if not own then return end
 		local style = GF.TabStyle()
-		local skinClose = nav.psSkinClose and style ~= "edge"
-		local x = style and style ~= "edge" and style ~= "switcher" and not nav.psClear and not skinClose
-		nav.Close:SetShown(skinClose and true or false)
-		-- The style's frames, made here on its first use: before the layout's
-		-- hooks run, so a skin's guideLayout dresses them from the first time.
 		if style and style ~= "underline" and GF.TabStyleBuild then GF.TabStyleBuild(style) end
 		GF.PlaceReach(style)
-		if x then closeOf():Show() else hide(own.x) end
-		nav.Menu:ClearAllPoints()
-		if x then
-			own.x:ClearAllPoints()
-			own.x:SetPoint("RIGHT", nav, "RIGHT", -6, 0)
-			own.rule:ClearAllPoints()
-			own.rule:SetPoint("RIGHT", own.x, "LEFT", -4, 0)
-			own.rule:Show()
-			nav.Menu:SetPoint("RIGHT", own.rule, "LEFT", -3, 0)
-		else
-			hide(own.rule)
-			-- The edge style takes a skin's close square away, and the room it kept.
-			local inset = (nav.psSkinClose and not skinClose) and 8 or tonumber(nav.psMenuRight) or 8
-			nav.Menu:SetPoint("RIGHT", nav, "RIGHT", -inset, 0)
-		end
 	end
 
 	-- How far the window's own parts stand past its top and bottom edges (the
@@ -154,13 +112,6 @@ ns.UI.GuideFrame.Part(function(GF)
 		-- The heads-up card on the live window steps clear of the tabs.
 		local CT = GF.live and ns.UI.ClassToast
 		if CT and CT.Place then CT.Place(false) end
-	end
-
-	-- What the navigator gives up right of the menu for the close (GF.Layout's title room).
-	function GF.CloseRoom()
-		if nav and nav.Close:IsShown() then return 18 end
-		if not (own and own.x and own.x:IsShown()) then return 0 end
-		return own.x:GetWidth() + 6 + 4 + 1 + 3 - 8
 	end
 
 	-- Draw the tabs in the style in use (GF.Layout, after the layout's hooks

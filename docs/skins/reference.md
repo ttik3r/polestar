@@ -1162,14 +1162,15 @@ assert(Theme.RegisterSkin("ref-hooks", {
 `Theme.GuideParts()` hands over the guide window's frames, to place things
 by and to restyle (capability `guideParts`): `window`, `strip` (the tabs),
 `tabSwitch` (the Title menu tab style's switcher), `tabEdge` (the On the top
-edge style's tabs), `tabSide` (the Down the left side style's tabs),
-`windowClose` (Polestar's own window ×, right of "…"; each of these four is
-nil until its style is first drawn, and is in the parts from that layout's
-`guideLayout` on), `nav` (the step bar), `body`, `card` (the step), `last` (the steps before this one over the header, as many as
+edge style's tabs), `tabSide` (the Down the left side style's tabs; each of
+these three is nil until its style is first drawn, and is in the parts from that layout's
+`guideLayout` on), `nav` (the step bar),
+`body`, `card` (the step), `last` (the steps before this one over the header, as many as
 `guideWindow.lastSteps` asks, 0 to 5, and never more than come before:
 `psCount` the rows shown, `Rows` the rows, pooled, the oldest first, each
 with `psIndex` the step, `psStatus` `"done"`, `"skipped"` or the step's
-status, `Num`, `Icon`, `Text`), `person` (its header), `goals` (the scroll of goal rows), `rows` (the goal rows, pooled), `tip`,
+status, `Num`, `Icon`, `Text`), `person` (its header), `goals` (the scroll of
+goal rows), `rows` (the goal rows, pooled), `tip`,
 `after` ("Then:"), `along`, `upnext`, `empty` (no guide), `band` (the house
 band), `banner`, `foot` (the progress), `line` (its bar), `here` (While
 you're here). One table, the same every time; nil before the window is

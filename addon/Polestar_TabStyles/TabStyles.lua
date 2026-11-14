@@ -29,7 +29,6 @@ ns.UI.GuideFrame.Part(function(GF)
 	local function full(n) return n >= MAX_TABS end
 	local function addTip(n) return full(n) and L["Six tabs is the limit"] or L["Open a guide in a new tab"] end
 	local function openPicker() UI.ShowPicker({ newTab = true }) end
-	local hideWindow = GF.HideWindow
 
 	-- A 1px edge on the sides of `f` that `sides` names ("TOP", "LEFT",
 	-- "RIGHT", "BOTTOM"), in the border wash.
@@ -54,7 +53,7 @@ ns.UI.GuideFrame.Part(function(GF)
 	end
 
 	-- An icon tab (edge, strip): its ground, the lit ground of the active
-	-- one, the accent mark, the glyph. kind: "tab", "add" or "close".
+	-- one, the accent mark, the glyph. kind: "tab" or "add".
 	local function iconTab(parent, kind, style)
 		local b = CreateFrame("Button", nil, parent)
 		b.psStyle = style
@@ -90,14 +89,13 @@ ns.UI.GuideFrame.Part(function(GF)
 			-- Its parts for a skin's hooks.guideTab, with the style they are drawn in.
 			b.psParts = { selected = b.Selected, bar = b.Bar, icon = b.Icon, style = style }
 		else
-			b.Icon:SetTexture(Theme.Media(kind == "add" and "plus" or "close"))
-			if kind == "close" then b.Icon:SetSize(10, 10) end
+			b.Icon:SetTexture(Theme.Media("plus"))
 			b:SetScript("OnClick", function(self, button)
 				if button ~= "LeftButton" or not self:IsEnabled() then return end
-				if kind == "add" then openPicker() else hideWindow() end
+				openPicker()
 			end)
 			b:SetScript("OnEnter", function(self)
-				if self:IsEnabled() then W.Color(self.Icon, kind == "close" and "danger" or "text") end
+				if self:IsEnabled() then W.Color(self.Icon, "text") end
 				W.Tooltip(self, style == "edge" and "ANCHOR_TOP" or "ANCHOR_LEFT", self.psTip or "")
 				GF.HoverIn()
 			end)
@@ -105,7 +103,6 @@ ns.UI.GuideFrame.Part(function(GF)
 				W.Color(self.Icon, "textMuted", self:IsEnabled() and 1 or 0.35)
 				W.HideTooltip(self)
 			end)
-			if kind == "close" then b.psTip = L["Hide window"] end
 		end
 		return b
 	end
@@ -197,7 +194,6 @@ ns.UI.GuideFrame.Part(function(GF)
 		e.Add = iconTab(e, "add", "edge")
 		e.Add.Ground:Hide()
 		for _, t in ipairs(e.Add.Edges) do W.Color(t, "border", 0.6) end
-		e.Close = iconTab(e, "close", "edge")
 		e:Hide()
 		return GF.AdoptTabFrame("edge", e)
 	end
@@ -285,13 +281,8 @@ ns.UI.GuideFrame.Part(function(GF)
 		e.Add.psTip = addTip(n)
 		if full(n) then e.Add:Disable() else e.Add:Enable() end
 		W.Color(e.Add.Icon, "textMuted", full(n) and 0.35 or 1)
-		e.Close:SetSize(EDGE_W, EDGE_H)
-		e.Close:ClearAllPoints()
-		e.Close:SetPoint(foot .. "RIGHT", e, foot .. "RIGHT", 0, 0)
-		e.Close:SetShown(not nav.psClear)
 		for _, b in ipairs(e.tabs) do ground(b) end
 		ground(e.Add)
-		ground(e.Close)
 		e:Show()
 	end
 
@@ -409,7 +400,7 @@ ns.UI.GuideFrame.Part(function(GF)
 
 	local function hide(f) if f then f:Hide() end end
 
-	-- The style's frames, made the first time it is drawn (GF.PlaceClose,
+	-- The style's frames, made the first time it is drawn (GF.PlaceTabStyle,
 	-- before the layout's hooks).
 	function GF.TabStyleBuild(style)
 		if not own then return end

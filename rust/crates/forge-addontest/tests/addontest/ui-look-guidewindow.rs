@@ -378,7 +378,7 @@ fn a_registered_skin_s_guide_title_hook_dresses_the_navigator() {
 		local function title()
 			local _, _, _, mx = P.nav.Menu:GetPoint(1)
 			local r, g, b = P.nav.Rule:GetVertexColor()
-			return { bar = P.nav.TitleBar:IsShown(), close = P.nav.Close:IsShown(), x = P.windowClose:IsShown(), band = P.band:IsShown(), menu = mx,
+			return { bar = P.nav.TitleBar:IsShown(), close = P.nav.Close:IsShown(), band = P.band:IsShown(), menu = mx,
 				rule = string.format("%02x%02x%02x", r * 255 + 0.5, g * 255 + 0.5, b * 255 + 0.5) }
 		end
 		local house = title()
@@ -399,8 +399,7 @@ fn a_registered_skin_s_guide_title_hook_dresses_the_navigator() {
 		emit({ ok = ok, why = why or false, house = house, titled = titled, clear = clear, back = title() })"##);
 	assert_eq!(out["ok"], true, "registered: {}", out["why"]);
 	let h = &out["house"];
-	assert_eq!((h["bar"].clone(), h["close"].clone(), h["band"].clone(), h["menu"].clone()), (json!(false), json!(false), json!(true), json!(-3)), "the house title: {h}");
-	assert_eq!(h["x"], true, "with tabs, the house title has Polestar's own × right of the menu, the menu past its hairline");
+	assert_eq!((h["bar"].clone(), h["close"].clone(), h["band"].clone(), h["menu"].clone()), (json!(false), json!(false), json!(true), json!(-8)), "the house title: {h}");
 	let t = &out["titled"];
 	assert_eq!((t["bar"].clone(), t["close"].clone(), t["band"].clone(), t["menu"].clone()), (json!(true), json!(true), json!(false), json!(-26)), "the hook's title: {t}");
 	assert_eq!(t["rule"], "43331e", "the rule under a title bar in titleLine");

@@ -114,7 +114,7 @@ return {
 		["guideWindow.tabs"] = one("strip"),
 		["guideWindow.tabStyle"] = { with = { ["guideWindow.tabs"] = true }, probe = function()
 			local function shown(f) return f and f:IsShown() or false end
-			return { P.strip:IsShown(), shown(P.tabSwitch), shown(P.tabEdge), shown(P.tabSide), shown(P.windowClose) }
+			return { P.strip:IsShown(), shown(P.tabSwitch), shown(P.tabEdge), shown(P.tabSide) }
 		end },
 		["guideWindow.navHeight"] = one("nav"),
 		["guideWindow.barTextSize"] = one("count"),

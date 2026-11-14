@@ -207,8 +207,6 @@ ns.UI.GuideFrame.Part(function(GF)
 		-- the bar's line (GF.PaintRule).
 		local title = GF.TitleParts(nav.TitleBar, nav.Close, nav.Rule, band)
 		if not clear then GF.Hook("guideTitle", nav, title) end
-		-- The close and the menu are placed with the tab style (GF.PlaceClose, in GF.Layout).
-		nav.psSkinClose, nav.psMenuRight, nav.psClear = nav.Close:IsShown(), title.menuRight, clear
 		nav.Menu:ClearAllPoints()
 		nav.Menu:SetPoint("RIGHT", nav, "RIGHT", -(tonumber(title.menuRight) or 8), 0)
 		GF.PaintRule(nav.Rule)

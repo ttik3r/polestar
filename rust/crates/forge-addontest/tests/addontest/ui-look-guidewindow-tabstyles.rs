@@ -1,7 +1,7 @@
 //! The guide window's tab styles (addon/Polestar/UI/GuideFrameTabStyles.lua and the load-on-demand
 //! addon/Polestar_TabStyles, guideWindow.tabStyle): each of
 //! underline, switcher, edge and strip draws its own tabs and hides the others, a change of style reaches the
-//! live window at once and back, six tabs is the limit in every style, and the window's × never overlaps "…".
+//! live window at once and back, six tabs is the limit in every style, and none has a × to hide the window ("…" has Hide window).
 //! Against the real Core + Theme + UI manifests and the fake Engine (tests/lua/stub_ui.lua).
 
 use forge_addontest::{emitted, Addon, RunAddon};
@@ -28,7 +28,7 @@ local function visible(f) return f and f:IsVisible() and true or false end
 local function drawn()
 	return {
 		strip = shown(P.strip), switch = shown(P.tabSwitch), edge = shown(P.tabEdge), side = shown(P.tabSide),
-		title = shown(nav.Title), x = shown(P.windowClose), edgeClose = visible(P.tabEdge and P.tabEdge.Close),
+		title = shown(nav.Title), close = shown(nav.Close), edgeClose = P.tabEdge ~= nil and rawget(P.tabEdge, "Close") ~= nil,
 		edgeTabs = count(P.tabEdge and P.tabEdge.tabs), sideTabs = count(P.tabSide and P.tabSide.tabs),
 		badge = P.tabSwitch and visible(P.tabSwitch.Badge) and P.tabSwitch.Badge.Text:GetText() or false,
 	}
@@ -102,13 +102,11 @@ fn each_style_draws_its_own_tabs_and_hides_the_others() {
 	assert_eq!(out["switcher"]["title"], false, "the switcher stands in for the guide's title");
 	assert_eq!(out["switcher"]["badge"], "3", "the switcher's badge counts the open tabs");
 	assert_eq!(out["edge"]["edgeTabs"], 3, "one edge tab per open guide");
-	assert_eq!(out["edge"]["edgeClose"], true, "the edge style's × is a tab of its own");
-	assert_eq!(out["edge"]["x"], false, "and the step bar has none");
+	assert_eq!(out["edge"]["edgeClose"], false, "the edge row has no × tab");
 	assert_eq!(out["strip"]["sideTabs"], 3, "one side tab per open guide");
-	for s in ["underline", "strip"] {
-		assert_eq!(out[s]["x"], true, "{s}: the window's × sits right of the menu");
+	for s in ["underline", "switcher", "edge", "strip"] {
+		assert_eq!(out[s]["close"], false, "{s}: no × to hide the window (\"…\" has Hide window)");
 	}
-	assert_eq!(out["switcher"]["x"], false, "the switcher has no × (\"…\" has Hide window)");
 }
 
 #[test]
@@ -122,7 +120,7 @@ fn a_style_s_frames_are_made_the_first_time_it_is_drawn() {
 		uistub.openTabs(THREE, 1)
 		stub.advance(1)
 		local function made() return { P.tabSwitch ~= nil, P.tabEdge ~= nil, P.tabSide ~= nil } end
-		local out = { login = made(), guideParts = T.GuideParts().tabEdge == nil, close = P.windowClose ~= nil }
+		local out = { login = made(), guideParts = T.GuideParts().tabEdge == nil, close = P.windowClose == nil }
 		Polestar.Set("ui.skin", "watcher")
 		stub.advance(1)
 		style("edge")
@@ -137,7 +135,7 @@ fn a_style_s_frames_are_made_the_first_time_it_is_drawn() {
 		emit(out)"#);
 	assert_eq!(out["login"], json!([false, false, false]), "on underline at login, no style's frames are made");
 	assert_eq!(out["guideParts"], true, "Theme.GuideParts() has no tabEdge before the style is used");
-	assert_eq!(out["close"], true, "underline with tabs on has the window's own ×");
+	assert_eq!(out["close"], true, "the window has no × part of its own");
 	assert_eq!(out["edge"], json!([false, true, false]), "picking edge makes the edge row alone");
 	assert_eq!(out["handed"], true, "Theme.GuideParts() hands it out once made");
 	assert_eq!(out["skinSaw"], true, "a skin's guideLayout gets it in the layout that made it, before it shows");
@@ -167,7 +165,7 @@ fn a_change_of_style_reaches_the_live_window_and_back() {
 	assert_eq!(out["seen"][0], out["seen"][3], "switcher twice draws the same");
 	assert_eq!(out["seen"][1], out["seen"][4], "edge twice draws the same");
 	let off = &out["off"];
-	assert_eq!(json!([off["strip"], off["switch"], off["edge"], off["side"], off["x"]]), json!([false, false, false, false, false]), "tabs off: no style draws");
+	assert_eq!(json!([off["strip"], off["switch"], off["edge"], off["side"]]), json!([false, false, false, false]), "tabs off: no style draws");
 	assert_eq!(out["on"]["edge"], true, "tabs on again: the picked style comes back");
 }
 
@@ -208,39 +206,11 @@ fn six_tabs_is_the_limit_in_every_style() {
 	assert_eq!(six["switcher"], json!(["Six tabs is the limit", false, "6"]), "switcher: off at six, with the limit's tip");
 }
 
+// No style has a × to hide the window: "…" has Hide window in every style. "…" sits at the bar's right inset with
+// no gap where a × was, the switcher stops short of it, and the switcher's own list keeps each tab's "Close tab".
 #[test]
-fn the_window_close_never_overlaps_the_menu() {
+fn no_style_has_a_window_close_and_the_menu_sits_at_the_bar_s_right() {
 	let out = run(r#"
-		local out = {}
-		for _, list in ipairs({ THREE, SIX }) do
-			uistub.openTabs(list, 1)
-			stub.advance(1)
-			for _, w in ipairs({ 300, 420 }) do
-				Polestar.Set("ui.width", w)
-				for _, s in ipairs({ "underline", "edge", "strip" }) do
-					style(s)
-					local close = P.windowClose:IsShown() and P.windowClose or P.tabEdge.Close
-					local m, c = rect(nav.Menu), rect(close)
-					out[#out + 1] = { s .. " " .. #list .. " tabs " .. w, close:IsShown() and true or false,
-						not overlap(close, nav.Menu), s == "edge" or c[1] >= m[2], table.concat(m, ","), table.concat(c, ",") }
-				end
-			end
-		end
-		emit(out)"#);
-	for row in out.as_array().unwrap() {
-		assert_eq!(row[1], true, "{}: a × shows", row[0]);
-		assert_eq!(row[2], true, "{}: the × and \"…\" do not overlap {} {}", row[0], row[4], row[5]);
-		assert_eq!(row[3], true, "{}: the × is right of \"…\"", row[0]);
-	}
-}
-
-// The switcher drops the window's ×: "…" hides the window in every style. The menu takes the ×'s room at the
-// bar's right, and the switcher's own list keeps each tab's "Close tab".
-#[test]
-fn the_switcher_has_no_window_close_and_the_menu_takes_its_room() {
-	let out = run(r#"
-		uistub.openTabs(THREE, 1)
-		stub.advance(1)
 		local function menuItems()
 			local items
 			local show = W.ShowMenu
@@ -249,23 +219,40 @@ fn the_switcher_has_no_window_close_and_the_menu_takes_its_room() {
 			W.ShowMenu = show
 			return items or {}
 		end
-		style("underline")
-		local under = { menu = rect(nav.Menu), nav = rect(nav) }
-		style("switcher")
-		local hide = false
-		for _, it in ipairs(menuItems()) do if it.icon == "close" and it.onClick then hide = true end end
-		local closeTab = 0
-		for _, it in ipairs(switcherMenu()) do if it.onRemove and it.removeTip then closeTab = closeTab + 1 end end
-		local m, n, sw = rect(nav.Menu), rect(nav), rect(P.tabSwitch)
-		emit({ x = shown(P.windowClose),
-			hide = hide, closeTab = closeTab, gap = n[2] - m[2], underGap = under.nav[2] - under.menu[2],
-			clear = sw[2] <= m[1] })"#);
-	assert_eq!(out["x"], false, "no × in the switcher style");
-	assert_eq!(out["hide"], true, "\"…\" has Hide window");
-	assert_eq!(out["closeTab"], 3, "the switcher's list keeps a Close tab per open guide");
-	assert_eq!(out["gap"], 8.0, "\"…\" moves into the ×'s room, at the bar's right inset");
-	assert!(out["underGap"].as_f64().unwrap() > 8.0, "underline keeps its × right of \"…\": {out}");
-	assert_eq!(out["clear"], true, "the switcher stops short of \"…\": {out}");
+		local out = {}
+		for _, list in ipairs({ THREE, SIX }) do
+			uistub.openTabs(list, 1)
+			stub.advance(1)
+			for _, w in ipairs({ 300, 420 }) do
+				Polestar.Set("ui.width", w)
+				for _, s in ipairs(STYLES) do
+					style(s)
+					local hide = false
+					for _, it in ipairs(menuItems()) do if it.icon == "close" and it.onClick then hide = true end end
+					local m, n = rect(nav.Menu), rect(nav)
+					local row = { name = s .. " " .. #list .. " tabs " .. w, close = shown(nav.Close), part = P.windowClose ~= nil,
+						edgeClose = P.tabEdge ~= nil and rawget(P.tabEdge, "Close") ~= nil, hide = hide, gap = n[2] - m[2] }
+					if s == "switcher" then
+						local closeTab = 0
+						for _, it in ipairs(switcherMenu()) do if it.onRemove and it.removeTip then closeTab = closeTab + 1 end end
+						row.closeTab, row.clear = closeTab, rect(P.tabSwitch)[2] <= m[1]
+					end
+					out[#out + 1] = row
+				end
+			end
+		end
+		emit(out)"#);
+	for row in out.as_array().unwrap() {
+		let name = &row["name"];
+		assert_eq!(json!([row["close"], row["part"], row["edgeClose"]]), json!([false, false, false]), "{name}: no × to hide the window: {row}");
+		assert_eq!(row["hide"], true, "{name}: \"…\" has Hide window");
+		assert_eq!(row["gap"].as_f64(), Some(8.0), "{name}: \"…\" at the bar's right inset, no gap: {row}");
+		if name.as_str().unwrap().starts_with("switcher") {
+			assert_eq!(row["clear"], true, "{name}: the switcher stops short of \"…\": {row}");
+			let tabs: u64 = if name.as_str().unwrap().contains(" 6 tabs") { 6 } else { 3 };
+			assert_eq!(row["closeTab"].as_u64(), Some(tabs), "{name}: a Close tab per open guide");
+		}
+	}
 }
 
 // Switcher, edge and strip live in their own addon (Polestar_TabStyles, load on demand): on underline at login
@@ -285,7 +272,7 @@ fn the_other_styles_load_with_the_first_of_them_picked() {
 		local function state()
 			return { loaded = stub.addonsLoaded.Polestar_TabStyles == true, build = GF.TabStyleBuild ~= nil, menu = W.MenuRows ~= nil, loads = loads }
 		end
-		local out = { login = state(), x = shown(P.windowClose) }
+		local out = { login = state() }
 		style("edge")
 		out.edge = state()
 		out.drawn = drawn()
@@ -296,7 +283,6 @@ fn the_other_styles_load_with_the_first_of_them_picked() {
 		out.underline = drawn()
 		emit(out)"#);
 	assert_eq!(out["login"], json!({ "loaded": false, "build": false, "menu": false, "loads": 0 }), "underline at login loads nothing of the other styles");
-	assert_eq!(out["x"], true, "underline keeps the window's ×");
 	assert_eq!(out["edge"], json!({ "loaded": true, "build": true, "menu": true, "loads": 1 }), "picking edge loads them");
 	assert_eq!(out["drawn"]["edge"], true);
 	assert_eq!(out["drawn"]["edgeTabs"], 3, "and draws its tabs");
@@ -346,11 +332,10 @@ fn without_the_styles_addon_the_tabs_stay_above_the_step_bar_and_the_chat_says_s
 		style("strip")
 		local said = {}
 		for i = before + 1, #stub.messages do said[#said + 1] = stub.messages[i] end
-		emit({ picked = Polestar.Get("guideWindow.tabStyle"), style = GF.TabStyle(), strip = d.strip, x = d.x, said = said, outside = { GF.TabsOutside() } })"#);
+		emit({ picked = Polestar.Get("guideWindow.tabStyle"), style = GF.TabStyle(), strip = d.strip, said = said, outside = { GF.TabsOutside() } })"#);
 	assert_eq!(out["picked"], "strip", "the choice is kept for when the addon is back");
 	assert_eq!(out["style"], "underline");
 	assert_eq!(out["strip"], true, "the tabs stay above the step bar");
-	assert_eq!(out["x"], true);
 	assert_eq!(out["outside"], json!([0, 0]));
 	let said = out["said"].as_array().unwrap();
 	assert_eq!(said.len(), 1, "one line: {said:?}");
@@ -383,7 +368,6 @@ fn atlas_cards_stand_above_the_edge_tabs() {
 			local e, list = P.tabEdge, {}
 			for _, b in ipairs(e.tabs) do if b:IsShown() then list[#list + 1] = b end end
 			list[#list + 1] = e.Add
-			if e.Close:IsShown() then list[#list + 1] = e.Close end
 			return list
 		end
 		local function top(list) local t = -math.huge for _, b in ipairs(list) do t = math.max(t, rect(b)[4]) end return t end
@@ -416,7 +400,7 @@ fn atlas_cards_stand_above_the_edge_tabs() {
 		uistub.openTabs(THREE, 1)
 		stub.advance(1)
 		local others = {}
-		for _, k in ipairs({ "nav", "strip", "tabSwitch", "windowClose" }) do if P[k] and P[k]:IsShown() then others[#others + 1] = P[k] end end
+		for _, k in ipairs({ "nav", "strip", "tabSwitch" }) do if P[k] and P[k]:IsShown() then others[#others + 1] = P[k] end end
 		out.empty = { cards = #cards(stack()), hits = hits(tabs(), others), tabsBottom = bottom(tabs()), windowTop = rect(F)[4] }
 		style("underline")
 		out.back = { stackBottom = rect(stack())[3], windowTop = rect(F)[4], reach = { Polestar.Theme.GuideReach(F) } }
@@ -443,7 +427,7 @@ fn atlas_cards_stand_above_the_edge_tabs() {
 }
 
 // The transparent style takes the tabs' ground away as it does the window's: no fill, no edges, in every style
-// (the × and the + tabs too); the accent mark of the active tab stays. Back on standard the ground is the window's
+// (the + tab too); the accent mark of the active tab stays. Back on standard the ground is the window's
 // opacity again.
 #[test]
 fn transparent_takes_every_style_s_tab_ground_away() {
@@ -472,7 +456,6 @@ fn transparent_takes_every_style_s_tab_ground_away() {
 			local e = P.tabEdge
 			for _, b in ipairs(e.tabs) do if b:IsShown() then icon(out.edge, b) end end
 			icon(out.edge, e.Add)
-			icon(out.edge, e.Close)
 			style("strip")
 			local s = P.tabSide
 			for _, b in ipairs(s.tabs) do if b:IsShown() then icon(out.strip, b) end end
@@ -496,7 +479,7 @@ fn transparent_takes_every_style_s_tab_ground_away() {
 	assert!(clear["under"].as_array().unwrap().iter().any(|r| r["bar"] == true), "underline: the accent mark stays");
 	for s in ["edge", "strip"] {
 		let rows = clear[s].as_array().unwrap();
-		assert!(rows.len() >= 4, "{s}: three tabs, + (and ×): {rows:?}");
+		assert!(rows.len() >= 4, "{s}: three tabs and +: {rows:?}");
 		for row in rows {
 			let (g, sel) = (row["ground"].as_f64().unwrap(), row["selected"].as_f64().unwrap());
 			assert!(g == 0.0 && sel == 0.0 && row["edges"] != true, "{s}: no ground, no edges: {row}");

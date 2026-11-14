@@ -7191,7 +7191,7 @@ Reading flow: `docs/DESIGN.md` ("Intent" and "The Guide Window").
   its goal rows and goals area, the render and the build. Its other parts
   are files of their own, loaded right after it (`UI/UI.xml`):
   `GuideFrameTabs.lua` (the tab strip), `GuideFrameTabStyles.lua` (the
-  style in use of `guideWindow.tabStyle`, the window's own × and the loader
+  style in use of `guideWindow.tabStyle` and the loader
   of the other styles: the title switcher, the top edge's and the left
   side's icon tabs live in `Polestar_TabStyles`, a part of the window,
   `GF.Part`, that joins the live window and every copy as it loads),
