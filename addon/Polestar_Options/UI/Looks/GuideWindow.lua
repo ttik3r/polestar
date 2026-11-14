@@ -266,6 +266,11 @@ function UI.GuideWindowScene(band)
 		local P, F = G.parts, G.frame
 		local nav, person, foot, up = P.nav, P.person, P.foot, P.upnext
 		hot(P.strip, "guideWindow.tabHeight")
+		-- The tab styles' own tabs (made on each style's first use), and the
+		-- steps before and the XP line where the window shows them.
+		for _, k in ipairs({ "tabSwitch", "tabEdge", "tabSide" }) do hot(P[k], "guideWindow.tabStyle") end
+		hot(P.last, "guideWindow.lastSteps")
+		hot(G.xp, "qol.xpTracker")
 		hot(nav, "guideWindow.navHeight")
 		hot(person, "guideWindow.titleSize")
 		for _, r in ipairs(G.rows) do hot(r, "guideWindow.goalSize") end
@@ -310,7 +315,7 @@ function UI.GuideWindowScene(band)
 			["guideWindow.tabHeight"] = { P.strip }, ["guideWindow.navHeight"] = { nav },
 			["guideWindow.barTextSize"] = bars, ["guideWindow.stepCount"] = { nav.Steps }, ["guideWindow.guideTitle"] = { nav.Title },
 			["guideWindow.skipButton"] = { nav.Skip }, ["guideWindow.reportButton"] = { nav.Report },
-			["guideWindow.titleSize"] = { person.Name }, ["guideWindow.lastSteps"] = { person }, ["guideWindow.goalSize"] = texts, ["guideWindow.detailSize"] = details,
+			["guideWindow.titleSize"] = { person.Name }, ["guideWindow.lastSteps"] = { person, P.last }, ["guideWindow.goalSize"] = texts, ["guideWindow.detailSize"] = details,
 			["guideWindow.glyphSize"] = icons, ["guideWindow.rowSpacing"] = rows, ["guideWindow.lineSpacing"] = spacing,
 			["guideWindow.checkSize"] = checks, ["guideWindow.targetBar"] = marks, ["guideWindow.targetBarWidth"] = marks,
 			["guideWindow.targetBarColor"] = marks, ["guideWindow.noteSize"] = { P.tip }, ["ui.showNotes"] = { P.tip },

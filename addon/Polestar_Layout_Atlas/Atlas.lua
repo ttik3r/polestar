@@ -342,8 +342,9 @@ local function header(parts)
 	own.emblem:SetPoint("LEFT", nav, "LEFT", 10, 0)
 	own.emblem:Show()
 	nav.Lookup:Hide()
-	local path, size, flags = probe("note")
-	nav.Steps.Count:SetFont(path, size + 2, flags)
+	-- The step count at the title's size, beside it.
+	local path, size, flags = probe("goal")
+	nav.Steps.Count:SetFont(path, size, flags)
 	local cw = math.max(40, math.ceil(nav.Steps.Count:GetUnboundedStringWidth()) + 1)
 	nav.Steps.Count:SetWidth(cw)
 	nav.Steps:SetWidth(24 + cw + 24)
@@ -1975,6 +1976,14 @@ local function xpBack(xp)
 	if line then xp.Text:SetText(line) end
 	xp.Icon:SetTexture(Theme.Media("icon-level"))
 	xp.Icon:SetVertexColor(Theme.Color("textMuted"))
+	local pts = own.points
+	if pts then
+		xp.Icon:ClearAllPoints()
+		xp.Icon:SetPoint(unpack(pts.icon))
+		xp.Text:ClearAllPoints()
+		for _, p in ipairs(pts.text) do xp.Text:SetPoint(unpack(p)) end
+		own.points = nil
+	end
 end
 
 local function xpLook(xp)
@@ -1990,6 +1999,22 @@ local function xpLook(xp)
 	xp.Text:SetText(table.concat(head, "  \194\183  "))
 	xp.Icon:SetTexture(Theme.Media("star"))
 	xp.Icon:SetVertexColor(Theme.Accent())
+	-- On the timeline's columns: the star on the rail, the text under the
+	-- step's title (stepHeader's inset in the card).
+	if has("guideInset") then
+		local own = store(xp)
+		if not own.points then
+			local text = {}
+			for i = 1, xp.Text:GetNumPoints() do text[i] = { xp.Text:GetPoint(i) } end
+			own.points = { icon = { xp.Icon:GetPoint(1) }, text = text }
+		end
+		local _, _, _, _, iy = xp.Icon:GetPoint(1)
+		xp.Icon:ClearAllPoints()
+		xp.Icon:SetPoint("CENTER", xp, "LEFT", RAIL, iy or -1)
+		xp.Text:ClearAllPoints()
+		xp.Text:SetPoint("LEFT", xp, "LEFT", CARD_X + 11, iy or -1)
+		xp.Text:SetPoint("RIGHT", xp, "RIGHT", -OPT_PAD, iy or -1)
+	end
 end
 
 -- The XP row is handed over by name only (guidePlace): the layout leaving a
