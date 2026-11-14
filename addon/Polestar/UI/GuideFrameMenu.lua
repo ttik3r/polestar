@@ -14,54 +14,53 @@ ns.UI.GuideFrame.Part(function(GF)
 		local E = Engine()
 		local hasGuide = E and E.GetGuide and E.GetGuide()
 		local clear = transparent()
+		-- Groups, each after a separator: the guide and its tabs; this step;
+		-- the quest log; the window; settings; tools; the guide reset last.
 		local items = {
 			{ text = L["Choose guide"], icon = "search", onClick = function() UI.ShowPicker() end },
 			{ text = L["Open in new tab"], icon = "plus", disabled = not (E and E.OpenTab), onClick = function() UI.ShowPicker({ newTab = true }) end },
-			-- No step on screen (a finished guide): nothing to skip, as with the navigator's Skip.
-			{ text = L["Skip this step"], icon = "skip", disabled = not (hasGuide and E.GetStepIndex and E.GetStepIndex()), onClick = function() GF.SkipStep() end },
-			-- The step browser (UI/StepList.lua), also when the step number that opens it is hidden.
-			{ text = L["All steps"], icon = "menu", checked = UI.StepList and UI.StepList.On() or false, disabled = not (hasGuide and UI.StepList),
-				onClick = function() GF.ScrubDone(); UI.StepList.Toggle() end },
-			{ text = L["Report a problem"], icon = "bug", onClick = function() UI.ShowReport() end },
-			{ separator = true },
 		}
+		local function add(it) items[#items + 1] = it end
+		local function group() if #items > 0 and not items[#items].separator then add({ separator = true }) end end
+		local reopen = GF.ReopenItem()
+		if reopen then add(reopen) end
+		group()
+		-- No step on screen (a finished guide): nothing to skip, as with the navigator's Skip.
+		add({ text = L["Skip this step"], icon = "skip", disabled = not (hasGuide and E.GetStepIndex and E.GetStepIndex()), onClick = function() GF.SkipStep() end })
+		-- The step browser (UI/StepList.lua), also when the step number that opens it is hidden.
+		add({ text = L["All steps"], icon = "menu", checked = UI.StepList and UI.StepList.On() or false, disabled = not (hasGuide and UI.StepList),
+			onClick = function() GF.ScrubDone(); UI.StepList.Toggle() end })
+		group()
 		-- Pin the shown step's quests in the log as along the way, or unpin them (#644).
-		local pins = GF.PinItems(GF.View())
-		for _, it in ipairs(pins) do items[#items + 1] = it end
-		if #pins > 0 then items[#items + 1] = { separator = true } end
+		for _, it in ipairs(GF.PinItems(GF.View())) do add(it) end
 		-- The quest log cleanup (UI/QuestRoom.lua), while it has quests to list.
 		local unneeded = ns.RoutePlan and ns.RoutePlan.Unneeded() or nil
 		if unneeded and #unneeded > 0 then
-			table.insert(items, 6, { text = L["Clean up quest log (%d)"]:format(#unneeded), icon = "cross", onClick = function() UI.ShowQuestRoom() end })
+			add({ text = L["Clean up quest log (%d)"]:format(#unneeded), icon = "cross", onClick = function() UI.ShowQuestRoom() end })
 		end
-		for _, it in ipairs({
-			{ text = L["Compact mode"], icon = "compact", checked = compact(), onClick = function() ns.Set("ui.compact", not compact()) end },
-			{ text = L["Transparent"], icon = "layers", checked = clear, onClick = function() ns.Set("ui.style", clear and "standard" or "transparent") end },
-			{ text = L["Lock window"], icon = "lock", checked = ns.Get("ui.locked") and true or false, onClick = function() ns.Set("ui.locked", not ns.Get("ui.locked")) end },
-			{ separator = true },
-			{ text = L["Reset guide progress"], icon = "reset", confirm = true, disabled = not hasGuide, tip = L["Clears your manual check-offs and skipped steps in this guide from your last quest progress on. The guide stays where your quests put you."],
-				onClick = function() if E and E.ResetProgress then E.ResetProgress() end end },
-			{ text = L["Options"], icon = "gear", onClick = function() UI.ShowOptions() end },
-			{ text = L["Hide window"], icon = "close", onClick = function()
-				ns.Set("ui.shown", false)
-				ns.Print(L["Guide window hidden. Type /polestar to bring it back."])
-			end },
-		}) do items[#items + 1] = it end
+		group()
+		add({ text = L["Compact mode"], icon = "compact", checked = compact(), onClick = function() ns.Set("ui.compact", not compact()) end })
+		add({ text = L["Transparent"], icon = "layers", checked = clear, onClick = function() ns.Set("ui.style", clear and "standard" or "transparent") end })
+		add({ text = L["Lock window"], icon = "lock", checked = ns.Get("ui.locked") and true or false, onClick = function() ns.Set("ui.locked", not ns.Get("ui.locked")) end })
+		add({ text = L["Hide window"], icon = "close", onClick = function()
+			ns.Set("ui.shown", false)
+			ns.Print(L["Guide window hidden. Type /polestar to bring it back."])
+		end })
+		group()
+		-- The few settings changed mid-play (UI/QuickSettings.lua), by the button.
+		if UI.QuickSettings then
+			add({ text = L["Quick settings"], icon = "sliders", onClick = function() UI.QuickSettings.Show(button) end })
+		end
+		add({ text = L["Options"], icon = "gear", onClick = function() UI.ShowOptions() end })
+		group()
+		add({ text = L["Report a problem"], icon = "bug", onClick = function() UI.ShowReport() end })
 		-- The Recorder's window, while the Recorder addon is loaded.
 		if type(PolestarRecorder_Command) == "function" then
-			table.insert(items, 6, { text = L["Recorder window"], icon = "record", onClick = function() PolestarRecorder_Command("ui") end })
+			add({ text = L["Recorder window"], icon = "record", onClick = function() PolestarRecorder_Command("ui") end })
 		end
-		local reopen = GF.ReopenItem()
-		if reopen then table.insert(items, 3, reopen) end
-		-- The few settings changed mid-play (UI/QuickSettings.lua), by the button, just before Options.
-		if UI.QuickSettings then
-			for i, it in ipairs(items) do
-				if it.icon == "gear" then
-					table.insert(items, i, { text = L["Quick settings"], icon = "sliders", onClick = function() UI.QuickSettings.Show(button) end })
-					break
-				end
-			end
-		end
+		group()
+		add({ text = L["Reset guide progress"], icon = "reset", confirm = true, disabled = not hasGuide, tip = L["Clears your manual check-offs and skipped steps in this guide from your last quest progress on. The guide stays where your quests put you."],
+			onClick = function() if E and E.ResetProgress then E.ResetProgress() end end })
 		-- A skin's own entries (Skin API 2, hooks.guideMenu(items, button)): it
 		-- may add, remove or reorder them; the list is made anew at each opening.
 		GF.Hook("guideMenu", items, button)

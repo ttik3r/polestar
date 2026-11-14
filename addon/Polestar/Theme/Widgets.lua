@@ -1586,7 +1586,16 @@ function W.ShowMenu(anchor, items, opts)
 			nsep = nsep + 1
 			local sep = menu.seps[nsep]
 			if not sep then
-				sep = W.Divider(menu)
+				-- A hairline in the divider wash; a skin that clears section
+				-- lines (divider = CLEAR) still gets a faint one between groups.
+				sep = menu:CreateTexture(nil, "BORDER")
+				sep:SetTexture(WHITE)
+				W.Painter(sep, function(tex)
+					local r, g, b, a = Theme.Wash("divider")
+					if (a or 0) < 0.05 then r, g, b = Theme.Color("textMuted"); a = 0.22 end
+					tex:SetVertexColor(r, g, b, a)
+					tex:SetHeight(Theme.Pixel(menu))
+				end)
 				menu.seps[nsep] = sep
 			end
 			sep:ClearAllPoints()
