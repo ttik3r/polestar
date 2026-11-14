@@ -19,6 +19,9 @@ ns.UI.GuideFrame.Part(function(GF)
 			{ text = L["Open in new tab"], icon = "plus", disabled = not (E and E.OpenTab), onClick = function() UI.ShowPicker({ newTab = true }) end },
 			-- No step on screen (a finished guide): nothing to skip, as with the navigator's Skip.
 			{ text = L["Skip this step"], icon = "skip", disabled = not (hasGuide and E.GetStepIndex and E.GetStepIndex()), onClick = function() GF.SkipStep() end },
+			-- The step browser (UI/StepList.lua), also when the step number that opens it is hidden.
+			{ text = L["All steps"], icon = "menu", checked = UI.StepList and UI.StepList.On() or false, disabled = not (hasGuide and UI.StepList),
+				onClick = function() GF.ScrubDone(); UI.StepList.Toggle() end },
 			{ text = L["Report a problem"], icon = "bug", onClick = function() UI.ShowReport() end },
 			{ separator = true },
 		}
@@ -29,7 +32,7 @@ ns.UI.GuideFrame.Part(function(GF)
 		-- The quest log cleanup (UI/QuestRoom.lua), while it has quests to list.
 		local unneeded = ns.RoutePlan and ns.RoutePlan.Unneeded() or nil
 		if unneeded and #unneeded > 0 then
-			table.insert(items, 5, { text = L["Clean up quest log (%d)"]:format(#unneeded), icon = "cross", onClick = function() UI.ShowQuestRoom() end })
+			table.insert(items, 6, { text = L["Clean up quest log (%d)"]:format(#unneeded), icon = "cross", onClick = function() UI.ShowQuestRoom() end })
 		end
 		for _, it in ipairs({
 			{ text = L["Compact mode"], icon = "compact", checked = compact(), onClick = function() ns.Set("ui.compact", not compact()) end },
@@ -46,7 +49,7 @@ ns.UI.GuideFrame.Part(function(GF)
 		}) do items[#items + 1] = it end
 		-- The Recorder's window, while the Recorder addon is loaded.
 		if type(PolestarRecorder_Command) == "function" then
-			table.insert(items, 5, { text = L["Recorder window"], icon = "record", onClick = function() PolestarRecorder_Command("ui") end })
+			table.insert(items, 6, { text = L["Recorder window"], icon = "record", onClick = function() PolestarRecorder_Command("ui") end })
 		end
 		local reopen = GF.ReopenItem()
 		if reopen then table.insert(items, 3, reopen) end
