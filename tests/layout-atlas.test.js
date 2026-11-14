@@ -485,3 +485,24 @@ test("Polestar's own layout keeps Along the way, the banner and the party line i
 	assert.deepEqual(out.party, [true, true]);
 	assert.equal(out.cards, 0);
 });
+
+// The target bar on the step's title stands clear of the rail's current
+// node: on the rail centred between the node's ring and the title, in
+// compact mode (no rail) back at Polestar's place.
+test("the step's target bar stands clear of the rail's current node", () => {
+	const out = hooks(`
+local person = parts.person
+local function at()
+	local point, _, rel, x = person.Mark:GetPoint(1)
+	return { point = point, rel = rel, x = x }
+end
+h.guideLayout(parts)
+local rail = at()
+Polestar.Set("ui.compact", true)
+h.guideLayout(parts)
+emit({ rail = rail, compact = at() })`);
+	assert.equal(out.rail.point, 'TOP');
+	assert.equal(out.rail.rel, 'TOPLEFT');
+	assert.equal(out.rail.x, 6, 'between the ring (x 1) and the title (x 11)');
+	assert.deepEqual(out.compact, { point: 'TOPLEFT', rel: 'TOPLEFT', x: 0 });
+});
