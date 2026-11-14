@@ -1723,6 +1723,24 @@ local function lastLines(last, person)
 end
 
 -- The rail and its nodes, on a layer of Atlas's own over the window.
+-- The target bar on the step's title: on the rail, centred in the gap
+-- between the current node's ring (its right edge at RAIL - CARD_X + 8)
+-- and the title (11 in), at any bar width; off it, Polestar's place.
+local function placeMark(person, on)
+	local mark = person and rawget(person, "Mark")
+	if not mark then return end
+	local x = on and (RAIL - CARD_X + 8 + 11) / 2 or nil
+	mark:ClearAllPoints()
+	if x then
+		mark:SetPoint("TOP", person, "TOPLEFT", x, -6)
+		mark:SetPoint("BOTTOM", person, "BOTTOMLEFT", x, 4)
+	else
+		mark:SetPoint("TOPLEFT", person, "TOPLEFT", 0, -6)
+		mark:SetPoint("BOTTOMLEFT", person, "BOTTOMLEFT", 0, 4)
+	end
+end
+onLeave(function(parts) placeMark(parts.person, false) end)
+
 local function rail(parts)
 	local window, person = parts.window, parts.person
 	local own = store(window)
@@ -1736,9 +1754,11 @@ local function rail(parts)
 	local parent = person and person:GetParent()
 	if not (onRail() and person and person:IsShown() and parent and parent:IsShown() and person.Name) then
 		layer:Hide()
+		placeMark(person, false)
 		return
 	end
 	layer:Show()
+	placeMark(person, true)
 	local last = parts.last
 	local past = (last and last:IsShown()) and lastLines(last, person) or {}
 	if not layer.pasts then layer.pasts = {} end
