@@ -139,6 +139,7 @@ end
 local function glyphOf(leg)
 	return (leg.kind == "walk" and STEP_GLYPH[leg.step]) or GLYPH[leg.kind] or "icon-note"
 end
+JP.Glyph = glyphOf -- for a layout that draws the legs its own way
 
 -- "Hostile town: <names>" for a walk whose path enters the other faction's
 -- towns (leg.hubs, Nav.travel.HubText), else nil.

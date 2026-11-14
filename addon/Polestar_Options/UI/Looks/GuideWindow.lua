@@ -603,6 +603,23 @@ local SPECS = {
 			help = L["How many steps the Up next list holds; 0 turns it off."], search = "up next, upcoming, later steps, list, preview, upcoming steps" },
 		textSize("upSize", L["Up next size"], L["Up next and Along the way: their rows and their headers; the rows grow with the text."],
 			"up next, upcoming, along the way, later steps, list, rows"),
+		{ kind = "dropdown", key = "guideWindow.journeyStyle", label = L["Journey style"], new = "0.4.0",
+			-- Only a layout that draws the others (its defaults name one) offers them.
+			disabled = function()
+				local T = ns.Theme
+				local id = T and T.LayoutId and T.LayoutId()
+				local info = id and T.LayoutInfo and T.LayoutInfo(id)
+				return not (info and info.defaults and info.defaults["guideWindow.journeyStyle"])
+			end,
+			help = L["Where the travel route shows while you travel: under the step, in a card under the window, folded to the leg you are on, as nodes on the timeline, or as chips in the window's foot."],
+			search = "journey, travel, route, legs, flight, boat, folded, chips, timeline, under the window",
+			choices = {
+				{ value = "inside", label = L["Under the step"] },
+				{ value = "joined", label = L["Under the window"] },
+				{ value = "folded", label = L["Under the window, folded"] },
+				{ value = "rail", label = L["On the timeline"] },
+				{ value = "foot", label = L["In the foot"] },
+			} },
 		{ kind = "slider", key = "guideWindow.progressHeight", label = L["Progress bar"], min = 1, max = 12, step = 1, format = px, new = NEW,
 			disabled = offKey("progress"),
 			help = L["The guide's progress at the bottom of the window: its thickness. The game's looks keep their own bar."],

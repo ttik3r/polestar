@@ -386,6 +386,206 @@ on("guideLayout", function() return Core.setting("guideWindow.progress") == fals
 local GAP = 5
 local OPT_ROW, OPT_PAD = 23, 14
 
+---------------------------------------------------------------------------
+-- The Journey's styles (guideWindow.journeyStyle; Atlas's default "joined"):
+-- "inside" (Polestar's own, under the step), "joined" (a card joined under
+-- the window's foot), "folded" (joined, its header the leg you are on with
+-- a progress bar while collapsed), "rail" (inside, its legs as nodes on the
+-- timeline) and "foot" (one chip per leg in the XP line's place, or in a
+-- strip under the window without one). The legs and times are the Journey
+-- panel's own (UI/JourneyPanel.lua: JP.Route, JP.Compute, JP.plan).
+---------------------------------------------------------------------------
+
+local JOURNEY_STYLES = { inside = true, joined = true, folded = true, rail = true, foot = true }
+local function journeyStyle()
+	local s = Core.setting("guideWindow.journeyStyle")
+	return JOURNEY_STYLES[s] and s or "joined"
+end
+local function journeyPanel() local u = P.UI; return u and u.JourneyPanel end
+
+-- The XP row's own text and star, faded out while the chips stand in it.
+local function xpUnder(xp, on)
+	if not xp then return end
+	if xp.Text then xp.Text:SetAlpha(on and 0 or 1) end
+	if xp.Icon then xp.Icon:SetAlpha(on and 0 or 1) end
+	if xp.Rest then xp.Rest:SetAlpha(on and 0 or 1) end
+end
+
+-- The panel's leg numbers: hidden on the rail (the nodes stand for them).
+local function journeyRowsLook(onRail)
+	local JP = journeyPanel()
+	for _, r in ipairs(JP and JP.rows or {}) do
+		if r.Num then r.Num:SetAlpha(onRail and 0 or 1) end
+	end
+end
+
+-- The leg you are on, its place among the route's rows and how many there
+-- are: leg, k, n; nil without a journey.
+local function currentLeg()
+	local JP = journeyPanel()
+	if not (JP and JP.Route and JP.plan) then return nil end
+	local legs, ci = JP.Route()
+	if not legs then return nil end
+	JP.Rows(legs, ci)
+	local p = JP.plan
+	local k = p.num[1] or 1
+	return legs[ci], k, k - 1 + p.n, legs, ci
+end
+
+-- "folded": the collapsed header names the leg you are on, with its glyph,
+-- and a thin bar of how far along the route is; open, "Journey" as ever.
+local function foldedHead(on)
+	local JP = journeyPanel()
+	local head = JP and JP.head
+	if not head then return end
+	local own = store(head)
+	local leg, k, n = currentLeg()
+	local show = on and leg and not P.Get("nav.journeyOpen")
+	if not show then
+		if own.folded then
+			own.folded = nil
+			head.Label:ClearAllPoints()
+			head.Label:SetPoint("LEFT", head, "LEFT", 14, 0)
+			head.Label:SetText(tr("Journey"))
+			head.Label:SetWidth(0)
+			if own.icon then own.icon:Hide() end
+			if own.bar then own.bar:Hide(); own.fill:Hide() end
+			if own.count then own.count:Hide() end
+		end
+		return
+	end
+	own.folded = true
+	if not own.icon then
+		own.icon = head:CreateTexture(nil, "ARTWORK")
+		own.icon:SetSize(13, 13)
+		own.icon:SetPoint("LEFT", head, "LEFT", 14, 0)
+		own.bar = head:CreateTexture(nil, "ARTWORK")
+		own.bar:SetTexture(Theme.Media("white"))
+		own.bar:SetPoint("BOTTOMLEFT", head, "BOTTOMLEFT", 14, 2)
+		own.bar:SetPoint("BOTTOMRIGHT", head, "BOTTOMRIGHT", -14, 2)
+		own.bar:SetHeight(2)
+		own.fill = head:CreateTexture(nil, "OVERLAY")
+		own.fill:SetTexture(Theme.Media("white"))
+		own.fill:SetPoint("TOPLEFT", own.bar, "TOPLEFT", 0, 0)
+		own.fill:SetPoint("BOTTOMLEFT", own.bar, "BOTTOMLEFT", 0, 0)
+		own.count = head:CreateFontString(nil, "OVERLAY")
+		own.count:SetFontObject(head.Label:GetFontObject() or GameFontNormalSmall)
+	end
+	own.icon:SetTexture(Theme.Media(JP.Glyph and JP.Glyph(leg) or "icon-note"))
+	own.icon:SetVertexColor(Theme.Accent())
+	own.icon:Show()
+	head.Label:ClearAllPoints()
+	head.Label:SetPoint("LEFT", own.icon, "RIGHT", 8, 0)
+	head.Label:SetText(JP.StepText(leg))
+	head.Label:SetWordWrap(false)
+	local right = head.Time:IsShown() and head.Time or head.Icon
+	head.Label:SetPoint("RIGHT", right, "LEFT", -34, 0)
+	own.count:SetText(k .. "/" .. n)
+	own.count:SetTextColor(Theme.Color("textMuted"))
+	own.count:ClearAllPoints()
+	own.count:SetPoint("RIGHT", right, "LEFT", -8, 0)
+	own.count:Show()
+	local r, g, b = Theme.Color("textMuted")
+	own.bar:SetVertexColor(r, g, b, 0.25)
+	own.bar:Show()
+	local w = own.bar:GetWidth() or 0
+	own.fill:SetVertexColor(Theme.Accent())
+	own.fill:SetWidth(math.max(1, w * (k - 0.5) / math.max(1, n)))
+	own.fill:SetShown(w > 0)
+end
+
+-- "foot": one chip per leg from the one you are on (its glyph and time, the
+-- current one in the accent), the route's total on the right.
+local CHIPS_MAX = 5
+local function chipsFill(f)
+	local JP = journeyPanel()
+	local leg, _, _, legs, ci = currentLeg()
+	if not leg then return false end
+	local v = JP.Compute(legs, ci)
+	local p = JP.plan
+	local x = 14
+	local tip = {}
+	for i = 1, math.max(CHIPS_MAX, #f.chips) do
+		local c = f.chips[i]
+		if i <= math.min(p.n, CHIPS_MAX) then
+			if not c then
+				c = {}
+				c.sep = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+				c.sep:SetText("\226\128\186")
+				c.icon = f:CreateTexture(nil, "ARTWORK")
+				c.icon:SetSize(11, 11)
+				c.time = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+				f.chips[i] = c
+			end
+			local lg = legs[p.first[i]]
+			local cur = i == 1
+			c.sep:SetShown(i > 1)
+			if i > 1 then
+				c.sep:ClearAllPoints()
+				c.sep:SetPoint("LEFT", f, "LEFT", x, 0)
+				c.sep:SetTextColor(Theme.Color("textMuted"))
+				x = x + 12
+			end
+			c.icon:SetTexture(Theme.Media(JP.Glyph and JP.Glyph(lg) or "icon-note"))
+			if cur then c.icon:SetVertexColor(Theme.Accent()) else c.icon:SetVertexColor(Theme.Color("textMuted")) end
+			c.icon:ClearAllPoints()
+			c.icon:SetPoint("LEFT", f, "LEFT", x, 0)
+			c.icon:Show()
+			c.time:SetFontObject(semibold() or GameFontNormalSmall)
+			c.time:SetText(JP.FormatTime(v.secs[i] or 0))
+			c.time:SetTextColor(Theme.Color(cur and "text" or "textDim"))
+			c.time:ClearAllPoints()
+			c.time:SetPoint("LEFT", c.icon, "RIGHT", 5, 0)
+			c.time:Show()
+			x = x + 11 + 5 + math.ceil(c.time:GetStringWidth()) + 8
+			tip[#tip + 1] = { JP.StepText(lg), JP.FormatTime(v.secs[i] or 0) }
+		elseif c then
+			c.sep:Hide(); c.icon:Hide(); c.time:Hide()
+		end
+	end
+	f.more:SetShown(p.n > CHIPS_MAX)
+	if p.n > CHIPS_MAX then
+		f.more:ClearAllPoints()
+		f.more:SetPoint("LEFT", f, "LEFT", x, 0)
+		f.more:SetText("+" .. (p.n - CHIPS_MAX))
+		f.more:SetTextColor(Theme.Color("textMuted"))
+	end
+	f.total:SetText(JP.FormatTime(v.total or 0))
+	f.total:SetTextColor(Theme.Color("text"))
+	f.psTip = tip
+	return true
+end
+
+local function chipsFrame(owner)
+	local own = store(owner)
+	local f = own.chips
+	if f then return f end
+	f = CreateFrame("Frame", nil, owner)
+	f.chips = {}
+	f.more = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+	f.total = f:CreateFontString(nil, "OVERLAY")
+	f.total:SetFontObject(semibold() or GameFontNormalSmall)
+	f.total:SetPoint("RIGHT", f, "RIGHT", -OPT_PAD, 0)
+	f:EnableMouse(true)
+	f:SetScript("OnEnter", function(self)
+		GameTooltip:SetOwner(self, "ANCHOR_TOP")
+		GameTooltip:AddLine(tr("Journey"))
+		for _, t in ipairs(self.psTip or {}) do GameTooltip:AddDoubleLine(t[1], t[2], 0.85, 0.87, 0.93, 1, 1, 1) end
+		GameTooltip:Show()
+	end)
+	f:SetScript("OnLeave", function() GameTooltip:Hide() end)
+	-- The times count down once a second while the chips are on screen.
+	local wait = 0
+	f:SetScript("OnUpdate", function(self, dt)
+		wait = wait - dt
+		if wait > 0 then return end
+		wait = 1
+		if not pcall(chipsFill, self) then self:Hide() end
+	end)
+	own.chips = f
+	return f
+end
+
 -- The step on screen (guideRender), per window: a card closed with its ×
 -- stays closed on that step.
 local stepOf = setmetatable({}, { __mode = "k" })
@@ -767,6 +967,12 @@ local function bannerLook(banner, on)
 end
 
 onLeave(function(parts) if parts.banner then bannerLook(parts.banner, false) end end)
+onLeave(function()
+	journeyRowsLook(false)
+	foldedHead(false)
+	local G = P.UI and P.UI.GuideFrame
+	xpUnder(G and G.xp, false)
+end)
 
 -- The party's place on this guide (and "Go on without them") on a card:
 -- Polestar's own line under a "PARTY" label, no rule over it.
@@ -1120,6 +1326,16 @@ on("guidePlace", function(name, part, width, height)
 		return true
 	end
 	if name == "journey" and not compact() then
+		local style = journeyStyle()
+		journeyRowsLook(style == "rail")
+		-- Inside and on the rail: Polestar stacks it under the step.
+		if style == "inside" or style == "rail" then return nil end
+		-- In the foot: the chips stand for it (layoutBottom); the panel waits hidden.
+		if style == "foot" then
+			part:Hide()
+			slots.journey, slots.journeyFoot = part, true
+			return true
+		end
 		part:SetHeight(height)
 		slots.journey = part
 		return true
@@ -1228,7 +1444,32 @@ local function layoutStack(parts)
 end
 
 -- The Journey: collapsed on a card joined to the window's foot.
-local function layoutBottom(parts, journey)
+-- "foot": the chips in the XP row's place, or in the strip under the window
+-- without one. -> whether the strip holds them
+local function layoutFoot(parts, b, on)
+	local window = parts.window
+	local G = P.UI and P.UI.GuideFrame
+	local xp = G and G.xp
+	local inXp = on and xp and isUnder(xp, window) and xp:IsShown() and not compact()
+	if xp then
+		local c = stores[xp] and stores[xp].chips
+		if c and not inXp then c:Hide() end
+		xpUnder(xp, inXp)
+	end
+	local strip = stores[b] and stores[b].chips
+	if strip and (inXp or not on) then strip:Hide() end
+	if not on then return false end
+	local f = chipsFrame(inXp and xp or b)
+	f:ClearAllPoints()
+	f:SetAllPoints(inXp and xp or b)
+	f:SetFrameLevel((inXp and xp or b):GetFrameLevel() + 3)
+	f:Show()
+	local ok, filled = pcall(chipsFill, f)
+	if not (ok and filled) then f:Hide() return false end
+	return not inXp
+end
+
+local function layoutBottom(parts, journey, foot)
 	local window = parts.window
 	local own = store(window)
 	if not journey and not own.bottom then return end
@@ -1242,7 +1483,12 @@ local function layoutBottom(parts, journey)
 		own.bottom = b
 	end
 	local b = own.bottom
-	if journey and isUnder(journey, window) then
+	foldedHead(journey and not foot and journeyStyle() == "folded")
+	if layoutFoot(parts, b, journey and foot) then
+		dress(b, window)
+		b:SetHeight(28)
+		b:Show()
+	elseif journey and not foot and isUnder(journey, window) then
 		journey:SetParent(b)
 		journey:ClearAllPoints()
 		journey:SetPoint("TOPLEFT", b, "TOPLEFT", 0, 0)
@@ -1257,10 +1503,20 @@ end
 
 on("guideLayout", function(parts)
 	if not parts.window then return end
-	local journey = slots.journey
+	local journey, foot = slots.journey, slots.journeyFoot
 	layoutStack(parts)
-	layoutBottom(parts, journey)
+	layoutBottom(parts, journey, foot)
 end)
+
+-- The folded header follows the leg you are on, once a second with the panel.
+do
+	local JP = journeyPanel()
+	if JP and JP.Refresh and hooksecurefunc then
+		hooksecurefunc(JP, "Refresh", function()
+			if journeyStyle() == "folded" and Theme.LayoutId and Theme.LayoutId() == "atlas" then foldedHead(true) end
+		end)
+	end
+end
 
 -- The heads-up card stands on the stack, over the cards.
 on("guideAnchor", function()
@@ -1866,6 +2122,27 @@ local function rail(parts)
 	placeNode(cn, person, "TOPLEFT", RAIL - CARD_X, -(10 + person.Name:GetStringHeight() / 2))
 	railMark(person, cn)
 	local bottom = cn.disc
+	-- "rail": the Journey's legs as nodes between the step and Up next.
+	local JP = journeyStyle() == "rail" and journeyPanel() or nil
+	local jf = JP and JP.frame
+	local legRows = {}
+	if jf and jf:IsShown() and isUnder(jf, window) and P.Get("nav.journeyOpen") then
+		for _, r in ipairs(JP.rows) do
+			if r:IsShown() then legRows[#legRows + 1] = r end
+		end
+	end
+	if not layer.legs then layer.legs = {} end
+	for i = 1, math.max(#legRows, #layer.legs) do
+		local d = node(layer.legs, i, layer)
+		local r = legRows[i]
+		if r then
+			paintNode(d, false, i == 1 and 1 or 0.7)
+			placeNode(d, r, "TOPLEFT", RAIL, -12)
+			bottom = d.disc
+		else
+			hideNode(d)
+		end
+	end
 	local rows = upRows(parts.upnext)
 	for i = 1, math.max(#rows, #layer.dots) do
 		local d = node(layer.dots, i, layer)
@@ -2125,6 +2402,7 @@ local function spec(hooks)
 			["guideWindow.targetBar"] = false,
 			["guideWindow.reportButton"] = false,
 			["guideWindow.lastSteps"] = 1,
+			["guideWindow.journeyStyle"] = "joined",
 		},
 		-- Its card in the guide window's Presets, beside Polestar's own:
 		-- picking it chooses this layout and the Atlas skin. A Polestar

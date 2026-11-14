@@ -301,6 +301,9 @@ GF.Part(function(GF)
 		progress = true, progressPct = true, progressHeight = 3, progressColor = false,
 		bgColor = false, bgOpacity = false, border = true, idleAlpha = 1, combatAlpha = 0.35, veil = 0.68, shade = 0.2,
 		stepAnim = true, animSpeed = 1, foldAnim = true, rules = true, hideTaxi = false, lastSteps = 0,
+		-- Where the Journey goes: "inside" (under the step); a layout may offer
+		-- more ("joined", "folded", "rail", "foot": Polestar_Layout_Atlas).
+		journeyStyle = "inside",
 	}
 	if GF.live then ns.RegisterDefaults("guideWindow", GF.LOOK) end
 
