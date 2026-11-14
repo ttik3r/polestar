@@ -1175,6 +1175,12 @@ band), `banner`, `foot` (the progress), `line` (its bar), `here` (While
 you're here). One table, the same every time; nil before the window is
 built.
 
+`Theme.GuideReach(window)` (capability `guideReach`) answers how far that
+window's own parts stand past its top and bottom edges, in its units: the On
+the top edge tab style's tabs (on the bottom edge with the bars there), 0
+otherwise. It is set before `guideLayout` runs, so cards you stack above the
+window clear the tabs: anchor them that much higher.
+
 The settings window's preview of the guide window (the Guide window and
 Theme pages) is a copy of the window drawn by its own code, so every hook
 below runs for it too, handed the copy's own frames and parts:
@@ -1479,6 +1485,7 @@ version 1, the API's preview before it.
 | `preview` | `DrawSkinCard`, `DrawSchemeCard`, cards in the picker |
 | `preset` | `preset`, and the functions that apply and undo it |
 | `guideParts` (**2**) | `Theme.GuideParts()` |
+| `guideReach` (**2**) | `Theme.GuideReach(window)` |
 | `variants` (**2**) | `variants`, `defaultVariant`, `SkinVariants`, `SkinVariant`, the variant cards |
 | `resolve` (**2**) | `resolve` |
 | `shadow` (**2**), `artTint` (**2**) | those skin fields |

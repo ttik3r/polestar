@@ -105,9 +105,10 @@ fn each_style_draws_its_own_tabs_and_hides_the_others() {
 	assert_eq!(out["edge"]["edgeClose"], true, "the edge style's × is a tab of its own");
 	assert_eq!(out["edge"]["x"], false, "and the step bar has none");
 	assert_eq!(out["strip"]["sideTabs"], 3, "one side tab per open guide");
-	for s in ["underline", "switcher", "strip"] {
+	for s in ["underline", "strip"] {
 		assert_eq!(out[s]["x"], true, "{s}: the window's × sits right of the menu");
 	}
+	assert_eq!(out["switcher"]["x"], false, "the switcher has no × (\"…\" has Hide window)");
 }
 
 #[test]
@@ -216,7 +217,7 @@ fn the_window_close_never_overlaps_the_menu() {
 			stub.advance(1)
 			for _, w in ipairs({ 300, 420 }) do
 				Polestar.Set("ui.width", w)
-				for _, s in ipairs(STYLES) do
+				for _, s in ipairs({ "underline", "edge", "strip" }) do
 					style(s)
 					local close = P.windowClose:IsShown() and P.windowClose or P.tabEdge.Close
 					local m, c = rect(nav.Menu), rect(close)
@@ -231,6 +232,40 @@ fn the_window_close_never_overlaps_the_menu() {
 		assert_eq!(row[2], true, "{}: the × and \"…\" do not overlap {} {}", row[0], row[4], row[5]);
 		assert_eq!(row[3], true, "{}: the × is right of \"…\"", row[0]);
 	}
+}
+
+// The switcher drops the window's ×: "…" hides the window in every style. The menu takes the ×'s room at the
+// bar's right, and the switcher's own list keeps each tab's "Close tab".
+#[test]
+fn the_switcher_has_no_window_close_and_the_menu_takes_its_room() {
+	let out = run(r#"
+		uistub.openTabs(THREE, 1)
+		stub.advance(1)
+		local function menuItems()
+			local items
+			local show = W.ShowMenu
+			W.ShowMenu = function(_, list) items = list end
+			nav.Menu:GetScript("OnClick")(nav.Menu, "LeftButton")
+			W.ShowMenu = show
+			return items or {}
+		end
+		style("underline")
+		local under = { menu = rect(nav.Menu), nav = rect(nav) }
+		style("switcher")
+		local hide = false
+		for _, it in ipairs(menuItems()) do if it.icon == "close" and it.onClick then hide = true end end
+		local closeTab = 0
+		for _, it in ipairs(switcherMenu()) do if it.onRemove and it.removeTip then closeTab = closeTab + 1 end end
+		local m, n, sw = rect(nav.Menu), rect(nav), rect(P.tabSwitch)
+		emit({ x = shown(P.windowClose),
+			hide = hide, closeTab = closeTab, gap = n[2] - m[2], underGap = under.nav[2] - under.menu[2],
+			clear = sw[2] <= m[1] })"#);
+	assert_eq!(out["x"], false, "no × in the switcher style");
+	assert_eq!(out["hide"], true, "\"…\" has Hide window");
+	assert_eq!(out["closeTab"], 3, "the switcher's list keeps a Close tab per open guide");
+	assert_eq!(out["gap"], 8.0, "\"…\" moves into the ×'s room, at the bar's right inset");
+	assert!(out["underGap"].as_f64().unwrap() > 8.0, "underline keeps its × right of \"…\": {out}");
+	assert_eq!(out["clear"], true, "the switcher stops short of \"…\": {out}");
 }
 
 // Switcher, edge and strip live in their own addon (Polestar_TabStyles, load on demand): on underline at login
@@ -320,4 +355,164 @@ fn without_the_styles_addon_the_tabs_stay_above_the_step_bar_and_the_chat_says_s
 	let said = out["said"].as_array().unwrap();
 	assert_eq!(said.len(), 1, "one line: {said:?}");
 	assert!(said[0].as_str().unwrap().contains("Polestar_TabStyles"), "{}", said[0]);
+}
+
+// Under the Atlas layout its cards stand above the window. The edge tabs stand on the window's top edge, so the
+// card stack clears them (Theme.GuideReach), follows a change of style live, and nothing overlaps the tabs.
+#[test]
+fn atlas_cards_stand_above_the_edge_tabs() {
+	let out = emitted(&RunAddon {
+		stubs: vec!["stub_ui.lua"],
+		addons: vec![Addon::files("Polestar", &FILES), Addon::name("Polestar_Layout_Atlas")],
+		script: format!(
+			"uistub.install()\nstub.login()\nPolestar.UI.LoadOptions()\nlocal GF = Polestar.UI.GuideFrame\nlocal F = PolestarGuideFrame\n{HELPERS}\n{}",
+			r#"
+		local step = uistub.guides[uistub.elwynn].steps[3]
+		local plain = step.goals
+		local withOpt = {}
+		for i, g in ipairs(plain) do withOpt[i] = g end
+		withOpt[#withOpt + 1] = { t = "goto", verb = "Use", subject = "the Dark Iron Map", subjectKind = "place", optional = true, status = "active" }
+		step.goals = withOpt
+		Polestar.Theme.SetLayout("atlas")
+		uistub.openTabs(THREE, 1)
+		stub.advance(1)
+		local function stack()
+			for _, c in ipairs({ F:GetChildren() }) do if rawget(c, "cards") then return c end end
+		end
+		local function tabs()
+			local e, list = P.tabEdge, {}
+			for _, b in ipairs(e.tabs) do if b:IsShown() then list[#list + 1] = b end end
+			list[#list + 1] = e.Add
+			if e.Close:IsShown() then list[#list + 1] = e.Close end
+			return list
+		end
+		local function top(list) local t = -math.huge for _, b in ipairs(list) do t = math.max(t, rect(b)[4]) end return t end
+		local function cards(s)
+			local list = {}
+			for _, c in ipairs(s and s.cards or {}) do if c:IsShown() then list[#list + 1] = c end end
+			return list
+		end
+		local function bottom(list) local b = math.huge for _, c in ipairs(list) do b = math.min(b, rect(c)[3]) end return b end
+		local function hits(list, against)
+			local n = 0
+			-- The active edge tab covers the window's edge one pixel in, by design: deeper is a hit.
+			for _, a in ipairs(list) do for _, b in ipairs(against) do
+				local ra, rb = rect(a), rect(b)
+				if overlap(a, b) and math.min(ra[4], rb[4]) - math.max(ra[3], rb[3]) > 1 then n = n + 1 end
+			end end
+			return n
+		end
+		local out = {}
+		style("switcher")
+		local s = stack()
+		out.switcher = { cards = #cards(s), stackBottom = rect(s)[3], windowTop = rect(F)[4] }
+		style("edge")
+		s = stack()
+		local list = tabs()
+		out.edge = { cards = #cards(s), optional = s.opt ~= nil and s.opt:IsShown(), cardBottom = bottom(cards(s)), tabsTop = top(list),
+			stackBottom = rect(s)[3], windowTop = rect(F)[4], reach = { Polestar.Theme.GuideReach(F) }, hits = hits(cards(s), list) }
+		-- No card on the step: the tabs overlap nothing of the window's either.
+		step.goals = plain
+		uistub.openTabs(THREE, 1)
+		stub.advance(1)
+		local others = {}
+		for _, k in ipairs({ "nav", "strip", "tabSwitch", "windowClose" }) do if P[k] and P[k]:IsShown() then others[#others + 1] = P[k] end end
+		out.empty = { cards = #cards(stack()), hits = hits(tabs(), others), tabsBottom = bottom(tabs()), windowTop = rect(F)[4] }
+		style("underline")
+		out.back = { stackBottom = rect(stack())[3], windowTop = rect(F)[4], reach = { Polestar.Theme.GuideReach(F) } }
+		emit(out)"#
+		),
+		..Default::default()
+	})
+	.remove(0);
+	let f = |v: &Value| v.as_f64().unwrap();
+	let sw = &out["switcher"];
+	assert_eq!(f(&sw["stackBottom"]) - f(&sw["windowTop"]), 5.0, "switcher: the stack sits its gap above the window: {sw}");
+	let e = &out["edge"];
+	assert_eq!(e["optional"], true, "the Optional card shows: {e}");
+	assert!(f(&e["cardBottom"]) >= f(&e["tabsTop"]), "edge: the cards' bottom is at or above the tabs' top: {e}");
+	assert_eq!(e["hits"], 0, "no card overlaps a tab: {e}");
+	assert_eq!(e["reach"], json!([25, 0]), "the tabs reach 25 above the window: {e}");
+	assert!(f(&e["stackBottom"]) > f(&sw["stackBottom"]), "the stack moves up when edge is picked live: {e}");
+	let m = &out["empty"];
+	assert_eq!(m["hits"], 0, "no card: the tabs overlap nothing of the window: {m}");
+	assert!(f(&m["tabsBottom"]) >= f(&m["windowTop"]) - 1.0, "the tabs stand on the window's top edge: {m}");
+	let b = &out["back"];
+	assert_eq!(b["reach"], json!([0, 0]), "underline reaches nothing past the top: {b}");
+	assert_eq!(f(&b["stackBottom"]) - f(&b["windowTop"]), 5.0, "and the stack comes back down: {b}");
+}
+
+// The transparent style takes the tabs' ground away as it does the window's: no fill, no edges, in every style
+// (the × and the + tabs too); the accent mark of the active tab stays. Back on standard the ground is the window's
+// opacity again.
+#[test]
+fn transparent_takes_every_style_s_tab_ground_away() {
+	let out = run(r#"
+		uistub.openTabs(THREE, 1)
+		stub.advance(1)
+		local function grounds()
+			local out = { under = {}, edge = {}, strip = {} }
+			local function icon(list, b)
+				if not b then return end
+				local row = {
+					ground = b.Ground:IsShown() and b.Ground:GetAlpha() or 0,
+					selected = b.Selected:IsShown() and b.Selected:GetAlpha() or 0,
+					bar = b.psActive and b.Bar:IsShown() or nil,
+				}
+				-- The edge style's tabs have edges; the strip's are drawn on the strip's.
+				local ed = rawget(b, "Edges")
+				if ed then row.edges = ed[1]:IsShown() end
+				list[#list + 1] = row
+			end
+			style("underline")
+			for _, b in ipairs(GF.tabs) do
+				if b:IsShown() then out.under[#out.under + 1] = { selected = b.Selected:IsShown(), bar = b.psActive and b.Bar:IsShown() or nil } end
+			end
+			style("edge")
+			local e = P.tabEdge
+			for _, b in ipairs(e.tabs) do if b:IsShown() then icon(out.edge, b) end end
+			icon(out.edge, e.Add)
+			icon(out.edge, e.Close)
+			style("strip")
+			local s = P.tabSide
+			for _, b in ipairs(s.tabs) do if b:IsShown() then icon(out.strip, b) end end
+			icon(out.strip, s.Add)
+			out.side = { ground = s.Ground:GetAlpha(), edges = s.Edges[1]:IsShown() }
+			return out
+		end
+		Polestar.Set("ui.bgOpacity", 0.8)
+		stub.advance(1)
+		local standard = grounds()
+		Polestar.Set("ui.style", "transparent")
+		stub.advance(1)
+		local clear = grounds()
+		Polestar.Set("ui.style", "standard")
+		stub.advance(1)
+		emit({ standard = standard, clear = clear, back = grounds() })"#);
+	let clear = &out["clear"];
+	for row in clear["under"].as_array().unwrap() {
+		assert_eq!(row["selected"], false, "underline: no lit ground on the active tab: {row}");
+	}
+	assert!(clear["under"].as_array().unwrap().iter().any(|r| r["bar"] == true), "underline: the accent mark stays");
+	for s in ["edge", "strip"] {
+		let rows = clear[s].as_array().unwrap();
+		assert!(rows.len() >= 4, "{s}: three tabs, + (and ×): {rows:?}");
+		for row in rows {
+			let (g, sel) = (row["ground"].as_f64().unwrap(), row["selected"].as_f64().unwrap());
+			assert!(g == 0.0 && sel == 0.0 && row["edges"] != true, "{s}: no ground, no edges: {row}");
+		}
+		assert!(rows.iter().any(|r| r["bar"] == true), "{s}: the accent mark stays on the active tab");
+	}
+	assert!(clear["side"]["ground"].as_f64() == Some(0.0) && clear["side"]["edges"] == false, "the side strip has no ground: {}", clear["side"]);
+	for o in [&out["standard"], &out["back"]] {
+		assert!(o["under"].as_array().unwrap().iter().any(|r| r["selected"] == true), "underline: the lit ground is back: {o}");
+		for s in ["edge", "strip"] {
+			for row in o[s].as_array().unwrap() {
+				assert!(row["edges"].is_null() || row["edges"] == true, "{s}: the edges are back: {row}");
+				let g = row["ground"].as_f64().unwrap().max(row["selected"].as_f64().unwrap());
+				assert!(g == 0.0 || (g - 0.8).abs() < 1e-6, "{s}: the window's opacity: {row}");
+			}
+		}
+		assert!((o["side"]["ground"].as_f64().unwrap() - 0.8).abs() < 1e-6, "the side strip at the window's opacity: {o}");
+	}
 }

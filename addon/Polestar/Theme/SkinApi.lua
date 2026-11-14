@@ -74,7 +74,7 @@ for _, c in ipairs({ "schemes", "skins", "tokens", "legibility", "fonts", "fontS
 	-- Skin API 2
 	"variants", "resolve", "shadow", "artTint", "media.dart", "tokens.accent2", "tokens.glow", "tokens.pins",
 	"kit.glow", "kit.gameArt", "kit.crossfade", "kit.tintArt", "kit.gradient.horizontal", "kit.color",
-	"media.pins", "arrow.parts", "pin.parts", "skins.installed", "theme.functions", "layouts", "layouts.preset" }) do CAPABILITIES[c] = true end
+	"media.pins", "arrow.parts", "pin.parts", "skins.installed", "theme.functions", "layouts", "layouts.preset", "guideReach" }) do CAPABILITIES[c] = true end
 for kind in pairs(PAINT_KINDS) do CAPABILITIES["surfaces." .. kind] = true end
 for name in pairs(HOOKS) do CAPABILITIES["surfaces." .. name] = true end
 
@@ -378,6 +378,16 @@ end
 function Theme.GuideParts()
 	local G = ns.UI and ns.UI.GuideFrame
 	return G and G.SkinParts and G.SkinParts() or nil
+end
+
+-- How far guide window `window`'s own parts stand past its top and bottom
+-- edges, in its units (capability "guideReach"): the On the top edge tab
+-- style's tabs, on the top edge (or the bottom one with the bars there); 0
+-- otherwise. Set before the layout's hooks run, so a guideLayout hook places
+-- its cards above the window clear of them. -> top, bottom
+function Theme.GuideReach(window)
+	if type(window) ~= "table" then return 0, 0 end
+	return tonumber(rawget(window, "psTopReach")) or 0, tonumber(rawget(window, "psBottomReach")) or 0
 end
 
 -- The palette skin `id` would give, with the player's own colours (a card's

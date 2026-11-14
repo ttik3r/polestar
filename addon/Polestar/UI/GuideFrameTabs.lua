@@ -202,7 +202,7 @@ ns.UI.GuideFrame.Part(function(GF)
 			W.Color(b.Label, b.psActive and "text" or "textMuted")
 			W.Color(b.Range, b.psActive and "textDim" or "textMuted")
 			W.Color(b.Icon, b.psActive and "accent" or "textMuted")
-			b.Selected:SetShown(b.psActive)
+			b.Selected:SetShown(b.psActive and not GF.Transparent())
 			b.Bar:SetShown(b.psActive)
 			GF.PaintTab(b)
 			local w = b.psActive and activeW or otherW

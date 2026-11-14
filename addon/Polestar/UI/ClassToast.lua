@@ -777,7 +777,12 @@ function CT.Place(animate)
 		-- hooks.guideAnchor) is the edge the card sits on instead.
 		local ran, own = Theme.SkinHookValue("guideAnchor")
 		local edge = ran and type(own) == "table" and own.GetTop and own or w
+		-- The window's own parts past its edges (the edge tab style's tabs):
+		-- the card clears them when it sits on the window itself.
+		local up, down = 0, 0
+		if edge == w then up, down = tonumber(w.psTopReach) or 0, tonumber(w.psBottomReach) or 0 end
 		local top, bottom, room = edge:GetTop(), edge:GetBottom(), UIParent:GetTop()
+		top, bottom = top and top + up, bottom and bottom - down
 		local s, us = w:GetEffectiveScale() or 1, UIParent:GetEffectiveScale() or 1
 		local fitsAbove = not (top and room) or (top + h * k) * s <= room * us
 		local above = fitsAbove
@@ -787,9 +792,9 @@ function CT.Place(animate)
 		end
 		CT.side = above and "above" or "below"
 		if above then
-			Anim.Anchor(f, "BOTTOMLEFT", edge, "TOPLEFT", 0, -1)
+			Anim.Anchor(f, "BOTTOMLEFT", edge, "TOPLEFT", 0, (up > 0 and up + 3 or 0) - 1)
 		else
-			Anim.Anchor(f, "TOPLEFT", edge, "BOTTOMLEFT", 0, 1)
+			Anim.Anchor(f, "TOPLEFT", edge, "BOTTOMLEFT", 0, 1 - (down > 0 and down + 3 or 0))
 		end
 		dy = above and -h or h
 	end

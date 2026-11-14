@@ -207,13 +207,23 @@ ns.UI.GuideFrame.Part(function(GF)
 		if own.side then return own.side end
 		local s = CreateFrame("Frame", nil, F)
 		s:SetWidth(SIDE_W)
-		W.Fill(s, "sidebar", "BACKGROUND", -7)
-		edges(s, { "TOP", "LEFT", "BOTTOM" })
+		s.Ground = W.Fill(s, "sidebar", "BACKGROUND", -7)
+		s.Edges = edges(s, { "TOP", "LEFT", "BOTTOM" })
 		s.tabs = {}
 		s.Add = iconTab(s, "add", "strip")
 		s.Add.Ground:Hide()
 		s:Hide()
 		return GF.AdoptTabFrame("side", s)
+	end
+
+	-- The window's own ground on a tab (or the side strip): its opacity
+	-- (guideWindow.bgOpacity, ui.bgOpacity), none and no edges in the
+	-- transparent style. The accent mark and the glyph stay.
+	local function ground(b)
+		local a = F.psBare and 0 or (F.psBgAlpha or Theme.GroundAlpha())
+		if rawget(b, "Ground") then b.Ground:SetAlpha(a) end
+		if rawget(b, "Selected") then b.Selected:SetAlpha(a) end
+		for _, t in ipairs(rawget(b, "Edges") or {}) do t:SetShown(not F.psBare) end
 	end
 
 	local function paintIconTab(b, active)
@@ -279,6 +289,9 @@ ns.UI.GuideFrame.Part(function(GF)
 		e.Close:ClearAllPoints()
 		e.Close:SetPoint(foot .. "RIGHT", e, foot .. "RIGHT", 0, 0)
 		e.Close:SetShown(not nav.psClear)
+		for _, b in ipairs(e.tabs) do ground(b) end
+		ground(e.Add)
+		ground(e.Close)
 		e:Show()
 	end
 
@@ -319,6 +332,9 @@ ns.UI.GuideFrame.Part(function(GF)
 		if full(n) then s.Add:Disable() else s.Add:Enable() end
 		W.Color(s.Add.Icon, "textMuted", full(n) and 0.35 or 1)
 		s:SetHeight(y + SIDE_BTN_H + SIDE_PAD)
+		for _, b in ipairs(s.tabs) do ground(b) end
+		ground(s.Add)
+		ground(s)
 		s:Show()
 	end
 

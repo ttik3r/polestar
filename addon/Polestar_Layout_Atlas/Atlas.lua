@@ -397,10 +397,17 @@ local function stackFrame(window)
 	local own = store(window)
 	if not own.stack then
 		own.stack = CreateFrame("Frame", nil, window)
-		own.stack:SetPoint("BOTTOMLEFT", window, "TOPLEFT", 0, GAP)
-		own.stack:SetPoint("BOTTOMRIGHT", window, "TOPRIGHT", 0, GAP)
 		own.stack:SetHeight(1)
 		own.stack.cards = {}
+	end
+	-- Above the window's own parts past its top edge (the On the top edge
+	-- tabs: Theme.GuideReach, set before this layout), its gap over them.
+	local reach = Theme.GuideReach and Theme.GuideReach(window) or 0
+	if own.stackReach ~= reach then
+		own.stackReach = reach
+		own.stack:ClearAllPoints()
+		own.stack:SetPoint("BOTTOMLEFT", window, "TOPLEFT", 0, GAP + reach)
+		own.stack:SetPoint("BOTTOMRIGHT", window, "TOPRIGHT", 0, GAP + reach)
 	end
 	return own.stack
 end

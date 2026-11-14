@@ -7,5 +7,7 @@ section: players
   over the window) and Down the left side. Each keeps selecting, the
   right-click menu, middle-click to close, "+", Reopen and the six-tab limit.
   The window's × sits right of "…" past a thin line, or is a tab of its own
-  on the top edge. The three new styles come in their own folder,
+  on the top edge; Title menu has none ("…" has Hide window). In the
+  transparent style the tabs go clear with the window, their accent mark
+  kept. The three new styles come in their own folder,
   Polestar_TabStyles, loaded the first time you pick one.
