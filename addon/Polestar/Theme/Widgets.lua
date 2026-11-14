@@ -1773,7 +1773,8 @@ function layoutMenu()
 		if it.preview then anyPreview = true end
 		if not it.separator then total = total + 1 end
 	end
-	local long = total > MENU_MAX
+	-- opts.short: a menu of actions, every row shown, never a filtered list.
+	local long = not opts.short and total > MENU_MAX
 	local sc = long and menuLong() or rawget(menu, "Scroll")
 	-- Rows hang from the menu, or from the scroll area's child in a long list.
 	local holder = long and sc.Child or menu
@@ -1905,7 +1906,7 @@ end
 -- items: { { text, icon, checked, disabled, onClick, tip, color, confirm, preview }, { separator = true }, ... }
 -- (W.MenuRows, when an addon sets it, places and paints rows of its own kinds:
 -- { place = fn(row, item, textX) -> textX, extra width; paint = fn(row, item, lit) })
--- opts: { point = "TOPRIGHT", relPoint = "BOTTOMRIGHT", x = 0, y = -4, minWidth = 168 }
+-- opts: { point = "TOPRIGHT", relPoint = "BOTTOMRIGHT", x = 0, y = -4, minWidth = 168, short = true }
 function W.ShowMenu(anchor, items, opts)
 	if not menu then buildMenu() end
 	menu.psItems, menu.psOpts = items, opts or {}
