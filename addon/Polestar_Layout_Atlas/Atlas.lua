@@ -258,8 +258,17 @@ local function semibold() return (probe("number")) end
 local function capsLabel(fs)
 	Theme.Font(fs, "small")
 	local path, size, flags = fs:GetFont()
-	if path and size then fs:SetFont(path, size - 1, flags) end
+	local bold = semibold()
+	if (bold or path) and size then fs:SetFont(bold or path, size, flags) end
 	fs:SetTextColor(Theme.Color("textMuted"))
+end
+
+-- The cards' rows: in the face and size of While you're here's (the window's
+-- goal rows', as the player sizes them), seen at its last layout; the icon on
+-- the label's left edge, in the accent.
+local hereFont
+local function rowFont(fs)
+	if hereFont and hereFont[1] then fs:SetFont(hereFont[1], hereFont[2], hereFont[3]) else Theme.Font(fs, "goal") end
 end
 
 local function pixel(f) return Theme.Pixel and Theme.Pixel(f) or 1 end
@@ -435,24 +444,28 @@ local function backing(stack, i)
 		b.Close = closeButton(b)
 		b.Close:SetPoint("TOPRIGHT", b, "TOPRIGHT", -4, -4)
 		b.Close:SetScript("OnClick", function(self) if self.psClose then self.psClose() end end)
+		-- The × shows while the pointer is on the card.
+		b.Close:SetAlpha(0)
+		b:SetScript("OnUpdate", function(self)
+			local over = self:IsMouseOver() and true or false
+			if over == self.psOver then return end
+			self.psOver = over
+			self.Close:SetAlpha(over and 1 or 0)
+		end)
 		stack.cards[i] = b
 	end
 	return b
 end
 
--- A small circled "i" after a card's label, its tooltip saying what the card holds.
+-- A card's label tells what the card holds on hover: no mark of its own.
 local function infoIcon(owner, label, tip)
 	local own = store(owner)
 	local b = own.info
 	if not b then
-		b = CreateFrame("Button", nil, owner)
-		b:SetSize(12, 12)
-		b.Icon = b:CreateTexture(nil, "ARTWORK")
-		b.Icon:SetTexture(Theme.Media(Theme.Icon and Theme.Icon("info") or "info"))
-		b.Icon:SetSize(8, 8)
-		b.Icon:SetPoint("CENTER")
+		b = CreateFrame("Frame", nil, owner)
+		b:EnableMouse(true)
 		b:SetScript("OnEnter", function(self)
-			self.Icon:SetVertexColor(Theme.Color("textDim"))
+			label:SetTextColor(Theme.Color("textDim"))
 			if GameTooltip then
 				GameTooltip:SetOwner(self, "ANCHOR_TOP")
 				GameTooltip:SetText(self.psTip or "", 1, 1, 1, 1, true)
@@ -460,15 +473,15 @@ local function infoIcon(owner, label, tip)
 			end
 		end)
 		b:SetScript("OnLeave", function(self)
-			self.Icon:SetVertexColor(Theme.Color("textMuted"))
+			label:SetTextColor(Theme.Color("textMuted"))
 			if GameTooltip then GameTooltip:Hide() end
 		end)
 		own.info = b
 	end
 	b.psTip = tip
-	b.Icon:SetVertexColor(Theme.Color("textMuted"))
 	b:ClearAllPoints()
-	b:SetPoint("LEFT", label, "RIGHT", 1, 0)
+	b:SetPoint("TOPLEFT", label, "TOPLEFT", -2, 2)
+	b:SetPoint("BOTTOMRIGHT", label, "BOTTOMRIGHT", 2, -2)
 	b:SetShown(label:IsShown())
 	return b
 end
@@ -483,6 +496,7 @@ local function hereLook(here, on)
 	end
 	if not here.Label then return end
 	if on then
+		hereFont = nil
 		own._label = own._label or here.Label:GetText()
 		capsLabel(here.Label)
 		here.Label:SetText(string.upper(own._label or ""))
@@ -506,6 +520,10 @@ local function hereRows(here)
 	for _, r in ipairs(rawget(here, "Rows") or {}) do
 		local own = store(r)
 		if own.count then own.count:Hide() end
+		if r.Text and not hereFont then
+			local path, size, flags = r.Text:GetFont()
+			if path then hereFont = { path, size, flags } end
+		end
 		if r:IsShown() and r.Text and r.Sub and r.Close and r.Dist and not r.psOff then
 			if shift ~= 0 then
 				local p, rel, rp, x, y = r:GetPoint(1)
@@ -523,6 +541,9 @@ local function hereRows(here)
 				r.Close:Hide()
 				own._close = true
 			end
+			-- The distance on the card's right edge, where the × was.
+			r.Dist:ClearAllPoints()
+			r.Dist:SetPoint("RIGHT", r, "TOPRIGHT", -OPT_PAD, -16)
 			-- From Polestar's own line (UI.SetCounted keeps it), so a second
 			-- layout finds the count it took out at the first.
 			local text = type(r.Text.psCounted) == "string" and r.Text.psCounted or r.Text:GetText() or ""
@@ -661,6 +682,22 @@ local function alongRows(along)
 		end
 		r.Text:SetTextColor(Theme.Color("text"))
 		own._color = true
+		-- The icon on the label's left edge, the text after it, in the cards' face.
+		if not own._font then own._font = { r.Text:GetFont() } end
+		rowFont(r.Text)
+		r.Icon:SetVertexColor(Theme.Accent())
+		own._icon = true
+		local _, irel, irp, ix, iy = r.Icon:GetPoint(1)
+		local _, trel, trp, tx, ty = r.Text:GetPoint(1)
+		if ix and tx then
+			local ox = OPT_PAD + 13 + 8
+			r.Icon:ClearAllPoints()
+			r.Icon:SetPoint("LEFT", irel, irp, OPT_PAD, iy)
+			r.Text:ClearAllPoints()
+			r.Text:SetPoint("TOPLEFT", trel, trp, ox, ty)
+			local tw = r.Text:GetWidth() or 0
+			if tw > 0 then r.Text:SetWidth(tw + (tx - ox)) end
+		end
 		local view = alongViews and r.psStep and r.psGoal and alongViews[r.psStep .. ":" .. r.psGoal] or nil
 		local function paint()
 			local yards = view and Core.yardsTo(view)
@@ -669,7 +706,7 @@ local function alongRows(along)
 			m.Text:SetText(meta or "")
 			return meta
 		end
-		m.Text:SetFont(r.Text:GetFont())
+		Theme.Font(m.Text, "small")
 		m.Text:SetTextColor(Theme.Color("textMuted"))
 		m.Text:ClearAllPoints()
 		m.Text:SetPoint("TOPRIGHT", r, "TOPRIGHT", -OPT_PAD, -math.floor(((r:GetHeight() or 24) - (r.Text:GetLineHeight() or 12)) / 2 + 0.5))
@@ -697,7 +734,9 @@ local function alongRowsBack(along)
 		if own then
 			if own._text and type(r.Text.psCounted) == "string" then r.Text:SetText(r.Text.psCounted) end
 			if own._color then r.Text:SetTextColor(Theme.Color("textDim")) end
-			own._text, own._color = nil, nil
+			if own._font and own._font[1] then r.Text:SetFont(own._font[1], own._font[2], own._font[3]) end
+			if own._icon then r.Icon:SetVertexColor(Theme.Color("textMuted")) end
+			own._text, own._color, own._font, own._icon = nil, nil, nil, nil
 			if own.meta then
 				own.meta.psPaint = nil
 				own.meta:Hide()
@@ -772,7 +811,7 @@ local function trainCard(stack)
 	local f = CreateFrame("Button", nil, stack)
 	f.Label = f:CreateFontString(nil, "OVERLAY")
 	f.Icon = f:CreateTexture(nil, "ARTWORK")
-	f.Icon:SetSize(15, 15)
+	f.Icon:SetSize(13, 13)
 	f.Text = f:CreateFontString(nil, "OVERLAY")
 	f.Text:SetWordWrap(false)
 	f.Text:SetJustifyH("LEFT")
@@ -793,8 +832,8 @@ local function fillTrain(f, width)
 	capsLabel(f.Label)
 	f.Label:SetText(string.upper(tr("Training due")))
 	f.Label:ClearAllPoints()
-	f.Label:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -8)
-	Theme.Font(f.Text, "small")
+	f.Label:SetPoint("TOPLEFT", f, "TOPLEFT", OPT_PAD, -8)
+	rowFont(f.Text)
 	f.Text:SetTextColor(Theme.Color("text"))
 	f.Text:SetText(tr("New spells at your class trainer"))
 	Theme.Font(f.Place, "small")
@@ -802,15 +841,15 @@ local function fillTrain(f, width)
 	f.Place:SetText(place or "")
 	f.Place:SetShown(place ~= nil)
 	f.Icon:SetTexture(Theme.VerbIcon("talk"))
-	f.Icon:SetVertexColor(Theme.Color("npc"))
+	f.Icon:SetVertexColor(Theme.Accent())
 	local rowY = -8 - f.Label:GetStringHeight() - 4
 	f.Icon:ClearAllPoints()
-	f.Icon:SetPoint("CENTER", f, "TOPLEFT", 14 + 7.5, rowY - 10)
+	f.Icon:SetPoint("LEFT", f, "TOPLEFT", OPT_PAD, rowY - 10)
 	f.Place:ClearAllPoints()
-	f.Place:SetPoint("RIGHT", f, "TOPRIGHT", -30, rowY - 10)
+	f.Place:SetPoint("RIGHT", f, "TOPRIGHT", -OPT_PAD, rowY - 10)
 	f.Place:SetWidth(math.min(f.Place:GetStringWidth() + 1, 120))
 	f.Text:ClearAllPoints()
-	f.Text:SetPoint("LEFT", f, "TOPLEFT", 39, rowY - 10)
+	f.Text:SetPoint("LEFT", f, "TOPLEFT", OPT_PAD + 13 + 8, rowY - 10)
 	f.Text:SetPoint("RIGHT", f.Place, "LEFT", -8, 0)
 	f:SetSize(width, math.floor(8 + f.Label:GetStringHeight() + 4 + 20 + 6 + 0.5))
 	return f
@@ -852,7 +891,23 @@ local function optMeta(r)
 	r.Meta:SetText(meta or "")
 	r.Meta:SetShown(meta ~= nil)
 	local right = r.psMetaRight + (meta and math.ceil(r.Meta:GetUnboundedStringWidth()) + 6 or 0)
-	r.Text:SetWidth(math.max(40, r.psWidth - (OPT_PAD + 12 + 6) - right - 2))
+	r.Text:SetWidth(math.max(40, r.psWidth - (OPT_PAD + 13 + 8) - right - 2))
+end
+
+-- Skip shows while the pointer is on the card; the count and distance keep the right edge without it.
+local function optRight(r)
+	local right = OPT_PAD
+	local show = r.psCanSkip and (r.psHover or r.psDismissed)
+	r.Skip:SetShown(show and true or false)
+	if show then
+		r.Skip:SetSize(math.floor(r.Skip.Label:GetStringWidth() + 8 + 0.5), 14)
+		r.Skip:ClearAllPoints()
+		r.Skip:SetPoint("RIGHT", r, "RIGHT", -right, 0)
+		right = right + r.Skip:GetWidth() + 6
+	end
+	r.Meta:ClearAllPoints()
+	r.Meta:SetPoint("RIGHT", r, "RIGHT", -right, 0)
+	r.psMetaRight = right
 end
 
 local function optRow(c, i)
@@ -872,16 +927,22 @@ local function optRow(c, i)
 		optMeta(self)
 	end)
 	r:SetScript("OnUpdate", function(self, elapsed)
+		local over = c:IsMouseOver() and true or false
+		if over ~= self.psHover and self._goal then
+			self.psHover = over
+			optRight(self)
+			optMeta(self)
+		end
 		self.psElapsed = (self.psElapsed or 0) + elapsed
 		if self.psElapsed < 0.25 or not self._goal then return end
 		self.psElapsed = 0
 		optMeta(self)
 	end)
 	r.Icon = r:CreateTexture(nil, "ARTWORK")
-	r.Icon:SetSize(12, 12)
+	r.Icon:SetSize(13, 13)
 	r.Icon:SetPoint("LEFT", r, "LEFT", OPT_PAD, 0)
 	r.Text = r:CreateFontString(nil, "OVERLAY")
-	Theme.Font(r.Text, "small")
+	rowFont(r.Text)
 	r.Text:SetJustifyH("LEFT")
 	r.Text:SetWordWrap(false)
 	r.Meta = r:CreateFontString(nil, "OVERLAY")
@@ -970,26 +1031,22 @@ local function layoutOptional(stack, window, step)
 		r:SetPoint("TOPRIGHT", c, "TOPRIGHT", 0, -lh)
 		r:SetHeight(OPT_ROW)
 		r.Icon:SetTexture(done and Theme.Media("check") or (dismissed and Theme.Media("skip")) or Theme.VerbIcon(goal.t))
-		r.Icon:SetVertexColor(Theme.Color(done and "success" or "textDim"))
+		if done then r.Icon:SetVertexColor(Theme.Color("success"))
+		elseif dismissed then r.Icon:SetVertexColor(Theme.Color("textMuted"))
+		else r.Icon:SetVertexColor(Theme.Accent()) end
+		rowFont(r.Text)
 		r.Text:SetText((done or dismissed) and Core.plainGoalText(goal) or Core.goalText(goal))
 		r.Text:SetTextColor(Theme.Color((done or dismissed) and "textMuted" or "text"))
 		r.Meta:SetTextColor(Theme.Color("textMuted"))
-		local right = OPT_PAD
 		r.Skip.Label:SetText(dismissed and tr("Undo") or tr("Skip"))
 		r.Skip.Label:SetTextColor(Theme.Color("textDim"))
-		local canSkip = not done and not goal.previewOnly and Core.canSkip()
-		r.Skip:SetShown(canSkip and true or false)
-		if canSkip then
-			r.Skip:SetSize(math.floor(r.Skip.Label:GetStringWidth() + 8 + 0.5), 14)
-			r.Skip:ClearAllPoints()
-			r.Skip:SetPoint("RIGHT", r, "RIGHT", -right, 0)
-			right = right + r.Skip:GetWidth() + 6
-		end
-		r.Meta:ClearAllPoints()
-		r.Meta:SetPoint("RIGHT", r, "RIGHT", -right, 0)
+		-- An undo stays in view: the goal put by says how to bring it back.
+		r.psCanSkip = (not done and not goal.previewOnly and Core.canSkip()) and true or false
+		r.psHover, r.psDismissed = c:IsMouseOver() and true or false, dismissed and true or false
+		r.psWidth = width
+		optRight(r)
 		r.Text:ClearAllPoints()
-		r.Text:SetPoint("LEFT", r.Icon, "RIGHT", 6, 0)
-		r.psMetaRight, r.psWidth = right, width
+		r.Text:SetPoint("LEFT", r.Icon, "RIGHT", 8, 0)
 		optMeta(r)
 		r:Show()
 		lh = lh + OPT_ROW
