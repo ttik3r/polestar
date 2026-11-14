@@ -1722,25 +1722,49 @@ local function lastLines(last, person)
 	return rows
 end
 
--- The rail and its nodes, on a layer of Atlas's own over the window.
--- The target bar on the step's title: on the rail, centred in the gap
--- between the current node's ring (its right edge at RAIL - CARD_X + 8)
--- and the title (11 in), at any bar width; off it, Polestar's place.
-local function placeMark(person, on)
-	local mark = person and rawget(person, "Mark")
-	if not mark then return end
-	local x = on and (RAIL - CARD_X + 8 + 11) / 2 or nil
-	mark:ClearAllPoints()
-	if x then
-		mark:SetPoint("TOP", person, "TOPLEFT", x, -6)
-		mark:SetPoint("BOTTOM", person, "BOTTOMLEFT", x, 4)
+-- The arrow on the step's title: on the rail, a yellow edge round the
+-- current node (the target bar's colour when the player set one) in place
+-- of the target bar, whose texture is taken off; off the rail, the bar back.
+local railNode = setmetatable({}, { __mode = "k" }) -- person -> current node
+
+local function edgeNode(person)
+	local n, mark = railNode[person], rawget(person, "Mark")
+	if not (n and mark and n.ring:IsShown()) then return end
+	local size = 10
+	if mark:IsShown() and Core.setting("guideWindow.targetBar") ~= false then
+		local c = Core.setting("guideWindow.targetBarColor")
+		local r, g, b
+		if type(c) == "table" and type(c[1]) == "number" then r, g, b = c[1], c[2], c[3] else r, g, b = Theme.Color("quest") end
+		n.ring:SetSize(size + 4, size + 4)
+		n.ring:SetVertexColor(r, g, b, 1)
 	else
-		mark:SetPoint("TOPLEFT", person, "TOPLEFT", 0, -6)
-		mark:SetPoint("BOTTOMLEFT", person, "BOTTOMLEFT", 0, 4)
+		local br, bg, bb = Theme.Color("bg")
+		n.ring:SetSize(size + 6, size + 6)
+		n.ring:SetVertexColor(br, bg, bb, 1)
 	end
 end
-onLeave(function(parts) placeMark(parts.person, false) end)
 
+local function railMark(person, node)
+	local mark = person and rawget(person, "Mark")
+	if not mark then return end
+	railNode[person] = node
+	if node then
+		mark:SetTexture(nil)
+		local own = store(person)
+		if not own._edgeHooked then
+			own._edgeHooked = true
+			for _, m in ipairs({ "Show", "Hide", "SetShown" }) do
+				hooksecurefunc(mark, m, function() if railNode[person] then edgeNode(person) end end)
+			end
+		end
+		edgeNode(person)
+	else
+		mark:SetTexture(Theme.Media("white"))
+	end
+end
+onLeave(function(parts) railMark(parts.person, nil) end)
+
+-- The rail and its nodes, on a layer of Atlas's own over the window.
 local function rail(parts)
 	local window, person = parts.window, parts.person
 	local own = store(window)
@@ -1754,11 +1778,10 @@ local function rail(parts)
 	local parent = person and person:GetParent()
 	if not (onRail() and person and person:IsShown() and parent and parent:IsShown() and person.Name) then
 		layer:Hide()
-		placeMark(person, false)
+		railMark(person, nil)
 		return
 	end
 	layer:Show()
-	placeMark(person, true)
 	local last = parts.last
 	local past = (last and last:IsShown()) and lastLines(last, person) or {}
 	if not layer.pasts then layer.pasts = {} end
@@ -1777,6 +1800,7 @@ local function rail(parts)
 	local cn = node(layer, "cur", layer)
 	paintNode(cn, true, 1)
 	placeNode(cn, person, "TOPLEFT", RAIL - CARD_X, -(10 + person.Name:GetStringHeight() / 2))
+	railMark(person, cn)
 	local bottom = cn.disc
 	local rows = upRows(parts.upnext)
 	for i = 1, math.max(#rows, #layer.dots) do
