@@ -1775,13 +1775,11 @@ local function goalRow(row, goal, info)
 	spotsOff(row, goal, own)
 	local text = row.Text:GetText() or ""
 	local live = info.current and not info.done and not info.skipped
-	own._single = true
-	row.Text:SetWordWrap(false)
-	row.Text:SetMaxLines(1)
+	-- Full size, up to two lines (a cut line hid the goal's end).
 	local path, size, flags = row.Text:GetFont()
-	if path and size then
+	if live and path and size then
 		own._font = { path, size, flags }
-		row.Text:SetFont((live and semibold()) or path, math.max(8, size - 2), flags)
+		row.Text:SetFont(semibold() or path, size, flags)
 	end
 	if live and goal.progress then
 		text = text:gsub("|c%x%x%x%x%x%x%x%x(%d+/%d+)|r", "|c" .. Theme.Hex("accent") .. "%1|r")
@@ -1793,18 +1791,9 @@ local function goalRow(row, goal, info)
 	end
 	local lvl = Core.questLevel(goal.quest)
 	if goal.t == "accept" or goal.t == "turnin" then
-		-- The line names the quest already: its level after it.
-		if lvl then
-			if not own.level then own.level = row:CreateFontString(nil, "OVERLAY") end
-			local label = own.level
-			Theme.Font(label, "small")
-			label:SetTextColor(Theme.Color("textMuted"))
-			label:SetText("[" .. lvl .. "]")
-			label:ClearAllPoints()
-			label:SetPoint("LEFT", row.Text, "RIGHT", 5, 0)
-			label:Show()
-			row.psLevelWidth = math.ceil(label:GetUnboundedStringWidth()) + 6
-		end
+		-- The line names the quest already: its level after it, in the
+		-- line so it wraps with it.
+		if lvl then text = text .. "  |c" .. muted .. "[" .. lvl .. "]|r" end
 		row.Text:SetText(text)
 		return
 	end
