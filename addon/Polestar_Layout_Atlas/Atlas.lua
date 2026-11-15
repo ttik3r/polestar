@@ -341,7 +341,9 @@ local function header(parts)
 	local own = store(nav)
 	own.atlas = true
 	if not own.emblem then
-		own.emblem = nav:CreateTexture(nil, "ARTWORK")
+		-- On the menu button, so it fades with the bars (a transparent
+		-- window's chrome shows only under the pointer; ui.barShown keeps it).
+		own.emblem = nav.Menu:CreateTexture(nil, "ARTWORK")
 		own.emblem:SetTexture(Theme.Media("emblem"))
 		own.emblem:SetSize(16, 16)
 	end
@@ -405,7 +407,15 @@ local function journeyStyle()
 	local s = Core.setting("guideWindow.journeyStyle")
 	return JOURNEY_STYLES[s] and s or "joined"
 end
-local function journeyPanel() local u = P.UI; return u and u.JourneyPanel end
+-- The panel behind journey frame `f`: a settings preview's sample
+-- (JP.Sample, f.psPanel) or the live one (JP). Every journey frame a layout
+-- placed is kept, to give each its look back on leaving.
+local journeyFrames = setmetatable({}, { __mode = "k" })
+local function journeyPanel(f)
+	if f and f.psPanel then return f.psPanel end
+	local u = P.UI
+	return u and u.JourneyPanel
+end
 
 -- The XP row's own text and star, faded out while the chips stand in it.
 local function xpUnder(xp, on)
@@ -416,8 +426,8 @@ local function xpUnder(xp, on)
 end
 
 -- The panel's leg numbers: hidden on the rail (the nodes stand for them).
-local function journeyRowsLook(onRail)
-	local JP = journeyPanel()
+local function journeyRowsLook(onRail, f)
+	local JP = journeyPanel(f)
 	for _, r in ipairs(JP and JP.rows or {}) do
 		if r.Num then r.Num:SetAlpha(onRail and 0 or 1) end
 	end
@@ -425,8 +435,8 @@ end
 
 -- The leg you are on, its place among the route's rows and how many there
 -- are: leg, k, n; nil without a journey.
-local function currentLeg()
-	local JP = journeyPanel()
+local function currentLeg(f)
+	local JP = journeyPanel(f)
 	if not (JP and JP.Route and JP.plan) then return nil end
 	local legs, ci = JP.Route()
 	if not legs then return nil end
@@ -438,12 +448,12 @@ end
 
 -- "folded": the collapsed header names the leg you are on, with its glyph,
 -- and a thin bar of how far along the route is; open, "Journey" as ever.
-local function foldedHead(on)
-	local JP = journeyPanel()
+local function foldedHead(on, f)
+	local JP = journeyPanel(f)
 	local head = JP and JP.head
 	if not head then return end
 	local own = store(head)
-	local leg, k, n = currentLeg()
+	local leg, k, n = currentLeg(f)
 	local show = on and leg and not P.Get("nav.journeyOpen")
 	if not show then
 		if own.folded then
@@ -502,8 +512,8 @@ end
 -- current one in the accent), the route's total on the right.
 local CHIPS_MAX = 5
 local function chipsFill(f)
-	local JP = journeyPanel()
-	local leg, _, _, legs, ci = currentLeg()
+	local JP = journeyPanel(f.psJourney)
+	local leg, _, _, legs, ci = currentLeg(f.psJourney)
 	if not leg then return false end
 	local v = JP.Compute(legs, ci)
 	local p = JP.plan
@@ -1005,6 +1015,7 @@ onLeave(function(parts) if parts.banner then bannerLook(parts.banner, nil) end e
 onLeave(function()
 	journeyRowsLook(false)
 	foldedHead(false)
+	for f in pairs(journeyFrames) do journeyRowsLook(false, f); foldedHead(false, f) end
 	local G = P.UI and P.UI.GuideFrame
 	xpUnder(G and G.xp, false)
 end)
@@ -1362,7 +1373,8 @@ on("guidePlace", function(name, part, width, height)
 	end
 	if name == "journey" and not compact() then
 		local style = journeyStyle()
-		journeyRowsLook(style == "rail")
+		journeyFrames[part] = true
+		journeyRowsLook(style == "rail", part)
 		-- Inside and on the rail: Polestar stacks it under the step.
 		if style == "inside" or style == "rail" then return nil end
 		-- In the foot: the chips stand for it (layoutBottom); the panel waits hidden.
@@ -1481,7 +1493,7 @@ end
 -- The Journey: collapsed on a card joined to the window's foot.
 -- "foot": the chips in the XP row's place, or in the strip under the window
 -- without one. -> whether the strip holds them
-local function layoutFoot(parts, b, on)
+local function layoutFoot(parts, b, on, journey)
 	local window = parts.window
 	local G = P.UI and P.UI.GuideFrame
 	local xp = G and G.xp
@@ -1495,6 +1507,7 @@ local function layoutFoot(parts, b, on)
 	if strip and (inXp or not on) then strip:Hide() end
 	if not on then return false end
 	local f = chipsFrame(inXp and xp or b)
+	f.psJourney = journey
 	f:ClearAllPoints()
 	f:SetAllPoints(inXp and xp or b)
 	f:SetFrameLevel((inXp and xp or b):GetFrameLevel() + 3)
@@ -1518,8 +1531,8 @@ local function layoutBottom(parts, journey, foot)
 		own.bottom = b
 	end
 	local b = own.bottom
-	foldedHead(journey and not foot and journeyStyle() == "folded")
-	if layoutFoot(parts, b, journey and foot) then
+	if journey then foldedHead(not foot and journeyStyle() == "folded", journey) end
+	if layoutFoot(parts, b, journey and foot, journey) then
 		dress(b, window)
 		b:SetHeight(28)
 		b:Show()
@@ -2158,8 +2171,13 @@ local function rail(parts)
 	railMark(person, cn)
 	local bottom = cn.disc
 	-- "rail": the Journey's legs as nodes between the step and Up next.
-	local JP = journeyStyle() == "rail" and journeyPanel() or nil
-	local jf = JP and JP.frame
+	local jf
+	if journeyStyle() == "rail" then
+		for f in pairs(journeyFrames) do
+			if f:IsShown() and isUnder(f, window) then jf = f end
+		end
+	end
+	local JP = jf and journeyPanel(jf)
 	local legRows = {}
 	if jf and jf:IsShown() and isUnder(jf, window) and P.Get("nav.journeyOpen") then
 		for _, r in ipairs(JP.rows) do

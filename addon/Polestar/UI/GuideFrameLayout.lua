@@ -335,15 +335,28 @@ ns.UI.GuideFrame.Part(function(GF)
 	GF.CapHeight = function() return F and capHeight() or nil end
 
 	-- The journey (UI/JourneyPanel.lua) right under the focus it leads to;
-	-- never in compact mode, and in the live window alone. A skin may place
-	-- it itself (guidePlace "journey"). Returns the new y.
+	-- never in compact mode. A copy (the settings preview) shows a sample
+	-- route (JP.Sample) while nav.journeySteps is on. A skin may place it
+	-- itself (guidePlace "journey"). Returns the new y.
 	local function stackJourney(y, width)
-		local J = GF.live and UI.JourneyPanel or nil
-		local jf = J and J.frame
+		local JP = UI.JourneyPanel
+		if not GF.live then
+			if not (JP and JP.Sample) then return y end
+			if not GF.journeySample then GF.journeySample = JP.Sample(body) or false end
+			local s = GF.journeySample
+			if not s then return y end
+			if ns.Get("nav.journeySteps") and not compact() then
+				s.frame:Show()
+				return place("journey", s.frame, y, s.Layout(width), width)
+			end
+			s.frame:Hide()
+			return y
+		end
+		local jf = JP and JP.frame
 		if not jf then return y end
 		if jf.psHas and not compact() then
 			jf:Show()
-			return place("journey", jf, y, J.Layout(width), width)
+			return place("journey", jf, y, JP.Layout(width), width)
 		end
 		jf:Hide()
 		return y
