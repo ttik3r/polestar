@@ -742,7 +742,32 @@ local function facing()
 	local C = ns.Compat
 	return C and C.GetPlayerFacing and C.GetPlayerFacing() or nil
 end
-local lastYards, lastEta
+-- The distance the arrow writes, steadier the further it is so its digits do
+-- not change several times a second on the run: to the yard under 100, to 5
+-- from 100, to 10 from 500 and from 1000 as the Journey panel writes it
+-- ("1.2k yd"; JP.FormatDistance). In metres (nav.distanceUnit) the same steps
+-- count metres, and from 1000 m it is "1.2 km".
+local YARD_METRES = 0.9144
+local metres = false -- nav.distanceUnit is "metres" (Arrow:OnSettings)
+local function distanceStep(v)
+	if v >= 1000 then return 100 elseif v >= 500 then return 10 elseif v >= 100 then return 5 end
+	return 1
+end
+-- The distance in the unit shown, rounded to its step: the text changes
+-- only when this does. -> number, step
+local function distanceKey(yards)
+	local v = metres and yards * YARD_METRES or yards
+	local step = distanceStep(v)
+	return floor(v / step + 0.5) * step, step
+end
+-- -> "420 yd", "1.2k yd", "455 m", "1.2 km"
+function Nav.ArrowDistance(yards)
+	local _, step = distanceKey(yards)
+	return ns.FormatDistance(yards, { round = min(step, 10), compact = true })
+end
+
+local lastYards, lastEta -- lastYards: distanceKey of the distance shown
+local lastDistText
 local floorShown -- the floor glyph's hint ("up" | "down") or nil
 local lastDist, closeSpeed = nil, 0
 local pulse = 0
@@ -808,7 +833,7 @@ local function setMode(m)
 	if act then halo:SetShown(look.glow) end
 	legIcon:SetShown(act)
 	dialLayout(D, look, not travel or look.distance)
-	lastYards, lastEta = nil, nil
+	lastYards, lastEta, lastDistText = nil, nil, nil
 	lastDist, closeSpeed = nil, 0
 	etaText:Hide()
 	if done then
@@ -1023,10 +1048,14 @@ local function sample(elapsed)
 		goalAngle = bearing
 	end
 
-	local yards = floor(dist + 0.5)
-	if yards ~= lastYards then
-		lastYards = yards
-		distText:SetText(ns.FormatDistance(yards))
+	local key = distanceKey(dist)
+	if key ~= lastYards then
+		lastYards = key
+		local text = Nav.ArrowDistance(dist)
+		if text ~= lastDistText then
+			lastDistText = text
+			distText:SetText(text)
+		end
 	end
 	local target = Nav.GetTarget()
 	applyColor(dist, target and target.r or Nav.DEFAULT_RADIUS)
@@ -1163,7 +1192,8 @@ ns.RegisterEvent("PLAYER_REGEN_ENABLED", function() inCombat = false; applyAlpha
 function Arrow:OnSettings()
 	frame:SetScale(clamp(ns.Get("nav.arrowScale"), 0.5, 2, 1))
 	applyAlpha()
-	lastYards = nil -- nav.distanceUnit: redraw the distance on the next sample
+	metres = ns.Get("nav.distanceUnit") == "metres"
+	lastYards, lastDistText = nil, nil -- nav.distanceUnit: redraw the distance on the next sample
 	showEta = ns.Get("nav.arrowEta") and true or false
 	if not showEta and mode == "travel" then etaText:Hide() end
 	applyStyle(Arrow.StyleFor(ns.Get("nav.arrowStyle")))
@@ -1341,7 +1371,7 @@ function Arrow.PaintDial(d, lk, s, state, angle, dist, label, eta)
 		d.near = near
 		dialRotate(d, angle or 0)
 		dialTint(d, r, g, b, lk)
-		d.distText:SetText(ns.FormatDistance(floor(dist + 0.5)))
+		d.distText:SetText(Nav.ArrowDistance(dist))
 		local c = lk.distColor
 		if c then d.distText:SetTextColor(c[1], c[2], c[3]) else d.distText:SetTextColor(Nav.RGB("text")) end
 	else

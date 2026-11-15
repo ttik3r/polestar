@@ -492,7 +492,7 @@ fn in_metres_the_arrow_redraws_its_distance_at_once_without_waiting_for_it_to_ch
 		local yards = A.distText:GetText()
 		Polestar.Set("nav.distanceUnit", "metres")
 		emit({ yards = yards, metres = A.distText:GetText() })"#);
-	assert_eq!(out, json!({ "yards": "500 yd", "metres": "457 m" }));
+	assert_eq!(out, json!({ "yards": "500 yd", "metres": "455 m" }));
 }
 
 #[test]

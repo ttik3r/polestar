@@ -418,7 +418,7 @@ fn the_arrow_shows_the_leg_caption_aims_at_the_waypoint_advances_inside_its_radi
 		stub.advance(0.2)
 		r.after = { A.labelText:GetText() }
 		emit(r)"#);
-	assert_eq!(out["walk"], json!(["travel", "1200 yd", "Through the gate to East Vale"]));
+	assert_eq!(out["walk"], json!(["travel", "1.2k yd", "Through the gate to East Vale"]));
 	assert_eq!(out["advanced"], 1);
 	assert_eq!(out["at"], json!(["51 yd", "Through the gate to East Vale"]), "now aiming at the far side of the gate");
 	assert_eq!(out["replanned"], 1, "arriving at a waypoint plans again");
