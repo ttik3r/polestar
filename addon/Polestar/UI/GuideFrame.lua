@@ -2050,6 +2050,8 @@ GF.Part(function(GF)
 				local quest = ns.Quoted(b.title or (L["Quest"] .. " " .. b.quest))
 				r.psStep, r.psGoal, r.psTitle, r.psPin, r.psBehind = nil, nil, b.title, nil, b.quest
 				r.psPlace, r.psCarried = true, nil
+				-- Its facts, for a layout that lays the row out its own way.
+				r.psFacts = { quest = quest, zone = b.zone, yards = b.yards }
 				r.Icon:SetTexture(Theme.VerbIcon("turnin"))
 				r.Text:SetText(where and string.format(L["Still to do: %s, %s"], quest, where) or string.format(L["Still to do: %s"], quest))
 				r:Show()
@@ -2068,6 +2070,7 @@ GF.Part(function(GF)
 			r.psPlace, r.psCarried = nil, true
 			r.Icon:SetTexture(Theme.VerbIcon("turnin"))
 			local text = #carried == 1 and L["1 finished quest to hand in elsewhere"] or string.format(L["%d finished quests to hand in elsewhere"], #carried)
+			r.psFacts = { text = text, count = #carried, xp = xp > 0 and xp or nil }
 			r.Text:SetText(xp > 0 and string.format(L["%s (%s XP)"], text, ns.Thousands(xp)) or text)
 			r:Show()
 		end
@@ -2101,7 +2104,7 @@ GF.Part(function(GF)
 				untilStep = untilStep or s.untilStep
 				local r = alongRow(n)
 				r.psStep, r.psGoal, r.psTitle, r.psPin, r.psBehind = e.step, gv.index, s.title or UI.GoalLine(gv), e.pin, nil
-				r.psPlace, r.psCarried = e.place, nil
+				r.psPlace, r.psCarried, r.psFacts = e.place, nil, nil
 				r.Icon:SetTexture(Theme.VerbIcon(gv.t))
 				UI.SetCounted(r.Text, UI.GoalLine(gv))
 				r:Show()
