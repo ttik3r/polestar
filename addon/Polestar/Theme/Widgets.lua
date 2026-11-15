@@ -1893,6 +1893,12 @@ end
 -- opts: { point = "TOPRIGHT", relPoint = "BOTTOMRIGHT", x = 0, y = -4, minWidth = 168 }
 function W.ShowMenu(anchor, items, opts)
 	if not menu then buildMenu() end
+	-- The button's hover tip would sit over the list's first rows: it goes
+	-- (only its own: another frame's tip is not the menu's to hide).
+	if anchor then
+		W.HideTooltip(anchor)
+		W.TipHide(anchor)
+	end
 	menu.psItems, menu.psOpts = items, opts or {}
 	opts = menu.psOpts
 	local f = rawget(menu, "Filter")
