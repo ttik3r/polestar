@@ -97,12 +97,17 @@ local function start()
 			{ quest = 0, title = "Brother Paxton", status = "skipped", xp = 0, grey = true } }
 	end)
 	patch(r, P.QoL and P.QoL.Space, "Banner", function() return { free = 0 } end)
-	patch(r, UI.JourneyPanel, "Route", function()
-		return {
-			{ kind = "walk", label = "Walk to the crossing", yards = 420, seconds = 56 },
-			{ kind = "boat", label = "Take the ferry", yards = 900, seconds = 90, to = { name = "The next stop" } },
-		}, 1
-	end)
+	-- A fake journey of every kind of row: a walk with a hostile town under
+	-- it, a flight, a lift and a ferry. One table for the whole test, so the
+	-- panel keeps it and the current leg counts down.
+	local legs = {
+		{ kind = "walk", label = "Walk to the flight master", yards = 420, seconds = 56,
+			hubs = { { name = "The next town" } }, to = { name = "The flight master" } },
+		{ kind = "fly", yards = 2400, seconds = 95, to = { name = "The harbour town" } },
+		{ kind = "lift", yards = 60, seconds = 20, to = { name = "The docks" } },
+		{ kind = "boat", label = "Take the ferry", yards = 900, seconds = 90, to = { name = "The next stop" } },
+	}
+	patch(r, UI.JourneyPanel, "Route", function() return legs, 1 end)
 	local notices = GF.notices
 	if notices then
 		local train, skip = notices.train, notices.questSkip
