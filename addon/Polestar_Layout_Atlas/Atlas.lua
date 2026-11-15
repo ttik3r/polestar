@@ -1393,18 +1393,12 @@ on("guidePlace", function(name, part, width, height)
 		bannerLook(part, "strip")
 		return false
 	end
-	-- Looking back or ahead: the same strip, an eye for its icon and no ×
-	-- (paging back or its link ends it); its link takes the ×'s place.
+	-- Looking back or ahead: the same strip, an eye for its icon; no × (the
+	-- guideShows "bannerClose" below), paging back or its link ends it.
 	if name == "banner" and part.psKind == "away" then
 		bannerLook(part, "strip")
 		local _, n = Core.notice()
 		if not (n and n.skipped) and part.Icon then part.Icon:SetTexture(Theme.Media("eye")) end
-		if part.Close then part.Close:Hide() end
-		local jump = part.Jump
-		if jump and jump:IsShown() and P.Get("guideWindow.bannerLinks") == "right" then
-			jump:ClearAllPoints()
-			jump:SetPoint("TOPRIGHT", part, "TOPRIGHT", -5, -7)
-		end
 		return false
 	end
 	-- Every other banner notice: a heads-up card on top of the stack.
@@ -1591,8 +1585,9 @@ on("guideAnchor", function()
 end)
 
 -- The class quest card's own "Later" row: the × does it.
-on("guideShows", function(what, shown)
+on("guideShows", function(what, shown, ...)
 	if what == "classCardLater" then return false end
+	if what == "bannerClose" and select(1, ...) == "away" then return false end
 	return shown
 end)
 
@@ -2411,8 +2406,8 @@ local FIRST = { guidePlace = true, guideTakes = true, guideInset = true, guidePe
 
 local function join(name, list)
 	if name == "guideShows" then
-		return function(what, shown)
-			for i = 1, #list do shown = list[i](what, shown) end
+		return function(what, shown, ...)
+			for i = 1, #list do shown = list[i](what, shown, ...) end
 			return shown
 		end
 	elseif name == "guideLayout" then
