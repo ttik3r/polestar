@@ -331,7 +331,7 @@ fn b_e_f_the_arrow_aims_along_the_engine_path_ahead_of_the_player_the_route_line
 		r.aim = { state = a.state, along = at, n = #pts, measured = a.measured, dist = a.dist, off = off, ahead = dist(a.x, a.y, GOLDSHIRE[1], GOLDSHIRE[2]), toTarget = dist(a.x, a.y, tx, ty) }
 		r.path = { length = length(pts), straight = dist(GOLDSHIRE[1], GOLDSHIRE[2], tx, ty), endGap = dist(pts[#pts].x, pts[#pts].y, tx, ty) }
 		r.left = { walk = N.walk.Left(0, tx, ty), along = length(pts) }
-		r.shown = { text = N.arrow.distText:GetText(), want = Polestar.FormatDistance(floor(a.dist + 0.5)), visible = PolestarNavArrow:IsShown() }
+		r.shown = { text = N.arrow.distText:GetText(), want = Polestar.Nav.ArrowDistance(a.dist), visible = PolestarNavArrow:IsShown() }
 		-- e: the route lines' walk legs are the arrow's walk: the engine's path points as Follow.Smooth kept them (it
 		-- drops only corners a straight walkable line skips, and adds none), in order, the player first and the mine's
 		-- mouth between the pieces.

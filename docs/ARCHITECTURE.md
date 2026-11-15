@@ -192,8 +192,10 @@ Every distance a player reads goes through `FormatDistance` (the arrow, the
 map target's tooltip, the death helper, the rares' toasts and view); text
 that embeds one takes the formatted string (`%s`). `opts.round = 5` rounds to
 the nearest 5, `opts.compact` writes yards from 1000 as "1.2k yd"
-(`Rares.YardsText`); metres turn to kilometres from 1000 m. The bug report
-keeps yards for whoever reads it.
+(`Rares.YardsText`); metres turn to kilometres from 1000 m. The arrow's own
+steps are `Nav.ArrowDistance` (to the yard under 100, to 5 from 100, to 10
+from 500, compact from 1000, the same in metres), redrawn only when the text
+changes. The bug report keeps yards for whoever reads it.
 
 `PolestarDB = { schema = 1, settings = { [section] = { ... } }, packs = { [packId] = { off = true } }, imports = { [guideId] = { format, license, guide, frames } }, gearAdjust = { [CLASS] = { [spec] = { [stat] = { x } | { v } } } }, welcomeSeen = 1, gamepad = { chords = { [action] = "PADRSHOULDER+PADDUP" } } }`
 `PolestarCharDB = { schema = 1, guide = id|nil, tabs = { guideId, ... }, activeTab = n, absentAt = { [guideId] = place }, closedTabs = { { id, at }, ... }, manual = { [guideId] = { ["s:g"] = true|"tick" } }, skipped = { [guideId] = { [stepIndex] = true, ["s:g"] = true } }, pins = { [guideId] = { step, done } }, offers = { [questID] = true }, skippedQuests = { [questID] = true }, shapes = { [guideId] = shape }, stepKeys = { [guideId] = { hash, ... } }, guideDone = { [guideId] = true }, flags = { fp = { [name] = true }, ... }, dungeons = { [mapId] = true }, welcomeSeen = 0|1 }`
@@ -8181,7 +8183,10 @@ the same.
 (nothing on the row: its gutter is the changed dot's or the reset's), and its page's sidebar row counts the
 page's new settings until the page is opened:
 `PolestarDB.optionsSeen[page key]` keeps the newest `new` release seen there
-(account-wide, not a setting, so profiles and resets leave it). The pills keep
+(account-wide, not a setting, so profiles and resets leave it). A fresh install
+sees nothing new: core's `UI/OptionsLoader.lua` starts its record as
+`{ ["*"] = true }`, and the window's first opening takes that as the newest
+`new` release among its settings, seen on every page. The pills keep
 through the session the page is first opened in (they read the seen state as
 it was when the window first opened), and go the next.
 

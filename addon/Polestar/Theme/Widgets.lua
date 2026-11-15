@@ -655,12 +655,14 @@ function W.SetLinkText(b, text)
 	b:SetSize(floor(b.Label:GetStringWidth() + 0.5), 20)
 end
 
--- Buttons that act only on a second click within three seconds.
+-- Buttons that act only on a second click within three seconds (the menu's
+-- confirm rows too).
+local CONFIRM_SECS = 3
 function W.Confirm(b, text, fn)
 	b.psConfirmText, b.psConfirmFn = text, fn
 	b:SetScript("OnClick", function(self)
 		local now = GetTime()
-		if self.psArmed and now - self.psArmed < 3 then
+		if self.psArmed and now - self.psArmed < CONFIRM_SECS then
 			self.psArmed = nil
 			if self.psSetText then self.psSetText(self, self.psConfirmText) end
 			self.psConfirmFn()
@@ -668,8 +670,8 @@ function W.Confirm(b, text, fn)
 		end
 		self.psArmed = now
 		if self.psSetText then self.psSetText(self, L["Click again to confirm"]) end
-		ns.After(3, function()
-			if self.psArmed and GetTime() - self.psArmed >= 2.9 then
+		ns.After(CONFIRM_SECS, function()
+			if self.psArmed and GetTime() - self.psArmed >= CONFIRM_SECS - 0.1 then
 				self.psArmed = nil
 				if self.psSetText then self.psSetText(self, self.psConfirmText) end
 			end
@@ -1588,15 +1590,24 @@ local function paintMenuRow(row, lit)
 end
 W.PaintMenuRow = paintMenuRow
 
--- Items with confirm = true need a second click: the first relabels the row
--- and keeps the menu open.
+-- Items with confirm = true need a second click within CONFIRM_SECS, as
+-- W.Confirm's buttons: the first relabels the row (the menu is laid out wide
+-- enough for it) and keeps the menu open; the row goes back to its label
+-- when the time is up.
 local function menuRowClick(self)
 	local item = self.psItem
 	if not item or item.disabled or item.heading then return end
-	if item.confirm and not self.psArmed then
-		self.psArmed = true
+	if item.confirm and not (self.psArmed and GetTime() - self.psArmed < CONFIRM_SECS) then
+		local armed = GetTime()
+		self.psArmed = armed
 		self.Text:SetText(L["Click again to confirm"])
 		W.Color(self.Text, "danger")
+		ns.After(CONFIRM_SECS, function()
+			if self.psArmed ~= armed or self.psItem ~= item then return end
+			self.psArmed = nil
+			self.Text:SetText(item.text)
+			paintMenuRow(self, self:IsMouseOver())
+		end)
 		return
 	end
 	W.HideMenu()
@@ -1858,7 +1869,14 @@ function layoutMenu()
 			row.Check:ClearAllPoints()
 			row.Check:SetPoint("RIGHT", row, "RIGHT", item.preview and -32 or -10, 0)
 			local shownText = (item.font and face) or row.Text
-			width = max(width, shownText:GetStringWidth() + textX + 36 + extra + (anyPreview and 26 or 0) + (long and 10 or 0))
+			local room = textX + 36 + extra + (anyPreview and 26 or 0) + (long and 10 or 0)
+			width = max(width, shownText:GetStringWidth() + room)
+			-- A row asking for a second click has room for the question.
+			if item.confirm then
+				row.Text:SetText(L["Click again to confirm"])
+				width = max(width, row.Text:GetStringWidth() + room)
+				row.Text:SetText(item.text)
+			end
 			if holds(item, needle) then
 				row:ClearAllPoints()
 				row:SetHeight(rowH)
@@ -1909,6 +1927,12 @@ end
 -- opts: { point = "TOPRIGHT", relPoint = "BOTTOMRIGHT", x = 0, y = -4, minWidth = 168, short = true }
 function W.ShowMenu(anchor, items, opts)
 	if not menu then buildMenu() end
+	-- The button's hover tip would sit over the list's first rows: it goes
+	-- (only its own: another frame's tip is not the menu's to hide).
+	if anchor then
+		W.HideTooltip(anchor)
+		W.TipHide(anchor)
+	end
 	menu.psItems, menu.psOpts = items, opts or {}
 	opts = menu.psOpts
 	local f = rawget(menu, "Filter")
