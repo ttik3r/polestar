@@ -38,3 +38,32 @@ test('opening a menu hides its button\'s hover tip, and leaves another frame\'s 
 	assert.equal(out.ownTip, false, 'Polestar\'s own tip goes too');
 	assert.equal(out.otherTip, true, 'another frame\'s tip is not the menu\'s to hide');
 });
+
+test('a row that asks for a second click fits "Click again to confirm" in any language, and forgets the first click after three seconds', () => {
+	const out = run(`
+		-- A long translation of the confirm text.
+		Polestar.L["Click again to confirm"] = "Нажмите ещё раз, чтобы подтвердить сброс"
+		local anchor = CreateFrame("Frame", nil, UIParent)
+		anchor:SetSize(100, 20)
+		anchor:SetPoint("CENTER")
+		local reset = 0
+		W.ShowMenu(anchor, { { text = "Rename" }, { text = "Reset", confirm = true, onClick = function() reset = reset + 1 end } })
+		local m = PolestarMenu
+		local row = m.rows[2]
+		local w = m:GetWidth()
+		row:Click()
+		local armed = { text = row.Text:GetText(), open = m:IsShown(), sameWidth = m:GetWidth() == w,
+			fits = row.Text:GetStringWidth() + 12 <= m:GetWidth() }
+		stub.advance(3.1)
+		local expired = { text = row.Text:GetText(), open = m:IsShown() }
+		row:Click()
+		local rearmed = { reset = reset, open = m:IsShown() }
+		stub.advance(1)
+		row:Click()
+		emit({ armed = armed, expired = expired, rearmed = rearmed, confirmed = { reset = reset, open = m:IsShown() } })`);
+	assert.deepEqual(out.armed, { text: 'Нажмите ещё раз, чтобы подтвердить сброс', open: true, sameWidth: true, fits: true },
+		'the first click asks again inside the menu, which already has room for it');
+	assert.deepEqual(out.expired, { text: 'Reset', open: true }, 'three seconds on, the row is back to its label');
+	assert.deepEqual(out.rearmed, { reset: 0, open: true }, 'a click after that asks again rather than acting');
+	assert.deepEqual(out.confirmed, { reset: 1, open: false }, 'a second click in time acts and closes the menu');
+});
