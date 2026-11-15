@@ -345,8 +345,15 @@ ns.UI.GuideFrame.Part(function(GF)
 		link.Label:SetText(text)
 		local right = link == banner.Jump and ns.Get("guideWindow.bannerLinks") == "right"
 		local room = right and floor(banner.Text:GetWidth() * 0.45) or floor(banner.Text:GetWidth() - x - 16)
-		if room > 0 and link.Label:GetStringWidth() > room then link.Label:SetWidth(room) end
-		link:SetWidth(floor(link.Label:GetStringWidth() + 16 + 0.5))
+		-- The link as wide as the label it draws: cut at room, the whole text's
+		-- width (all some clients report once it is cut) would put the label
+		-- far left of a link set by its right edge.
+		local textW = link.Label:GetStringWidth()
+		if room > 0 and textW > room then
+			link.Label:SetWidth(room)
+			textW = room
+		end
+		link:SetWidth(floor(textW + 16 + 0.5))
 		link:ClearAllPoints()
 		if right then
 			link:SetPoint("TOPRIGHT", banner, "TOPRIGHT", -(5 + closeRoom + 4), -7)

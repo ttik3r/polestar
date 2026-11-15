@@ -519,3 +519,33 @@ emit({ aimed = aimed, plain = plain, compactTex = person.Mark:GetTexture() ~= ni
 	assert.equal(out.plain.w, 16, 'not aimed: the plain halo');
 	assert.equal(out.compactTex, true, 'compact mode draws the bar');
 });
+
+// A notice's action by the × (guideWindow.bannerLinks "right", Atlas's
+// default), its text cut short: the link is as wide as the label it draws,
+// so it stays inside its card. Some clients (and the playground) report the
+// whole text's width from GetStringWidth once it is cut; the label does so here.
+test("under Atlas a notice's long jump link stays inside its card", () => {
+	const [out] = runAddon({
+		stubs: ['stub_world.lua'],
+		addons: ['Polestar', 'Polestar_Skin_Atlas', 'Polestar_Layout_Atlas'],
+		script: `${GUIDE}
+local T, GF = Polestar.Theme, Polestar.UI.GuideFrame
+Polestar.Set("ui.shown", true)
+T.SetLayout("atlas")
+local banner = T.GuideParts().banner
+local label = banner.Jump.Label
+label.GetStringWidth = label.GetUnboundedStringWidth
+local width = 260
+GF.LayoutBanner(width, true, "outlevel", { guideId = "test/atlas", title = "Western Elwynn, Westfall and the Road to Darkshire" })
+emit({
+	links = Polestar.Get("guideWindow.bannerLinks"),
+	link = banner.Jump:GetWidth(), label = label:GetWidth(), full = label:GetUnboundedStringWidth(),
+	shown = banner.Jump:IsShown(), width = width,
+})`,
+	}).emitted;
+	assert.equal(out.links, 'right');
+	assert.equal(out.shown, true);
+	assert.ok(out.full > out.label, `the label is cut: ${out.label} of ${out.full}`);
+	assert.equal(out.link, Math.floor(out.label + 16 + 0.5), 'the link is as wide as its label');
+	assert.ok(out.link + 33 <= out.width, `inside the card: link ${out.link} in ${out.width}`);
+});
