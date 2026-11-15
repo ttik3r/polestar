@@ -24,7 +24,7 @@ ns.RegisterDefaults("ui", {
 	compact = false,
 	style = "standard", -- "standard" | "transparent"
 	backing = "soft", -- transparent: "soft" (a light shade behind each line) | "dark" (a dark backing) | "none" (GuideFrame GF.SHADE, GF.VEIL)
-	barShown = false, -- transparent: the tabs and the step bar stay shown instead of only under the cursor
+	barShown = true, -- transparent: the tabs and the step bar stay shown (off: only under the cursor)
 	scale = 1,
 	opacity = 1,
 	bgOpacity = 0.94, -- the ground of every Polestar window
