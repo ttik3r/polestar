@@ -61,11 +61,47 @@ test('a scripted session: hub, a guide, a goal, a scheme change, the world map, 
 		assert.equal(f.state.guide.id, g.id);
 		const before = f.state.guide.goals.filter((x) => x.status === 'done').length + f.state.guide.step * 100;
 
+		// Walk previews exercise the real Atlas cards without advancing the guide.
+		for (const [path, value] of [['ui.layout', 'atlas'], ['ui.skin', 'atlas'], ['ui.compact', false]]) {
+			f = await act(play.url, { type: 'set', path, value });
+		}
+		for (const [i, text] of ['Optional', "While you're here", 'Class quest', 'Bags full', 'Journey', 'Tip', 'New abilities'].entries()) {
+			f = await act(play.url, { type: 'walk', card: i + 1 });
+			assert.equal(f.errors.length, 0, JSON.stringify(f.errors));
+			assert.equal(f.result.kind, 'event');
+			assert.equal(f.result.event, text);
+			assert.ok(f.svg.startsWith("<svg"));
+			assert.equal(f.state.guide.step * 100 + f.state.guide.goals.filter((x) => x.status === 'done').length, before);
+		}
+		f = await act(play.url, { type: 'walk', preview: [1, 2, 4, 5, 6] });
+		assert.deepEqual(f.errors, []);
+		assert.equal(f.result.label, "Optional + While you're here + Bags full + Journey + Tip");
+		assert.equal(f.state.guide.step * 100 + f.state.guide.goals.filter((x) => x.status === 'done').length, before);
+		f = await act(play.url, { type: 'walk', preview: [] });
+		assert.deepEqual(f.errors, []);
+		assert.equal(f.result.label, 'Previews cleared');
+		for (const path of ['ui.layout', 'ui.skin']) f = await act(play.url, { type: 'set', path, value: null });
+
 		// Do a goal: the Engine sees the world change.
 		f = await act(play.url, { type: 'goal' });
 		assert.ok(['done', 'advanced'].includes(f.result), `goal result ${f.result}`);
 		const after = f.state.guide.goals.filter((x) => x.status === 'done').length + f.state.guide.step * 100;
 		assert.ok(after > before, 'the goal was completed');
+
+		// The walk: a stride toward the goal, then the goal; with an event
+		// every goal, each goal brings a banner or toast.
+		const kinds = [];
+		let w;
+		for (let i = 0; i < 4 && kinds[kinds.length - 1] !== 'goal'; i++) {
+			w = await act(play.url, { type: 'walk', strides: 1, every: 1, xp: true, restart: i === 0 });
+			assert.equal(w.errors.length, 0);
+			kinds.push(w.result.kind);
+		}
+		assert.ok(kinds.length <= 2 && kinds.every((k) => k === 'stride' || k === 'goal'), kinds.join(' '));
+		assert.equal(w.result.kind, 'goal');
+		assert.ok(['done', 'advanced'].includes(w.result.result), `walk goal ${w.result.result}`);
+		assert.ok(w.result.event, 'an event came with the goal');
+		assert.equal(w.result.level, w.state.player.level);
 
 		// The scheme, through the addon's own settings; the frame re-renders.
 		const svgBefore = f.svg;

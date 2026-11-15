@@ -4792,3 +4792,6 @@ L["Nothing to apply: the parts ticked are the same as yours."] = "적용할 것�
 -- L["A list beside the target button names the mobs and NPCs of your step: click a name to target it, or press the button's key for the first one close by."] = "대상 버튼 옆의 목록에 단계의 몹과 NPC 이름이 표시됩니다. 이름을 클릭하면 대상으로 지정하고, 버튼의 단축키를 누르면 가까이 있는 첫 번째 대상을 지정합니다."
 -- L["A row for each mob or NPC your step names, with its face and what it drops, beside a small Polestar mark. Click a row, or press the target button's key for the first one close by."] = "단계에 나오는 몹이나 NPC마다 얼굴과 드롭 아이템을 담은 줄이 작은 Polestar 표시 옆에 나타납니다. 줄을 클릭하거나, 대상 버튼의 단축키를 눌러 가까이 있는 첫 번째 대상을 지정하십시오."
 -- L["One square button instead of the list: each click, or a press of its key, targets the next name."] = "목록 대신 정사각형 버튼 하나: 클릭하거나 단축키를 누를 때마다 다음 이름을 대상으로 지정합니다."
+-- L["The target button and the step key ping the mob they target, so your group sees it behind rocks and buildings. Never in a raid unless you lead or assist. The rare buttons always ping."] = "대상 버튼과 단계 키가 지정한 몹에 핑을 찍어, 파티원이 바위나 건물 뒤에서도 볼 수 있게 합니다. 공격대에서는 공격대장이나 부공격대장일 때만 찍습니다. 희귀 버튼은 항상 핑을 찍습니다."
+-- L["Preview"] = "미리보기"
+-- L["Brill"] = "브릴"

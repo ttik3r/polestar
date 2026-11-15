@@ -26,8 +26,9 @@ ns.UI.GuideFrame.Part(function(GF)
 	local hovering = false
 
 	-- ui.barShown keeps a transparent window's tabs and step bar on screen (not the grip).
+	-- A copy (the settings preview) shows them always: its title and tabs are part of what it previews.
 	local function chromeAlpha(c)
-		if not transparent() or hovering then return 1 end
+		if not transparent() or hovering or not GF.live then return 1 end
 		return (ns.Get("ui.barShown") and c ~= grip) and 1 or 0
 	end
 
@@ -213,7 +214,7 @@ ns.UI.GuideFrame.Part(function(GF)
 		-- from the right edge (room for the close square). The rule then takes
 		-- the bar's line (GF.PaintRule).
 		local title = GF.TitleParts(nav.TitleBar, nav.Close, nav.Rule, band)
-		if not clear then Theme.SkinHook("guideTitle", nav, title) end
+		if not clear then GF.Hook("guideTitle", nav, title) end
 		nav.Menu:ClearAllPoints()
 		nav.Menu:SetPoint("RIGHT", nav, "RIGHT", -(tonumber(title.menuRight) or 8), 0)
 		GF.PaintRule(nav.Rule)
@@ -257,7 +258,7 @@ ns.UI.GuideFrame.Part(function(GF)
 
 	-- A guideWindow.* setting changed (`key` without the section; nil: all of
 	-- them, a reset): only what it touches is redrawn.
-	GF.LOOK_STYLE = { outline = true, bgColor = true, bgOpacity = true, border = true, veil = true, shade = true, rules = true }
+	GF.LOOK_STYLE = { tabStyle = true, outline = true, bgColor = true, bgOpacity = true, border = true, veil = true, shade = true, rules = true }
 	GF.LOOK_PAINT = { targetBar = true, targetBarColor = true, targetBarWidth = true, progressColor = true }
 	GF.LOOK_LATER = { stepAnim = true, animSpeed = true, foldAnim = true } -- read when they play
 	function GF.ApplyLook(key)
@@ -335,7 +336,7 @@ ns.UI.GuideFrame.Part(function(GF)
 		end
 		-- A skin's own tab (Skin API 2, hooks.guideTab(button, parts, active)):
 		-- after the house painted it, on every render of the strip and repaint.
-		Theme.SkinHook("guideTab", b, b.psParts, b.psActive)
+		GF.Hook("guideTab", b, b.psParts, b.psActive)
 	end
 
 	-- The progress bar: the house and Halo's slim line with its percent right of

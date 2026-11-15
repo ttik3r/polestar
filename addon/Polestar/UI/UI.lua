@@ -24,11 +24,12 @@ ns.RegisterDefaults("ui", {
 	compact = false,
 	style = "standard", -- "standard" | "transparent"
 	backing = "soft", -- transparent: "soft" (a light shade behind each line) | "dark" (a dark backing) | "none" (GuideFrame GF.SHADE, GF.VEIL)
-	barShown = false, -- transparent: the tabs and the step bar stay shown instead of only under the cursor
+	barShown = true, -- transparent: the tabs and the step bar stay shown (off: only under the cursor)
 	scale = 1,
 	opacity = 1,
 	bgOpacity = 0.94, -- the ground of every Polestar window
 	width = 340,
+	stepListHeight = 0, -- the step browser's height, dragged with the window's grip while it is open; 0: the window's height when it opens
 	maxHeight = 0.5, -- the guide window's tallest, as a share of the screen's height; a longer step scrolls (#843)
 	wholeStep = false, -- the card lists every goal of the step, finished ones kept, instead of one person at a time (#843)
 	upcoming = 0, -- Up next is off by default (the reading flow names the next person instead)
@@ -39,6 +40,7 @@ ns.RegisterDefaults("ui", {
 	instance = "hide", -- "show" | "hide": in dungeons, raids, battlegrounds and arenas, until the player opens it there; hidden by default, a healer asked for it out of the way
 	reduceMotion = false,
 	classCardSound = true, -- the class-quest card's and the class quest heads-up's chime (UI/ClassCard.lua, UI/ClassToast.lua)
+	-- layout: unset (Polestar's own) | a registered layout's id (Theme.SetLayout, Theme.RegisterLayout)
 	skin = "polestar", -- "polestar" (the house style, the default) | "halo" | "hearth" | "forever" | "blizzard" | "classic" (Polestar.Theme, "Skins")
 	font = "skin", -- "skin" (the game's in Polestar) | "opensans" | "game" | "inter" | "fira"
 	textSize = 1, -- 0.8..1.4: every text role's size against its own (Theme.FontSpec), apart from the window scale

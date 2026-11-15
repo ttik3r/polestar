@@ -333,16 +333,32 @@ ns.UI.GuideFrame.Part(function(GF)
 
 	-- One link-style action in the banner (label, chevron), `x` right of the
 	-- text's left edge. It never runs past the text's column: a label too long
-	-- for it (a guide's whole title) is cut short with "…".
+	-- for it (a guide's whole title) is cut short with "…". With
+	-- guideWindow.bannerLinks "right", a notice's one action sits on the
+	-- text's first line by the × instead (GF.LayoutBanner narrows the text
+	-- for it); a second action (Later) puts both back under.
+	local onRight = 0 -- the width the action on the right takes, else 0
 	local function placeLink(link, text, x, y)
 		link.Label:SetWordWrap(false)
 		link.Label:SetWidth(0)
 		link.Label:SetText(text)
-		local room = floor(banner.Text:GetWidth() - x - 16)
+		local right = link == banner.Jump and ns.Get("guideWindow.bannerLinks") == "right"
+		local room = right and floor(banner.Text:GetWidth() * 0.45) or floor(banner.Text:GetWidth() - x - 16)
 		if room > 0 and link.Label:GetStringWidth() > room then link.Label:SetWidth(room) end
 		link:SetWidth(floor(link.Label:GetStringWidth() + 16 + 0.5))
 		link:ClearAllPoints()
-		link:SetPoint("TOPLEFT", banner.Text, "BOTTOMLEFT", x, y)
+		if right then
+			link:SetPoint("TOPRIGHT", banner, "TOPRIGHT", -(5 + 24 + 4), -7)
+			onRight = link:GetWidth() + 10
+		else
+			if onRight > 0 then
+				-- A second action: the first goes back under the text too.
+				onRight = 0
+				banner.Jump:ClearAllPoints()
+				banner.Jump:SetPoint("TOPLEFT", banner.Text, "BOTTOMLEFT", 0, y)
+			end
+			link:SetPoint("TOPLEFT", banner.Text, "BOTTOMLEFT", x, y)
+		end
 		link:Show()
 		return link:GetWidth()
 	end
@@ -355,6 +371,8 @@ ns.UI.GuideFrame.Part(function(GF)
 		banner.Jump.psDefault = (kind == "group" or kind == "lost" or kind == "dungeon" or kind == "dungeonRun") or nil -- the gamepad's first focus (UI/GamepadGuide.lua)
 		banner.Text:SetWidth(width - PAD * 2 - 21 - 24)
 		banner.Later:Hide()
+		onRight = 0
+		local oneLine = false -- no link row under the text
 		if kind == "skipped" then
 			banner.Icon:SetTexture(Theme.Media("skip"))
 			local lines = {}
@@ -605,13 +623,16 @@ ns.UI.GuideFrame.Part(function(GF)
 			local title = n.free == 0 and L["Your bags are full."]
 				or string.format(n.free == 1 and L["Bags nearly full: %d slot left."] or L["Bags nearly full: %d slots left."], n.free)
 			local j, Q = n.junk, ns.QoL
+			-- One line: the bags, then the cheapest junk with its Delete link
+			-- under it; without junk, the bags alone.
 			if j then
 				local worth = j.value < math.huge and Q.Money(j.value) or "?"
-				banner.Text:SetText(title .. "\n" .. string.format(L["Cheapest junk: %s (%s)"], Q.Space.ItemText(j), worth))
+				banner.Text:SetText(title .. "  \194\183  " .. string.format(L["Cheapest junk: %s (%s)"], Q.Space.ItemText(j), worth))
 				placeLink(banner.Jump, n.armed and L["Click again to delete it"] or L["Delete it"], 0, -4)
 			else
-				banner.Text:SetText(title .. "\n" .. L["No junk to make room with. Ctrl+Alt-click an item to mark it as junk."])
+				banner.Text:SetText(title)
 				banner.Jump:Hide()
+				oneLine = true
 			end
 			banner.Close:Show()
 		elseif kind == "wear" then
@@ -632,7 +653,12 @@ ns.UI.GuideFrame.Part(function(GF)
 			placeLink(banner.Jump, n.kind == "old" and L["How to update"] or L["Update"], 0, -4)
 			banner.Close:SetShown(n.closable)
 		end
-		local h = floor(9 + banner.Text:GetStringHeight() + 4 + 18 + 9 + 0.5)
+		-- The action on the right: the text stops short of it, no row under.
+		if onRight > 0 and banner.Jump:IsShown() then
+			banner.Text:SetWidth(width - PAD * 2 - 21 - 24 - onRight)
+			oneLine = true
+		end
+		local h = floor(9 + banner.Text:GetStringHeight() + (oneLine and 0 or 4 + 18) + 9 + 0.5)
 		banner:SetHeight(h)
 		return h
 	end

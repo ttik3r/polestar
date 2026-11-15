@@ -4792,3 +4792,6 @@ L["Nothing to apply: the parts ticked are the same as yours."] = "無可套用�
 -- L["A list beside the target button names the mobs and NPCs of your step: click a name to target it, or press the button's key for the first one close by."] = "目標按鈕旁的清單會列出你步驟中的怪物與 NPC：點擊名字即可選取，或按下按鈕的按鍵選取附近的第一個。"
 -- L["A row for each mob or NPC your step names, with its face and what it drops, beside a small Polestar mark. Click a row, or press the target button's key for the first one close by."] = "你步驟中提到的每個怪物或 NPC 各佔一行，顯示頭像與掉落物品，旁邊有一個小小的 Polestar 標記。點擊一行，或按下目標按鈕的按鍵選取附近的第一個。"
 -- L["One square button instead of the list: each click, or a press of its key, targets the next name."] = "以一個方形按鈕取代清單：每次點擊或按下它的按鍵，都會選取下一個名字。"
+-- L["The target button and the step key ping the mob they target, so your group sees it behind rocks and buildings. Never in a raid unless you lead or assist. The rare buttons always ping."] = "目標按鈕和步驟鍵會對選取的怪物發送信號，讓隊友隔著岩石和建築也能看到它。團隊中只有團隊領袖或助理才會發送。稀有按鈕一律會發送信號。"
+-- L["Preview"] = "預覽"
+-- L["Brill"] = "布瑞爾"

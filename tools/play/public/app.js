@@ -540,6 +540,16 @@
 		if (b) act({ type: 'quest', op: b.dataset.op, quest: Number(b.dataset.quest) });
 	});
 
+	// The chat on the game screen, shown or hidden: this browser remembers it
+	// (shown when it cannot).
+	const CHAT_KEY = 'polestarPlay.chatShown';
+	const showChat = (on) => { $('#chat').hidden = !on; $('#chat-shown').checked = on; };
+	try { showChat(localStorage.getItem(CHAT_KEY) !== '0'); } catch { showChat(true); }
+	$('#chat-shown').addEventListener('change', (e) => {
+		showChat(e.target.checked);
+		try { localStorage.setItem(CHAT_KEY, e.target.checked ? '1' : '0'); } catch { /* kept for this page only */ }
+	});
+
 	// Session
 	$('#eui').addEventListener('change', (e) => call('/api/eui', { on: e.target.checked }));
 	$('#reload').addEventListener('click', () => call('/api/reload'));
@@ -682,6 +692,169 @@
 			known = version;
 		}, 1000);
 	}
+	// -------------------------------------------------------------------------
+	// The walk: the guide played a tick at a time (a stride toward the goal, or
+	// the goal), each frame kept so the bar under the chat can look back.
+
+	const walk = { on: false, timer: null, frames: [], viewing: -1, restart: true };
+	const KEEP = 400;
+	const seek = $('#walk-seek');
+	const marks = $('#walk-marks');
+	const now = $('#walk-now');
+
+	const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+	function describe(f, i) {
+		const r = f.tick || {};
+		const bits = [`<strong>${i + 1}</strong>/${walk.frames.length}`, `step ${r.step ?? '?'}`, `level ${r.level ?? '?'}`];
+		let what = r.label || r.kind || '';
+		if (r.kind === 'goal' && r.result && r.result !== 'done' && r.result !== 'advanced') what += ` (${r.result})`;
+		if (r.xp) what += ` · +${r.xp} XP`;
+		if (r.levels) what += ` · level up`;
+		if (r.event) what += ` · event: ${r.event}`;
+		bits.push(esc(what));
+		return bits.join(' · ');
+	}
+	function drawMarks() {
+		const n = walk.frames.length;
+		marks.innerHTML = walk.frames.map((f, i) => {
+			const r = f.tick || {};
+			const kind = r.levels ? 'level' : r.event ? 'event' : r.result === 'stuck' || r.result === 'skipped' ? 'stuck' : r.kind === 'goal' && f.newStep ? 'step' : null;
+			return kind ? `<i class="${kind}" style="left:${n > 1 ? (i / (n - 1)) * 100 : 0}%" title="${esc(describe(f, i).replace(/<[^>]+>/g, ''))}"></i>` : '';
+		}).join('');
+	}
+	function syncWalk() {
+		const n = walk.frames.length;
+		seek.max = Math.max(0, n - 1);
+		const at = walk.viewing >= 0 ? walk.viewing : n - 1;
+		seek.value = at;
+		if (n) now.innerHTML = (walk.viewing >= 0 ? '<span class="past">Looking back</span> · ' : '') + describe(walk.frames[at], at);
+		$('#walk-play').textContent = walk.on ? 'Pause' : 'Walk';
+	}
+	function backToLive() {
+		if (walk.viewing < 0) return;
+		walk.viewing = -1;
+		syncWalk();
+		act({ type: 'render' });
+	}
+	const selectedCards = new Set();
+	const cardButtons = $$('[data-walk-card]');
+	function updateCardButtons() {
+		for (const button of cardButtons) {
+			const on = selectedCards.has(Number(button.dataset.walkCard));
+			button.setAttribute('aria-pressed', String(on));
+		}
+	}
+	async function tick(preview) {
+		if (!preview && selectedCards.size) {
+			selectedCards.clear();
+			updateCardButtons();
+		}
+		backToLive();
+		const action = {
+			type: 'walk', strides: Number($('#walk-strides').value), every: Number($('#walk-every').value),
+			cards: $('#walk-cards').checked, preview, xp: $('#walk-xp').checked, restart: walk.restart, seed: 1,
+		};
+		walk.restart = false;
+		const before = state && state.guide ? state.guide.step : null;
+		const frame = await act(action);
+		if (!frame || !frame.svg) return stopWalk();
+		const r = frame.result && typeof frame.result === 'object' ? frame.result : { kind: 'frame' };
+		walk.frames.push({ svg: frame.svg, tick: r, newStep: r.step !== before });
+		if (walk.frames.length > KEEP) walk.frames.shift();
+		drawMarks();
+		syncWalk();
+		const stopAt = Number($('#walk-stop').value);
+		if (r.kind === 'end' || (stopAt && r.step >= stopAt)) stopWalk();
+	}
+	function stopWalk() {
+		walk.on = false;
+		clearTimeout(walk.timer);
+		walk.timer = null;
+		syncWalk();
+	}
+	function loop() {
+		if (!walk.on) return;
+		const wait = 1400 / Number($('#walk-speed').value);
+		tick().then(() => {
+			if (walk.on) walk.timer = setTimeout(loop, wait);
+		});
+	}
+	$('#walk-play').addEventListener('click', () => {
+		if (walk.on) return stopWalk();
+		walk.on = true;
+		syncWalk();
+		loop();
+	});
+	$('#walk-tick').addEventListener('click', () => {
+		stopWalk();
+		tick();
+	});
+	for (const button of cardButtons) button.addEventListener('click', () => {
+		stopWalk();
+		const card = Number(button.dataset.walkCard);
+		if (selectedCards.has(card)) selectedCards.delete(card);
+		else {
+			// The two large previews share the heads-up card.
+			if (card === 3) selectedCards.delete(7);
+			if (card === 7) selectedCards.delete(3);
+			selectedCards.add(card);
+		}
+		updateCardButtons();
+		tick([...selectedCards]);
+	});
+	$('#clear-card-previews').addEventListener('click', () => {
+		stopWalk();
+		selectedCards.clear();
+		updateCardButtons();
+		tick([]);
+	});
+	seek.addEventListener('input', () => {
+		const i = Number(seek.value);
+		stopWalk();
+		if (i >= walk.frames.length - 1) return backToLive();
+		walk.viewing = i;
+		ui.innerHTML = walk.frames[i].svg;
+		syncWalk();
+	});
+	// The chat over the screen, on or off (remembered in this browser).
+	const chatBox = $('#show-chat');
+	try {
+		chatBox.checked = localStorage.getItem('polestar-play-chat') !== 'off';
+	} catch {}
+	screen.classList.toggle('no-chat', !chatBox.checked);
+	chatBox.addEventListener('change', () => {
+		screen.classList.toggle('no-chat', !chatBox.checked);
+		try {
+			localStorage.setItem('polestar-play-chat', chatBox.checked ? 'on' : 'off');
+		} catch {}
+	});
+	const sizeBox = $('#actual-size');
+	const game = $('.game');
+	try {
+		sizeBox.checked = localStorage.getItem('polestar-play-size') === 'actual';
+	} catch {}
+	game.classList.toggle('actual', sizeBox.checked);
+	sizeBox.addEventListener('change', () => {
+		game.classList.toggle('actual', sizeBox.checked);
+		try {
+			localStorage.setItem('polestar-play-size', sizeBox.checked ? 'actual' : 'fit');
+		} catch {}
+	});
+	// A new guide starts the walk over (its XP and strides).
+	$('#guide-load').addEventListener('click', () => {
+		walk.restart = true;
+	});
+	// The panel's own goal buttons play on from where the walk is: it pauses.
+	for (const b of $$('[data-act]')) b.addEventListener('click', stopWalk);
+	// Space walks or pauses, unless the game screen or a field has the keys.
+	window.addEventListener('keydown', (e) => {
+		if (e.key !== ' ' || e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+		const t = e.target;
+		if (screen.contains(t) || (t.closest && t.closest('input, select, textarea, button, [contenteditable]'))) return;
+		e.preventDefault();
+		$('#walk-play').click();
+	});
+
 	// For scripted sessions and debugging: the current hit map and state, and
 	// where a screen point is on the page.
 	window.PolestarPlay = {
