@@ -1822,7 +1822,17 @@ end
 -- The count in a column on the right. The tick stays laid out (its room
 -- keeps the column clear) but unseen and off.
 local COUNT = "|c%x%x%x%x%x%x%x%x(%d+/%d+)|r"
-local function countColumn(row, info)
+-- Core leaves a lone 0/1 to the tick; with the tick gone it goes in the
+-- column too ("Kill X for X's Skull" would show nothing).
+local function oneCount(goal, info)
+	local p = goal and goal.progress
+	if info.skipped or type(p) ~= "table" or p.max ~= 1 then return nil end
+	if p.kind == "skill" or p.kind == "rep" or p.kind == "wait" then return nil end
+	local cur = (goal.status == "done" or (p.cur or 0) >= 1) and 1 or 0
+	return cur .. "/1"
+end
+
+local function countColumn(row, goal, info)
 	local own = store(row)
 	if row.Check and row.Check:IsShown() then
 		row.Check:SetAlpha(0)
@@ -1830,10 +1840,14 @@ local function countColumn(row, info)
 	end
 	local text = row.Text:GetText() or ""
 	local count = text:match(COUNT) or text:match("%s(%d+/%d+)%s*$")
-	if not count then return end
-	text = text:gsub("%s*" .. COUNT, "", 1)
-	if text == row.Text:GetText() then text = text:gsub("%s+%d+/%d+%s*$", "", 1) end
-	row.Text:SetText(text)
+	if count then
+		text = text:gsub("%s*" .. COUNT, "", 1)
+		if text == row.Text:GetText() then text = text:gsub("%s+%d+/%d+%s*$", "", 1) end
+		row.Text:SetText(text)
+	else
+		count = oneCount(goal, info)
+		if not count then return end
+	end
 	if not own.count then
 		own.count = row:CreateFontString(nil, "OVERLAY")
 		own.count:SetJustifyH("RIGHT")
@@ -1854,7 +1868,7 @@ end
 on("guideRow", function(row, goal, info)
 	if not (row.Text and goal and info) then return end
 	goalRow(row, goal, info)
-	countColumn(row, info)
+	countColumn(row, goal, info)
 end)
 
 -- After the rows are laid out: "Other" (the next spot) in the count's
