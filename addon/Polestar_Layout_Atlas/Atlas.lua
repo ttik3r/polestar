@@ -1720,7 +1720,7 @@ local function rowBack(row)
 	end
 	if own.level then own.level:Hide() end
 	if own.count then own.count:Hide() end
-	row.psLevelWidth = nil
+	row.psLevelWidth, row.psRightMin = nil, nil
 	if own._single then
 		row.Text:SetWordWrap(true)
 		row.Text:SetMaxLines(2)
@@ -1852,6 +1852,8 @@ local function countColumn(row, goal, info)
 	own.count:ClearAllPoints()
 	own.count:SetPoint("TOPRIGHT", row, "TOPRIGHT", -14, -4)
 	own.count:Show()
+	-- The text wraps clear of the count.
+	row.psRightMin = 14 + math.ceil(own.count:GetUnboundedStringWidth()) + 8
 end
 
 on("guideRow", function(row, goal, info)
