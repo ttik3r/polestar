@@ -897,6 +897,20 @@ local function alongRows(along)
 			r.Text:SetText((text:gsub("%s*" .. HERE_COUNT, "", 1)))
 			own._text = true
 		end
+		-- Still to do, under its own heading: the quest alone, where it is (or
+		-- the XP) in the right column like the other rows' distance.
+		local facts, factsMeta = r.psFacts, nil
+		if type(facts) == "table" and (facts.quest or facts.text) then
+			own._orig = own._orig or text
+			-- The finished quests carried: the card's heading says they are still to do.
+			local carried = facts.count and (facts.count == 1 and Core.tr("1 quest to hand in") or string.format(Core.tr("%d quests to hand in"), facts.count))
+			r.Text:SetText(facts.quest or carried or facts.text)
+			if facts.zone then
+				factsMeta = facts.yards and (facts.zone .. "  \194\183  " .. (Core.distanceText(facts.yards) or "")) or facts.zone
+			elseif facts.xp and P.Thousands then
+				factsMeta = P.Thousands(facts.xp) .. " XP"
+			end
+		end
 		r.Text:SetTextColor(Theme.Color("text"))
 		own._color = true
 		-- The icon on the label's left edge, the text after it, in the cards' face.
@@ -919,7 +933,7 @@ local function alongRows(along)
 		local function paint()
 			local yards = view and Core.yardsTo(view)
 			local dist = yards and Core.distanceText(yards)
-			local meta = count and dist and (count .. "  \194\183  " .. dist) or count or dist
+			local meta = count and dist and (count .. "  \194\183  " .. dist) or count or dist or factsMeta
 			m.Text:SetText(meta or "")
 			return meta
 		end
@@ -949,7 +963,9 @@ local function alongRowsBack(along)
 	for _, r in ipairs({ along:GetChildren() }) do
 		local own = stores[r]
 		if own then
-			if own._text and type(r.Text.psCounted) == "string" then r.Text:SetText(r.Text.psCounted) end
+			if own._orig then r.Text:SetText(own._orig)
+			elseif own._text and type(r.Text.psCounted) == "string" then r.Text:SetText(r.Text.psCounted) end
+			own._orig = nil
 			if own._color then r.Text:SetTextColor(Theme.Color("textDim")) end
 			if own._font and own._font[1] then r.Text:SetFont(own._font[1], own._font[2], own._font[3]) end
 			if own._icon then r.Icon:SetVertexColor(Theme.Color("textMuted")) end

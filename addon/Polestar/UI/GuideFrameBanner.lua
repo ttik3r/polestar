@@ -437,7 +437,7 @@ ns.UI.GuideFrame.Part(function(GF)
 			banner.Close:Show()
 		elseif kind == "questSkip" then
 			banner.Icon:SetTexture(Theme.Media("skip"))
-			banner.Text:SetText(string.format(L["Skipped %s"], ns.Quoted(n.title) or L["the quest"]) .. "  \194\183  " .. L["and the quests that follow from it"])
+			banner.Text:SetText(string.format(L["Skipped %s and its follow-ups"], ns.Quoted(n.title) or L["the quest"]))
 			placeLink(banner.Jump, L["Undo"], 0, -4)
 			banner.Close:Show()
 		elseif kind == "lost" then
@@ -593,10 +593,11 @@ ns.UI.GuideFrame.Part(function(GF)
 				body  = L["Tome of Nobility quest chain (Lord Grayson Shadowbreaker, Stormwind); riding trainer otherwise."]
 			else
 				title = n.tier == 1 and L["Level 40: you can learn to ride"] or L["Level 60: Journeyman Riding"]
-				local tierName = n.tier == 1 and L["Apprentice Riding"] or L["Journeyman Riding"]
 				-- Gold as "1,000 g", in the client's thousands and gold symbol.
 				local function gold(g) return ns.Thousands(g) .. " " .. (ns.CoinSymbols()) end
-				local bodyParts = { tierName .. DOT .. gold(n.tier == 1 and 100 or 1000) }
+				-- The title says what it is; the body keeps to the price, the discount
+				-- and the balance, one short line.
+				local bodyParts = { gold(n.tier == 1 and 100 or 1000) }
 				-- Discount: always mention; "Honored: Xg" when standing is confirmed.
 				local C = ns.Compat
 				local standing = n.factionID and C and C.GetFactionStanding and C.GetFactionStanding(n.factionID)
@@ -670,6 +671,8 @@ ns.UI.GuideFrame.Part(function(GF)
 			oneLine = true
 		end
 		if noClose then banner.Close:Hide() end
+		-- No action shown (the riding notice when the gold is short): no row kept for one.
+		if not banner.Jump:IsShown() and not banner.Later:IsShown() then oneLine = true end
 		local h = floor(9 + banner.Text:GetStringHeight() + (oneLine and 0 or 4 + 18) + 9 + 0.5)
 		banner:SetHeight(h)
 		return h
