@@ -2359,10 +2359,14 @@ local function xpLook(xp)
 	if not (xp.Text and xp.Icon) then return end
 	store(xp).atlas = true
 	local head = {}
-	local level = UnitLevel and UnitLevel("player")
-	local cur, max = UnitXP and UnitXP("player"), UnitXPMax and UnitXPMax("player")
-	if type(level) == "number" and level > 0 then head[#head + 1] = string.format(tr("Level %d"), level) end
-	if type(cur) == "number" and type(max) == "number" and max > 0 then head[#head + 1] = math.floor(cur / max * 100) .. "%" end
+	-- The level and its percent are the XP tracker's: not while it is off.
+	local Q = Polestar.QoL
+	if Q and Q.GetXPStats and Q.GetXPStats() then
+		local level = UnitLevel and UnitLevel("player")
+		local cur, max = UnitXP and UnitXP("player"), UnitXPMax and UnitXPMax("player")
+		if type(level) == "number" and level > 0 then head[#head + 1] = string.format(tr("Level %d"), level) end
+		if type(cur) == "number" and type(max) == "number" and max > 0 then head[#head + 1] = math.floor(cur / max * 100) .. "%" end
+	end
 	local line = Core.xpLine(xp)
 	if line then head[#head + 1] = line end
 	xp.Text:SetText(table.concat(head, "  \194\183  "))
