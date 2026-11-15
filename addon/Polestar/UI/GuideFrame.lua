@@ -295,7 +295,7 @@ GF.Part(function(GF)
 	---------------------------------------------------------------------------
 
 	GF.LOOK = {
-		tabs = true, tabStyle = "underline", tabHeight = 1, navHeight = 1, stepCount = true, guideTitle = true, skipButton = true, reportButton = true,
+		tabs = true, tabStyle = "underline", tabHeight = 1, navHeight = 1, stepCount = true, guideTitle = true, skipButton = true, reportButton = true, allStepsButton = false,
 		barTextSize = 1, titleSize = 1, goalSize = 1, detailSize = 1, noteSize = 1, upSize = 1,
 		outline = "outline", padding = 0, rowSpacing = 0, lineSpacing = 0, glyphSize = 1, checkSize = 1,
 		targetBar = true, targetBarColor = false, targetBarWidth = 2,
@@ -1821,7 +1821,7 @@ GF.Part(function(GF)
 	-- button is off (nav.nearbyButton).
 	local function anchorSkip()
 		nav.Skip:ClearAllPoints()
-		nav.Skip:SetPoint("RIGHT", (nav.Nearby:IsShown() and nav.Nearby) or (nav.Report:IsShown() and nav.Report) or nav.Menu, "LEFT", -2, 0)
+		nav.Skip:SetPoint("RIGHT", (nav.AllSteps:IsShown() and nav.AllSteps) or (nav.Nearby:IsShown() and nav.Nearby) or (nav.Report:IsShown() and nav.Report) or nav.Menu, "LEFT", -2, 0)
 	end
 
 	local function navigatorFor(guide, index)
@@ -1847,6 +1847,11 @@ GF.Part(function(GF)
 		nav.Report:SetShown(guide ~= nil and GF.On("reportButton"))
 		nav.Nearby:ClearAllPoints()
 		nav.Nearby:SetPoint("RIGHT", nav.Report:IsShown() and nav.Report or nav.Lookup, "LEFT", 0, 0)
+		local SL = UI.StepList
+		nav.AllSteps:SetShown(guide ~= nil and SL ~= nil and GF.On("allStepsButton"))
+		W.SetIconState(nav.AllSteps, SL and SL.On() or false, true)
+		nav.AllSteps:ClearAllPoints()
+		nav.AllSteps:SetPoint("RIGHT", nav.Nearby:IsShown() and nav.Nearby or nav.Report:IsShown() and nav.Report or nav.Lookup, "LEFT", 0, 0)
 		anchorSkip()
 		-- No guide: no steps to walk; the navigator names the addon instead.
 		nav.Steps:SetShown(guide ~= nil and GF.On("stepCount"))
@@ -2948,6 +2953,14 @@ GF.Part(function(GF)
 		nav.Nearby:SetPoint("RIGHT", nav.Report, "LEFT", 0, 0)
 		nav.Nearby:SetShown(ns.Get("nav.nearbyButton") ~= false)
 		GF.nearbyButton = nav.Nearby
+		-- All steps: opens and closes the step browser (UI/StepList.lua), lit
+		-- while it is open; left of Nearby (guideWindow.allStepsButton).
+		nav.AllSteps = W.IconButton(nav, "layers", 24, L["All steps"], function()
+			if UI.StepList then UI.StepList.Toggle() end
+		end)
+		nav.AllSteps.psTipLines = { L["Every step of the guide in one list. Click one to look at it."] }
+		nav.AllSteps:SetPoint("RIGHT", nav.Nearby, "LEFT", 0, 0)
+		nav.AllSteps:Hide()
 		-- Skip: the 11px skip glyph and a Small label, a ghost button left of the
 		-- bug.
 		local skip = CreateFrame("Button", nil, nav)
@@ -3004,11 +3017,11 @@ GF.Part(function(GF)
 			GF.ScrubDone()
 			UI.StepList.Toggle()
 		end)
-		for _, b in ipairs({ nav.Menu, nav.Lookup, nav.Report, nav.Nearby, nav.Next, nav.Prev, nav.Skip }) do hoverable(b) end
+		for _, b in ipairs({ nav.Menu, nav.Lookup, nav.Report, nav.Nearby, nav.AllSteps, nav.Next, nav.Prev, nav.Skip }) do hoverable(b) end
 		-- Transparent chrome: the step number fades with its chevrons (nav.Steps
 		-- holds all three) and the title with them; a lone "3 / 8" over the world
 		-- would read as a stray number. Progress stays readable in the foot.
-		for _, c in ipairs({ nav.Menu, nav.Lookup, nav.Report, nav.Nearby, nav.Skip, nav.Steps, nav.Title }) do chrome[#chrome + 1] = c end
+		for _, c in ipairs({ nav.Menu, nav.Lookup, nav.Report, nav.Nearby, nav.AllSteps, nav.Skip, nav.Steps, nav.Title }) do chrome[#chrome + 1] = c end
 
 		-- Body
 		body = CreateFrame("Frame", nil, F)

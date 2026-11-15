@@ -52,6 +52,8 @@ ns.UI.GuideFrame.Part(function(GF)
 		if not E then return end
 		if button == "RightButton" then return tabMenu(self) end
 		if button == "MiddleButton" and E.CloseTab then return E.CloseTab(self.psIndex) end
+		-- The tab on screen, clicked with the step browser open: back to the step card.
+		if self.psActive and UI.StepList and UI.StepList.On() then return UI.StepList.Toggle(false) end
 		if E.SelectTab and not self.psActive then E.SelectTab(self.psIndex) end
 	end
 

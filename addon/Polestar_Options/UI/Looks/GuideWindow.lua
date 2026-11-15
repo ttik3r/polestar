@@ -50,7 +50,7 @@ local PREVIEW_H = 250 -- the drawing's height until its band lays it out
 -- part as the window names it (GF.Placed).
 local PART_OF = {}
 for part, keys in pairs({
-	bars = { "tabs", "tabStyle", "tabHeight", "navHeight", "barTextSize", "stepCount", "guideTitle", "skipButton", "reportButton" },
+	bars = { "tabs", "tabStyle", "tabHeight", "navHeight", "barTextSize", "stepCount", "guideTitle", "skipButton", "reportButton", "allStepsButton" },
 	person = { "titleSize", "glyphSize", "lastSteps" },
 	goals = { "goalSize", "detailSize", "rowSpacing", "lineSpacing", "checkSize", "targetBar", "targetBarWidth", "targetBarColor" },
 	tip = { "noteSize" },
@@ -315,7 +315,7 @@ function UI.GuideWindowScene(band)
 			["guideWindow.tabs"] = { P.strip }, ["guideWindow.tabStyle"] = styled,
 			["guideWindow.tabHeight"] = { P.strip }, ["guideWindow.navHeight"] = { nav },
 			["guideWindow.barTextSize"] = bars, ["guideWindow.stepCount"] = { nav.Steps }, ["guideWindow.guideTitle"] = { nav.Title },
-			["guideWindow.skipButton"] = { nav.Skip }, ["guideWindow.reportButton"] = { nav.Report },
+			["guideWindow.skipButton"] = { nav.Skip }, ["guideWindow.reportButton"] = { nav.Report }, ["guideWindow.allStepsButton"] = { nav.AllSteps },
 			["guideWindow.titleSize"] = { person.Name }, ["guideWindow.lastSteps"] = { person, P.last }, ["guideWindow.goalSize"] = texts, ["guideWindow.detailSize"] = details,
 			["guideWindow.glyphSize"] = icons, ["guideWindow.rowSpacing"] = rows, ["guideWindow.lineSpacing"] = spacing,
 			["guideWindow.checkSize"] = checks, ["guideWindow.targetBar"] = marks, ["guideWindow.targetBarWidth"] = marks,
@@ -559,6 +559,9 @@ local SPECS = {
 			help = L["Skip in the step bar. The guide menu still skips a step."], search = "skip, button, hide skip, skip button" },
 		{ kind = "toggle", key = "guideWindow.reportButton", label = L["Report"], new = NEW,
 			help = L["The bug button that reports a problem with the step. The guide menu still has it."], search = "bug, report, problem, button, report button" },
+		{ kind = "toggle", key = "guideWindow.allStepsButton", label = L["All steps"], new = NEW,
+			help = L["A button in the step bar that opens every step of the guide in one list. The step number and the guide menu open it too."],
+			search = "all steps, browse, step list, list, every step, button" },
 	} },
 	{ page = PAGE, tab = L["Parts"], section = L["Step card"], controls = {
 		{ kind = "slider", key = "guideWindow.lastSteps", label = L["Steps before"], min = 0, max = 5, step = 1, format = "%d", new = NEW,

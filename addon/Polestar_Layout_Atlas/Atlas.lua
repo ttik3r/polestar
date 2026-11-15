@@ -316,7 +316,7 @@ onLeave(function(parts) if parts.window then parts.window.psBelow = nil end end)
 local SKIP_W = 7 + 11 + 7
 local function navRow(nav)
 	local prev = nav.Menu
-	for _, b in ipairs({ nav.Report, nav.Nearby, nav.Skip }) do
+	for _, b in ipairs({ nav.Report, nav.Nearby, nav.AllSteps, nav.Skip }) do
 		if b == nav.Skip then
 			if b.Label then b.Label:Hide() end
 			b:SetWidth(SKIP_W)
@@ -367,7 +367,7 @@ local function header(parts)
 	nav.Title:SetShown(text ~= nil and text ~= "")
 end
 on("guideLayout", function(parts) header(parts) end)
--- The render shows or hides Skip, Report and Nearby again and puts Skip
+-- The render shows or hides Skip, Report, Nearby and All steps again and puts Skip
 -- back by them: set the row out again.
 on("guideRender", function(view, parts)
 	local nav = parts.nav
@@ -2457,6 +2457,7 @@ local function spec(hooks)
 			["guideWindow.progress"] = false,
 			["guideWindow.targetBar"] = false,
 			["guideWindow.reportButton"] = false,
+			["guideWindow.allStepsButton"] = true,
 			["guideWindow.lastSteps"] = 1,
 			["guideWindow.journeyStyle"] = "folded",
 			["guideWindow.bannerLinks"] = "right",
