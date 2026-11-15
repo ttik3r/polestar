@@ -975,11 +975,11 @@ end)
 -- left, a step skipped, the bags, a newer Polestar...) as a heads-up card on
 -- top of the stack ("card"): Polestar's own banner, its text, its action link,
 -- Later and its × as they are; the card's ground in place of its tint and
--- rule. One kept in the window ("strip", the bags) reads as a dark strip
+-- rule. One kept in the window ("strip", the bags and Looking back or ahead) reads as a dark strip
 -- tinted by its kind, with a 3px edge and icon in that colour; its action
 -- sits by the × (guideWindow.bannerLinks "right"). nil: Polestar's own look.
 -- Shown or hidden, never SetAlpha: a texture's alpha is its colour's.
-local BANNER_ROLE = { bags = "warning", train = "npc", riding = "npc", skipped = "textMuted", questSkip = "textMuted" }
+local BANNER_ROLE = { bags = "warning", away = "npc", train = "npc", riding = "npc", skipped = "textMuted", questSkip = "textMuted" }
 local function bannerLook(banner, mode)
 	local W = P.Widgets
 	if banner.Fill then banner.Fill:SetShown(mode == nil) end
@@ -1391,6 +1391,20 @@ on("guidePlace", function(name, part, width, height)
 	-- Full bags stay in the window, as a tinted strip.
 	if name == "banner" and part.psKind == "bags" then
 		bannerLook(part, "strip")
+		return false
+	end
+	-- Looking back or ahead: the same strip, an eye for its icon and no ×
+	-- (paging back or its link ends it); its link takes the ×'s place.
+	if name == "banner" and part.psKind == "away" then
+		bannerLook(part, "strip")
+		local _, n = Core.notice()
+		if not (n and n.skipped) and part.Icon then part.Icon:SetTexture(Theme.Media("eye")) end
+		if part.Close then part.Close:Hide() end
+		local jump = part.Jump
+		if jump and jump:IsShown() and P.Get("guideWindow.bannerLinks") == "right" then
+			jump:ClearAllPoints()
+			jump:SetPoint("TOPRIGHT", part, "TOPRIGHT", -5, -7)
+		end
 		return false
 	end
 	-- Every other banner notice: a heads-up card on top of the stack.
