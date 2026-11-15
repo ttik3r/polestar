@@ -1490,9 +1490,11 @@ GF.Part(function(GF)
 	-- as rows, default off: folded into one line), "upnextHead" (Up next's
 	-- heading, default on; without it the rows always show), "goalScroll" (the
 	-- goals area scrolls past the window's cap, default on), "classCardLater"
-	-- (the class quest card on the chain's later steps, default on).
-	function GF.Shows(name, default)
-		local ran, v = GF.HookValue("guideShows", name, default)
+	-- (the class quest card on the chain's later steps, default on),
+	-- "bannerClose" (a banner notice's ×, default on; the notice's kind follows
+	-- `default`).
+	function GF.Shows(name, default, ...)
+		local ran, v = GF.HookValue("guideShows", name, default, ...)
 		if ran and type(v) == "boolean" then return v end
 		return default
 	end
