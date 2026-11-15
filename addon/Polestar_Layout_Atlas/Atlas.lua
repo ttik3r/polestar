@@ -393,7 +393,7 @@ local GAP = 5
 local OPT_ROW, OPT_PAD = 23, 14
 
 ---------------------------------------------------------------------------
--- The Journey's styles (guideWindow.journeyStyle; Atlas's default "joined"):
+-- The Journey's styles (guideWindow.journeyStyle; Atlas's default "folded", open):
 -- "inside" (Polestar's own, under the step), "joined" (a card joined under
 -- the window's foot), "folded" (joined, its header the leg you are on with
 -- a progress bar while collapsed), "rail" (inside, its legs as nodes on the
@@ -405,7 +405,7 @@ local OPT_ROW, OPT_PAD = 23, 14
 local JOURNEY_STYLES = { inside = true, joined = true, folded = true, rail = true, foot = true }
 local function journeyStyle()
 	local s = Core.setting("guideWindow.journeyStyle")
-	return JOURNEY_STYLES[s] and s or "joined"
+	return JOURNEY_STYLES[s] and s or "folded"
 end
 -- The panel behind journey frame `f`: a settings preview's sample
 -- (JP.Sample, f.psPanel) or the live one (JP). Every journey frame a layout
@@ -2455,7 +2455,7 @@ local function spec(hooks)
 			["guideWindow.targetBar"] = false,
 			["guideWindow.reportButton"] = false,
 			["guideWindow.lastSteps"] = 1,
-			["guideWindow.journeyStyle"] = "joined",
+			["guideWindow.journeyStyle"] = "folded",
 			["guideWindow.bannerLinks"] = "right",
 		},
 		-- Its card in the guide window's Presets, beside Polestar's own:
