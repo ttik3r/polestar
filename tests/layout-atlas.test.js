@@ -444,6 +444,7 @@ end
 emit({
 	along = { placed.along or false, parts.along:IsShown(), parts.along.Label:GetText() },
 	banner = { placed.banner or false, parts.banner:IsShown(), parts.banner.psKind or false, parts.banner.Text:GetText() or "" },
+	bannerClose = parts.banner.Close:IsShown(),
 	party = { placed.party or false, GF.party:IsShown() },
 	rows = rows, cards = #stack,
 })`;
@@ -464,13 +465,14 @@ test('under Atlas Along the way is a card above the window: no heading in it, th
 	assert.doesNotMatch(out.rows[0][0], /6\/10/, 'the count leaves the line');
 	assert.match(out.rows[0][0], /optional/, 'the optional tag stays');
 	assert.match(String(out.rows[0][1]), /^6\/10  ·  \d+ yd$/, `meta: ${out.rows[0][1]}`);
-	assert.ok(out.cards >= 3, `cards above: ${out.cards}`);
+	assert.ok(out.cards >= 2, `cards above: ${out.cards}`);
 });
 
-test('under Atlas the Looking ahead banner is a heads-up card above the window', () => {
+test('under Atlas the Looking ahead banner stays in the window as a strip, with no ×', () => {
 	const out = outside('atlas');
-	assert.deepEqual(out.banner.slice(0, 3), [false, true, 'away']);
+	assert.deepEqual(out.banner.slice(0, 3), [true, true, 'away']);
 	assert.match(out.banner[3], /Looking ahead/);
+	assert.equal(out.bannerClose, false, 'no ×: paging back or its link ends it');
 });
 
 test('under Atlas the party line is a card above the window', () => {
