@@ -197,7 +197,8 @@ function UI.GuideWindowScene(band)
 		self.psW, self.psHeight = width, height or PREVIEW_H
 		if not self.psDrawn then return end
 		local F = G.frame
-		local w, y = F:GetWidth(), F:GetHeight()
+		-- What a layout hangs under the window (G.Below) is in the box too.
+		local w, y = F:GetWidth(), F:GetHeight() + (G.Below and G.Below() or 0)
 		-- Tabs drawn outside the window (guideWindow.tabStyle "edge", "strip") keep their room in the box.
 		local ol, ot = G.TabsOutside()
 		local s = (tonumber(ns.Get("ui.scale")) or 1) * band:TrueScale()
@@ -379,7 +380,8 @@ local function buildPreview(view)
 		-- Drawn first: its natural size at its own scale.
 		G:Draw()
 		local ol, ot = G.Copy.TabsOutside()
-		local winW, winH = (G.Window:GetWidth() + ol) * s, (G.Window:GetHeight() + ot) * s
+		local below = G.Copy.Below and G.Copy.Below() or 0
+		local winW, winH = (G.Window:GetWidth() + ol) * s, (G.Window:GetHeight() + ot + below) * s
 		local room = self.psRoom and max(60, self.psRoom - 2 * P.BAND_PAD - P.LINE_GAP - P.LINE_H) or winH + 8
 		-- Whole: its height and the 8 its crop keeps under it; else the room, cut.
 		local h = min(winH + 8, room)
