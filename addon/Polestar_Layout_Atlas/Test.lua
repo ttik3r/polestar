@@ -45,8 +45,33 @@ local function provider()
 		for k, v in pairs(view) do copy[k] = v end
 		copy.note, copy.image = "Check the path near the bridge before heading up the hill.", nil
 		copy.goals = { unpack(view.goals or {}) }
-		local i = #copy.goals + 1
-		copy.goals[i] = { index = i, optional = true, previewOnly = true, status = "active", t = "talk", text = "Talk to the nearby scout" }
+		-- Every kind of count: a lone 0/1, a part-done count, a done count,
+		-- and a long goal that wraps to its second line.
+		local fake = {
+			{ status = "active", t = "kill", text = "Kill the camp leader for the leader's head", progress = { cur = 0, max = 1 } },
+			{ status = "active", t = "kill", text = "Kill Bandits", progress = { cur = 3, max = 10 } },
+			{ status = "done", t = "collect", text = "Collect Wolf Meat", progress = { cur = 8, max = 8 } },
+			{ status = "active", t = "kill", text = "Kill the raiders along the road from the farm to the old mill", progress = { cur = 2, max = 12 } },
+			{ optional = true, status = "active", t = "talk", text = "Talk to the nearby scout" },
+		}
+		-- In the focus group (the window lists its goals), else the last
+		-- goal's: copies, so the Engine's own groups stay as they are.
+		local last = copy.goals[#copy.goals]
+		local gk = (view.groups and view.groups[view.focus] and view.focus) or (last and last.group)
+		copy.groups = {}
+		for k, grp in pairs(view.groups or {}) do
+			local gc = {}
+			for f, x in pairs(grp) do gc[f] = x end
+			if k == gk then gc.goals = { unpack(grp.goals or {}) } end
+			copy.groups[k] = gc
+		end
+		local into = gk and copy.groups[gk]
+		for _, g in ipairs(fake) do
+			local i = #copy.goals + 1
+			g.index, g.previewOnly, g.group = i, true, gk
+			copy.goals[i] = g
+			if into and not g.optional then into.goals[#into.goals + 1] = i end
+		end
 		return copy
 	end
 	function c.GetWhileHereList()

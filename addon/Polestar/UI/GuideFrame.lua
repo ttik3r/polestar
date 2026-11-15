@@ -929,6 +929,9 @@ GF.Part(function(GF)
 			r.Alt:SetPoint("TOPRIGHT", r, "TOPRIGHT", -(right - 4), -2 - ROW_PAD)
 			right = right + 20
 		end
+		-- A skin that puts its own column at the edge (Atlas's count) asks
+		-- for at least that much room with r.psRightMin.
+		if r.psRightMin and r.psRightMin > right then right = r.psRightMin end
 		local tw = max(40, width - TEXT_X - right)
 		r.Text:SetWidth(tw)
 		UI.FitCounts(r.Text)
