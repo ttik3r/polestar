@@ -383,8 +383,10 @@ local function buildPreview(view)
 		local below = G.Copy.Below and G.Copy.Below() or 0
 		local winW, winH = (G.Window:GetWidth() + ol) * s, (G.Window:GetHeight() + ot + below) * s
 		local room = self.psRoom and max(60, self.psRoom - 2 * P.BAND_PAD - P.LINE_GAP - P.LINE_H) or winH + 8
-		-- Whole: its height and the 8 its crop keeps under it; else the room, cut.
-		local h = min(winH + 8, room)
+		-- Whole: its height and the 8 its crop keeps under it, smaller to fit
+		-- the room (the band scales it, down to 60%); taller still, the room, cut.
+		local h = winH + 8
+		if h > room and room / h < 0.6 then h = room end
 		return winW, h, function(left, top, k)
 			G:ClearAllPoints()
 			G:SetPoint("TOPLEFT", self, "TOPLEFT", P.Snap(self, left - SIDE), -P.Snap(self, top))

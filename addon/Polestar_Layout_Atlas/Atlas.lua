@@ -309,6 +309,7 @@ local function navBack(nav)
 	Theme.Font(nav.Title, "small")
 end
 onLeave(function(parts) navBack(parts.nav) end)
+onLeave(function(parts) if parts.window then parts.window.psBelow = nil end end)
 
 -- Right to left from the menu: Report and Nearby where the player shows
 -- them, Skip (its glyph alone), then the step count.
@@ -1547,6 +1548,8 @@ local function layoutBottom(parts, journey, foot)
 	else
 		b:Hide()
 	end
+	-- Its height for a host that shows the window whole (GF.Below).
+	window.psBelow = b:IsShown() and b:GetHeight() or 0
 end
 
 on("guideLayout", function(parts)

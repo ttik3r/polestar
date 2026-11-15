@@ -442,18 +442,12 @@ ns.UI.GuideFrame.Part(function(GF)
 		return top * uiScale / scale - bottom
 	end
 
-	-- How far the window's shown children reach below its bottom edge (a
-	-- layout's frame joined under it, such as Atlas's folded Journey): a host
-	-- showing a copy (the settings preview) leaves that room too. -> height
+	-- How far a layout's frames reach below the window's bottom edge (Atlas's
+	-- folded Journey): the layout sets F.psBelow in its guideLayout hook. A
+	-- host showing a copy (the settings preview) leaves that room too. -> height
 	function GF.Below()
-		local bottom = F and F:GetBottom()
-		if not bottom then return 0 end
-		local most = 0
-		for _, c in ipairs({ F:GetChildren() }) do
-			local b = c:IsShown() and c:GetBottom()
-			if b and bottom - b > most then most = bottom - b end
-		end
-		return floor(most + 0.5)
+		local h = F and tonumber(F.psBelow) or 0
+		return h > 0 and floor(h + 0.5) or 0
 	end
 
 	function GF.Layout()
