@@ -14,7 +14,7 @@ local P = Polestar
 if not (P and P.RegisterCommand and P.UI and P.UI.GuideFrame) then return end
 
 local active = nil -- { restores = { fn, ... }, banner = i } while on
-local BANNERS = { "Training due", "Bags full", "Skipped quest" }
+local BANNERS = { "Training due", "Bags full", "Bags full, junk", "Skipped quest" }
 
 local function patch(restores, t, key, fn)
 	if type(t) ~= "table" then return end
@@ -96,7 +96,14 @@ local function start()
 		return { { quest = 0, title = "The Absent Minded Prospector", status = "missed", xp = 410 },
 			{ quest = 0, title = "Brother Paxton", status = "skipped", xp = 0, grey = true } }
 	end)
-	patch(r, P.QoL and P.QoL.Space, "Banner", function() return { free = 0 } end)
+	patch(r, P.QoL and P.QoL.Space, "Banner", function()
+		if active and BANNERS[active.banner] == "Bags full, junk" then
+			return { free = 0, junk = { id = 0, link = "Ruined Pelt", count = 1, value = 4 } }
+		end
+		return { free = 0 }
+	end)
+	-- Its Delete it would arm the real cheapest junk: in the test, a line in chat.
+	patch(r, P.QoL and P.QoL.Space, "Press", function() P.Print("Atlas test: Delete it (nothing deleted).") end)
 	-- A fake journey of every kind of row: a walk with a hostile town under
 	-- it, a flight, a lift and a ferry. One table for the whole test, so the
 	-- panel keeps it and the current leg counts down.

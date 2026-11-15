@@ -326,6 +326,13 @@ local function navRow(nav)
 	end
 	nav.Steps:ClearAllPoints()
 	nav.Steps:SetPoint("RIGHT", prev, "LEFT", -2, 0)
+	-- The title runs up to the step count, or with it off to the buttons.
+	local own = stores[nav]
+	if own and own.emblem and nav.Title then
+		nav.Title:ClearAllPoints()
+		nav.Title:SetPoint("LEFT", own.emblem, "RIGHT", 8, 0)
+		nav.Title:SetPoint("RIGHT", nav.Steps:IsShown() and nav.Steps or prev, "LEFT", -8, 0)
+	end
 end
 
 local function header(parts)
@@ -351,9 +358,6 @@ local function header(parts)
 	navRow(nav)
 	Theme.Font(nav.Title, "goal")
 	nav.Title:SetTextColor(Theme.Color("textDim"))
-	nav.Title:ClearAllPoints()
-	nav.Title:SetPoint("LEFT", own.emblem, "RIGHT", 8, 0)
-	nav.Title:SetPoint("RIGHT", nav.Steps, "LEFT", -8, 0)
 	nav.Title:SetJustifyH("LEFT")
 	nav.Title:SetWordWrap(false)
 	local text = nav.Title:GetText()
@@ -958,15 +962,46 @@ end)
 
 -- A banner notice (Looking ahead, the tab just closed and its Reopen, a quest
 -- left, a step skipped, the bags, a newer Polestar...) as a heads-up card on
--- top of the stack: Polestar's own banner, its text, its action link, Later
--- and its × as they are; the card's ground in place of its tint and rule.
-local function bannerLook(banner, on)
-	for _, t in ipairs({ banner.Fill, banner.Rule }) do
-		if t and t.SetAlpha then t:SetAlpha(on and 0 or 1) end
+-- top of the stack ("card"): Polestar's own banner, its text, its action link,
+-- Later and its × as they are; the card's ground in place of its tint and
+-- rule. One kept in the window ("strip", the bags) reads as a dark strip
+-- tinted by its kind, with a 3px edge and icon in that colour; its action
+-- sits by the × (guideWindow.bannerLinks "right"). nil: Polestar's own look.
+-- Shown or hidden, never SetAlpha: a texture's alpha is its colour's.
+local BANNER_ROLE = { bags = "warning", train = "npc", riding = "npc", skipped = "textMuted", questSkip = "textMuted" }
+local function bannerLook(banner, mode)
+	local W = P.Widgets
+	if banner.Fill then banner.Fill:SetShown(mode == nil) end
+	if banner.Rule then
+		local G = P.UI and P.UI.GuideFrame
+		banner.Rule:SetShown(mode ~= "card" and (not G or not G.On or G.On("rules")))
+	end
+	local strip = mode == "strip"
+	if strip and not banner.psTint then
+		banner.psTint = banner:CreateTexture(nil, "BACKGROUND", nil, 1)
+		banner.psTint:SetTexture(Theme.Media("white"))
+		banner.psTint:SetAllPoints(banner)
+		banner.psEdge = banner:CreateTexture(nil, "BORDER")
+		banner.psEdge:SetTexture(Theme.Media("white"))
+		banner.psEdge:SetPoint("TOPLEFT", banner, "TOPLEFT", 0, 0)
+		banner.psEdge:SetPoint("BOTTOMLEFT", banner, "BOTTOMLEFT", 0, 0)
+		banner.psEdge:SetWidth(3)
+	end
+	if banner.psTint then
+		banner.psTint:SetShown(strip)
+		banner.psEdge:SetShown(strip)
+	end
+	local role = strip and BANNER_ROLE[banner.psKind] or "accent"
+	if W and W.Color then
+		if strip then
+			W.Color(banner.psTint, role, 0.11)
+			W.Color(banner.psEdge, role)
+		end
+		if banner.Icon then W.Color(banner.Icon, role) end
 	end
 end
 
-onLeave(function(parts) if parts.banner then bannerLook(parts.banner, false) end end)
+onLeave(function(parts) if parts.banner then bannerLook(parts.banner, nil) end end)
 onLeave(function()
 	journeyRowsLook(false)
 	foldedHead(false)
@@ -1340,14 +1375,14 @@ on("guidePlace", function(name, part, width, height)
 		slots.journey = part
 		return true
 	end
-	-- Full bags stay Polestar's own banner, in the window.
+	-- Full bags stay in the window, as a tinted strip.
 	if name == "banner" and part.psKind == "bags" then
-		bannerLook(part, false)
+		bannerLook(part, "strip")
 		return false
 	end
 	-- Every other banner notice: a heads-up card on top of the stack.
 	if name == "banner" then
-		bannerLook(part, true)
+		bannerLook(part, "card")
 		part:SetHeight(height)
 		slots.banner = part
 		return true
@@ -2403,6 +2438,7 @@ local function spec(hooks)
 			["guideWindow.reportButton"] = false,
 			["guideWindow.lastSteps"] = 1,
 			["guideWindow.journeyStyle"] = "joined",
+			["guideWindow.bannerLinks"] = "right",
 		},
 		-- Its card in the guide window's Presets, beside Polestar's own:
 		-- picking it chooses this layout and the Atlas skin. A Polestar

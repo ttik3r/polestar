@@ -35,7 +35,8 @@
 -- GF.live), then again, part by part in the same order, for each copy
 -- GF.Copy(parent, content) makes (the settings preview's, UI/Looks/
 -- GuideWindow.lua). A copy is unnamed, in `parent`, takes no clicks, wheel or
--- tooltip (only the pointer's hover, for the look the window has under it),
+-- tooltip (only the pointer's hover, for the look the window has under it;
+-- a transparent window's tabs and step bar show on a copy at rest too),
 -- has no event, message, setting or hook of its own, and none of the frames
 -- other modules put in the live window (the class card, the journey, the step
 -- browser, name targets, gear picks), nor its banner, timers or party line.
@@ -304,6 +305,9 @@ GF.Part(function(GF)
 		-- Where the Journey goes: "inside" (under the step); a layout may offer
 		-- more ("joined", "folded", "rail", "foot": Polestar_Layout_Atlas).
 		journeyStyle = "inside",
+		-- The banner's action: "under" the text, or "right" on its line, by
+		-- the × (only a notice with one action; two stay under).
+		bannerLinks = "under",
 	}
 	if GF.live then ns.RegisterDefaults("guideWindow", GF.LOOK) end
 
