@@ -690,7 +690,10 @@ local function infoIcon(owner, label, tip)
 		b:SetScript("OnEnter", function(self)
 			label:SetTextColor(Theme.Color("textDim"))
 			if GameTooltip then
-				GameTooltip:SetOwner(self, "ANCHOR_TOP")
+				-- Above the card, clear of its edge (on the label it covered the border).
+				GameTooltip:SetOwner(self, "ANCHOR_NONE")
+				GameTooltip:ClearAllPoints()
+				GameTooltip:SetPoint("BOTTOMLEFT", owner, "TOPLEFT", 0, 4)
 				GameTooltip:SetText(self.psTip or "", 1, 1, 1, 1, true)
 				GameTooltip:Show()
 			end
