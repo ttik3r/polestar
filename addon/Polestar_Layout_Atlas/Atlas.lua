@@ -1027,7 +1027,11 @@ local function bannerLook(banner, mode)
 		banner.psEdge:SetWidth(3)
 	end
 	if banner.psTint then
-		banner.psTint:SetShown(strip)
+		-- A transparent window (psBare) has no ground: the strip keeps its
+		-- edge and icon, not its tint.
+		local parts = Theme.GuideParts and Theme.GuideParts()
+		local bare = parts and parts.window and parts.window.psBare
+		banner.psTint:SetShown(strip and not bare)
 		banner.psEdge:SetShown(strip)
 	end
 	local role = strip and BANNER_ROLE[banner.psKind] or "accent"
