@@ -1004,7 +1004,7 @@ end)
 -- top of the stack ("card"): Polestar's own banner, its text, its action link,
 -- Later and its × as they are; the card's ground in place of its tint and
 -- rule. One kept in the window ("strip", the bags and Looking back or ahead) reads as a dark strip
--- tinted by its kind, with a 3px edge and icon in that colour; its action
+-- tinted by its kind (no tint in a transparent window), with a 3px edge and icon in that colour; its action
 -- sits by the × (guideWindow.bannerLinks "right"). nil: Polestar's own look.
 -- Shown or hidden, never SetAlpha: a texture's alpha is its colour's.
 local BANNER_ROLE = { bags = "warning", away = "npc", train = "npc", riding = "npc", skipped = "textMuted", questSkip = "textMuted" }
@@ -1027,10 +1027,11 @@ local function bannerLook(banner, mode)
 		banner.psEdge:SetWidth(3)
 	end
 	if banner.psTint then
-		-- A transparent window (psBare) has no ground: the strip keeps its
-		-- edge and icon, not its tint.
-		local parts = Theme.GuideParts and Theme.GuideParts()
-		local bare = parts and parts.window and parts.window.psBare
+		-- A transparent window (psBare: the one holding this banner, live or
+		-- a settings copy) has no ground: the strip keeps its edge and icon,
+		-- not its tint.
+		local w = windowOf(banner)
+		local bare = w and w.psBare
 		banner.psTint:SetShown(strip and not bare)
 		banner.psEdge:SetShown(strip)
 	end
