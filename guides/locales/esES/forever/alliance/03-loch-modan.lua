@@ -50,9 +50,9 @@ return {
 
 	-- Step 11: The loch
 	["The loch"] = "",
-	-- {object:665289} Discarded Fishing Toolbox (no name in this language: may be words) · {area:144} Thelsamar · {item:278051} Monogrammed Silver Hair Clip
+	-- {object:665289} Discarded Fishing Toolbox · {area:144} Thelsamar · {item:278051} Monogrammed Silver Hair Clip
 	["South along the west shore. The {object:665289} lies on the loch bed at one of several places: east of {area:144} (48.1,39.7), a little south-west of there (45.7,43.4), or at the south end of the loch (48.7,54.4 or 50.6,53.3). If it isn't at the arrow, try the next place. Click it for the quest; the {item:278051} comes with it."] = "",
-	-- {object:665289} Discarded Fishing Toolbox (no name in this language: may be words)
+	-- {object:665289} Discarded Fishing Toolbox
 	["{object:665289}; underwater"] = "",
 
 	-- Step 12: Thelsamar
@@ -221,8 +221,8 @@ return {
 
 	-- Step 40: Sunken Chest
 	-- {area:68} Lake Everstill · {item:1467} Spotted Sunfish
-	-- plural, as words: Murloc Flesheaters = {npc:422} Murloc Flesheater
-	["Back toward town, swim east from the bridge into {area:68}; the chest lies on the lake bed beside a sunken boat. Murloc Flesheaters and Tidecallers line the south shore around it: any of them can carry a {item:1467}."] = "",
+	-- plural, as words: Murloc Flesheaters = {npc:422} Murloc Flesheater · Lake Threshers = {npc:14357} Lake Thresher
+	["Back toward town, swim east from the bridge into {area:68}; the chest lies on the lake bed beside a sunken boat. Murloc Flesheaters and Tidecallers line the south shore around it: any of them can carry a {item:1467}.\nCareful: Lake Threshers, level 25 elites, swim in the lake: keep your distance from them while you dive for the chest."] = "De vuelta hacia el pueblo, nada al este desde el puente hacia {area:68}; el cofre está en el fondo del lago, junto a un barco hundido. Los Comecarnes múrloc y los Clamamareas ocupan la orilla sur a su alrededor: cualquiera puede llevar un {item:1467}.\nCuidado: los Trilladores del Lago, élites de nivel 25, nadan en el lago: mantente lejos de ellos mientras buceas hasta el cofre.",
 	-- {item:1309} Oslow's Toolbox
 	["{item:1309}; underwater"] = "",
 

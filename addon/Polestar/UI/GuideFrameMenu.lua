@@ -9,20 +9,40 @@ ns.UI.GuideFrame.Part(function(GF)
 	-- Menu
 	---------------------------------------------------------------------------
 
-	local function openMenu(button)
+	local openMenu
+
+	-- The open tabs' page of the menu (GF.TabListItems): every guide open, the
+	-- one in view checked, New tab and Reopen closed tab. Back returns to the
+	-- menu.
+	local function openTabsPage(button)
+		local items = {
+			{ text = L["Back"], icon = "chevron-left", onClick = function() openMenu(button) end },
+			{ separator = true },
+		}
+		for _, it in ipairs(GF.TabListItems()) do items[#items + 1] = it end
+		W.ShowMenu(button, items)
+	end
+
+	function openMenu(button)
 		if W.MenuShown(button) then return W.HideMenu() end
 		local E = Engine()
 		local hasGuide = E and E.GetGuide and E.GetGuide()
 		local clear = transparent()
+		-- With two guides or more open, their list takes New tab's place, and
+		-- New tab and Reopen closed tab go in it: the strip can be hidden
+		-- (compact mode, Options), and the menu still lists and switches them.
+		local open = tabsOf(E)
+		local several = open and #open >= 2
 		-- Groups, each after a separator: the guide and its tabs; this step;
 		-- the quest log; the window; settings; tools; the guide reset last.
 		local items = {
 			{ text = L["Choose guide"], icon = "search", onClick = function() UI.ShowPicker() end },
-			{ text = L["Open in new tab"], icon = "plus", disabled = not (E and E.OpenTab), onClick = function() UI.ShowPicker({ newTab = true }) end },
+			several and { text = string.format(L["Open tabs (%d)"], #open) .. "  \226\128\186", icon = "guides", onClick = function() openTabsPage(button) end }
+				or { text = L["Open in new tab"], icon = "plus", disabled = not (E and E.OpenTab), onClick = function() UI.ShowPicker({ newTab = true }) end },
 		}
 		local function add(it) items[#items + 1] = it end
 		local function group() if #items > 0 and not items[#items].separator then add({ separator = true }) end end
-		local reopen = GF.ReopenItem()
+		local reopen = not several and GF.ReopenItem()
 		if reopen then add(reopen) end
 		group()
 		-- No step on screen (a finished guide): nothing to skip, as with the navigator's Skip.

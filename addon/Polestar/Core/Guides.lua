@@ -78,6 +78,32 @@ local function guideMatches(g, player)
 end
 Guides.GuideMatches = guideMatches
 
+-- The side guide g is locked to when it is the other one's ("Horde" for an
+-- Alliance character's Horde guide): nil for a guide of the character's side
+-- or of both, and while their side is unknown. A character never sees such a
+-- guide offered (the guide menu, search, links, cards); one opened anyway (an
+-- import, an old saved tab) says so and is not routed (Engine.OtherFaction).
+local SIDES = { alliance = "Alliance", horde = "Horde" }
+function Guides.OtherFaction(g, player)
+	local side = type(g) == "table" and type(g.faction) == "string" and SIDES[g.faction:lower()]
+	local mine = type(player) == "table" and type(player.faction) == "string" and SIDES[player.faction:lower()]
+	if side and mine and side ~= mine then return side end
+	return nil
+end
+
+-- Guide (or header) g's levels for a character of `faction` (default: the
+-- player's): a guide both factions play may give each its own range
+-- (`factionLevels`, a header's `levels <min>-<max> Alliance|Horde`: where the
+-- route brings that side's characters), else its minLevel/maxLevel. Every
+-- reader of a guide's range goes through here. -> min | nil, max | nil
+function Guides.Levels(g, faction)
+	if type(g) ~= "table" then return nil, nil end
+	local by = g.factionLevels
+	local r = by and by[faction or ns.Compat.GetPlayerFaction() or ""]
+	if r then return r.min, r.max end
+	return g.minLevel, g.maxLevel
+end
+
 -- Another race's starting zone on the character's own side (Fitz,
 -- 2026-10-30): a leveling guide from level 1 locked to races the character
 -- is not, for their faction and class. GuideMatches turns it away like any
@@ -555,6 +581,15 @@ local function checkGoal(goal)
 	return nil
 end
 
+-- factionLevels = { Alliance = { min, max }, Horde = { min, max } }, either side optional.
+function Own.levelsOk(by)
+	if type(by) ~= "table" then return false end
+	for side, r in pairs(by) do
+		if not (type(side) == "string" and SIDES[side:lower()] == side and type(r) == "table" and isNum(r.min) and isNum(r.max) and r.min <= r.max) then return false end
+	end
+	return true
+end
+
 local function validate(def)
 	if type(def) ~= "table" then return "guide is not a table" end
 	if not isStr(def.id) then return "missing id" end
@@ -567,6 +602,7 @@ local function validate(def)
 	elseif type(def.steps) ~= "table" or #def.steps == 0 then return "no steps" end
 	if def.minLevel ~= nil and not isNum(def.minLevel) then return "bad minLevel" end
 	if def.maxLevel ~= nil and not isNum(def.maxLevel) then return "bad maxLevel" end
+	if def.factionLevels ~= nil and not Own.levelsOk(def.factionLevels) then return "bad factionLevels" end
 	if def.next ~= nil and not isStr(def.next) then return "bad next" end
 	if def.faction ~= nil and not isStr(def.faction) then return "bad faction" end
 	if def.category ~= nil and not isStr(def.category) then return "bad category" end
@@ -1490,7 +1526,8 @@ end
 -- leveling guides for one race in <pack addon>_<race file>. Once the pack's
 -- own files are done, the player's faction's part loads, then the player's
 -- race's (its baked legs name the faction's guides); the other faction's
--- only when asked for (Guides.LoadFaction). Their guides register into the
+-- only for a saved tab of one of its guides (Own.loadForSaved): the guide
+-- menu never lists them (Guides.OtherFaction). Their guides register into the
 -- pack. A load the faction (not known yet) or combat put off is done at
 -- login or after the fight.
 local FACTIONS = { "Alliance", "Horde" }
@@ -1537,24 +1574,33 @@ local function registering(fn)
 	return true
 end
 
--- Loads the faction parts of every pack that has them: `faction`'s
--- ("Alliance", "Horde"), or both for "All". Never in combat (Data.Pack; a
--- later call loads them).
-function Own.loadFactions(faction)
+-- Loads both faction parts of every pack that has them. Never in combat
+-- (Data.Pack; a later call loads them).
+function Own.loadFactions()
 	for _, r in ipairs(records) do
 		if r.addon and loaded[r.addon] and accepted(r) then
-			for _, f in ipairs(FACTIONS) do
-				if faction == "All" or f == faction then ns.Data.Pack(r.addon .. "_" .. f) end
-			end
+			for _, f in ipairs(FACTIONS) do ns.Data.Pack(r.addon .. "_" .. f) end
 		end
 	end
 end
 
--- Own.loadFactions for the player: a character holds its own faction's
--- guides only until the player asks for the other's (the guide menu's
--- faction filter). -> whether guides came in (GUIDES_REGISTERED has fired)
-function Guides.LoadFaction(faction)
-	return registering(function() Own.loadFactions(faction) end)
+-- Whether `next` option `id` of guide `from` is the other side's guide in
+-- its pack's faction part this character does not load: the pack keeps each
+-- faction's guides in a part and loads the player's (loadParts), and a guide
+-- both factions play names one `next` per faction (Shen'dralas hands each
+-- side to its own Feralas). With the player's part in and the other's not,
+-- an option of the pack no part registered is the other side's: a route
+-- walking on skips it, as it skips a loaded guide of the other faction,
+-- rather than call the route "not loaded".
+function Guides.OtherSidePart(from, id)
+	if type(from) ~= "table" or type(id) ~= "string" or guides[id] or not ownsId(from.pack, id) then return false end
+	local r = packs[from.pack]
+	local mine = ns.Compat.GetPlayerFaction()
+	if not (r and r.addon and mine and loaded[r.addon .. "_" .. mine]) then return false end
+	for _, f in ipairs(FACTIONS) do
+		if f ~= mine and not loaded[r.addon .. "_" .. f] then return true end
+	end
+	return false
 end
 
 ns.RegisterEvent("ADDON_LOADED", function(_, name)
@@ -1693,6 +1739,19 @@ function Guides.IsExperimental(g)
 	return type(g) == "table" and g.pack ~= nil and Guides.NEVER_SUGGESTED[g.pack] == true
 end
 
+-- Forever's own new zones on the leveling route, by uiMapID: Mount Hyjal,
+-- the Riverglades and Shen'dralas. Our zone data has no "new in Forever"
+-- flag, so this short list says it; add a zone here when Forever opens one.
+Guides.FOREVER_ZONES = { [2482] = true, [2548] = true, [2652] = true }
+
+-- Is guide (or header) g set in one of Forever's new zones (FOREVER_ZONES),
+-- or one of our experimental guides (all written for those zones)? The guide
+-- menu gives it the Forever mark.
+function Guides.InForeverZone(g)
+	if type(g) ~= "table" then return false end
+	return Guides.FOREVER_ZONES[g.zone] == true or Guides.IsExperimental(g)
+end
+
 -- Shown guides whose route choice (`nextChoices`) offers `id` now (an
 -- option with `when` only while it holds: Engine.RouteOffered), in
 -- registration order; never one of a NEVER_SUGGESTED pack.
@@ -1754,6 +1813,10 @@ function ns.RegisterExperimental(list)
 			local def = { id = e.id, pack = e.pack, category = "Leveling" }
 			for _, k in ipairs(K.strings) do if isStr(e[k]) then def[k] = e[k] end end
 			for _, k in ipairs(K.numbers) do if isNum(e[k]) then def[k] = e[k] end end
+			if e.factionLevels ~= nil and Own.levelsOk(e.factionLevels) then
+				def.factionLevels = {}
+				for side, r in pairs(e.factionLevels) do def.factionLevels[side] = { min = r.min, max = r.max } end
+			end
 			for _, k in ipairs(K.lists) do
 				if type(e[k]) == "table" then
 					local l = {}
@@ -1871,7 +1934,9 @@ local function rank(packId, player, here, zone)
 	for i, id in ipairs(r.guides) do
 		local g = guides[id]
 		if (g.category == nil or g.category == "Leveling") and guideMatches(g, player) then
-			local lo, hi = g.minLevel or 1, g.maxLevel or g.minLevel or 1
+			local lo, hi = Guides.Levels(g, player.faction)
+			lo = lo or 1
+			hi = hi or lo
 			if hi < lo then hi = lo end
 			if level >= lo and level <= hi then
 				local specific = ((g.races and #g.races > 0) or (g.classes and #g.classes > 0)) and 0 or 1
@@ -2059,9 +2124,10 @@ function Guides.FirstGuide()
 	return fitting[1]
 end
 
--- A saved tab of a guide no part has brought in (the other faction's,
--- opened from the guide menu): the parts of both factions come in, so the
--- tab is back where it was when the Engine restores the tabs.
+-- A saved tab of a guide no part has brought in (the other faction's, from
+-- before the guide menu listed only the character's side): the parts of both
+-- factions come in, so the tab is back where it was when the Engine restores
+-- the tabs; it says whose guide it is and is not routed (Engine.OtherFaction).
 function Own.loadForSaved()
 	local s = ns.CharState and ns.CharState()
 	if type(s) ~= "table" then return end
@@ -2074,7 +2140,7 @@ function Own.loadForSaved()
 	end
 	local missing = absent(s.guide)
 	for _, id in ipairs(type(s.tabs) == "table" and s.tabs or {}) do missing = missing or absent(id) end
-	if missing then Own.loadFactions("All") end
+	if missing then Own.loadFactions() end
 end
 
 ns.OnLogin(function()

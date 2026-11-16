@@ -178,11 +178,7 @@ emit(out)"#,
 			"guides": n, "count": n, "loads": 1, "rows": 0, "setting": true }),
 		"no saved choice: shown, loaded at login, every guide in; not on the Community guides page"
 	);
-	assert_eq!(
-		out["off"],
-		json!({ "status": "off", "guides": 0, "get": false, "saved": false, "fired": "packs polestar-experimental" }),
-		"switched off: hidden, and the choice saved"
-	);
+	assert_eq!(out["off"], json!({ "status": "off", "guides": 0, "get": false, "saved": false, "fired": "packs polestar-experimental" }), "switched off: hidden, and the choice saved");
 	assert_eq!(
 		out["again"],
 		json!({ "status": "on", "guides": n, "loads": 1, "saved": false, "fired": "packs polestar-experimental" }),
@@ -444,14 +440,14 @@ end
 -- The guide menu's experimental guides under `cat`, sorted, comma-joined, each with its folder.
 local function menu(cat)
 	local out = {}
-	for _, e in ipairs(Picker.Entries("All", "", cat)) do
+	for _, e in ipairs(Picker.Entries("", cat)) do
 		if e.kind == "guide" and G.IsExperimental(e.guide) then out[#out + 1] = e.guide.id .. "@" .. e.folder.id end
 	end
 	table.sort(out)
 	return table.concat(out, ",")
 end
 UI.ShowOptions("guidepacks")
-local _, _, counts = Picker.Entries("All", "", "All")
+local _, _, counts = Picker.Entries("", "All")
 local first = G.Pack(ID).guides[1]
 local out = { row = rowOf("Polestar_Experimental") ~= false, loads = stub.packLoads.Polestar_Experimental or 0, leveling = menu("Leveling"),
 	packEntry = menu("pack:" .. ID), countLeveling = counts.Leveling or 0, countPack = counts["pack:" .. ID] or 0,
@@ -509,8 +505,9 @@ const INSTALLED_OFF_BUDGET_KIB: f64 = 2.0;
 
 /// What the shipped experimental guides add to a login now that they are on by default (0.4.0: listed with our
 /// guides, so loaded at login): measured 2026-11-15 (Lua 5.1) with Riverglades (Alliance and Horde), Shen'dralas
-/// and Mount Hyjal, +2237.9 KiB, and the budget that plus about 5 %.
-const ON_MEASURED_KIB: f64 = 2237.9;
+/// and Mount Hyjal, +2237.9 KiB; compiled on the QuestieDB 1.1.1 data the same day, +2351.1 KiB (size budgets may
+/// grow for 0.4.0, Fitz). The budget is the last figure plus about 5 %.
+const ON_MEASURED_KIB: f64 = 2351.1;
 const ON_BUDGET_KIB: f64 = ON_MEASURED_KIB * 1.05;
 
 #[test]

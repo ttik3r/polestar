@@ -221,8 +221,8 @@ return {
 
 	-- Step 40: Sunken Chest
 	-- {area:68} Lake Everstill · {item:1467} Spotted Sunfish
-	-- plural, as words: Murloc Flesheaters = {npc:422} Murloc Flesheater
-	["Back toward town, swim east from the bridge into {area:68}; the chest lies on the lake bed beside a sunken boat. Murloc Flesheaters and Tidecallers line the south shore around it: any of them can carry a {item:1467}."] = "De volta em direção à cidade, nade para leste a partir da ponte até {area:68}; o baú fica no fundo do lago, ao lado de um barco afundado. Carniceiros e Chamarés Murloc ocupam a margem sul em volta dele: qualquer um deles pode carregar {item:1467}.",
+	-- plural, as words: Murloc Flesheaters = {npc:422} Murloc Flesheater · Lake Threshers = {npc:14357} Lake Thresher
+	["Back toward town, swim east from the bridge into {area:68}; the chest lies on the lake bed beside a sunken boat. Murloc Flesheaters and Tidecallers line the south shore around it: any of them can carry a {item:1467}.\nCareful: Lake Threshers, level 25 elites, swim in the lake: keep your distance from them while you dive for the chest."] = "De volta em direção à cidade, nade para leste a partir da ponte até {area:68}; o baú fica no fundo do lago, ao lado de um barco afundado. Carniceiros e Chamarés Murloc ocupam a margem sul em volta dele: qualquer um deles pode carregar {item:1467}.\nCuidado: Manguais do Lago, elites de nível 25, nadam no lago: mantenha distância deles enquanto mergulha atrás do baú.",
 	-- {item:1309} Oslow's Toolbox
 	["{item:1309}; underwater"] = "{item:1309}; debaixo d'água",
 
@@ -304,9 +304,9 @@ return {
 	["{item:1381}: the {npc:550}"] = "{item:1381}: o {npc:550}",
 
 	-- Step 54: Half Pendant of Aquatic Endurance
-	-- {area:113} Gold Coast Quarry · {object:177790} Strange Lockbox (no name in this language: may be words)
+	-- {area:113} Gold Coast Quarry · {object:177790} Strange Lockbox
 	["Druids on Trial of the Sea Lion: from the {area:113}, west to the shore and north along it. The {object:177790} lies on the sea floor off the coast (about 18,33); then back south along the coast to the lighthouse."] = "Druidas na Missão do Leão Marinho: de {area:113}, siga para oeste até a costa e para o norte ao longo dela. O {object:177790} fica no fundo do mar, ao largo da costa (por volta de 18,33); depois volte para o sul pela costa até o farol.",
-	-- {item:15882} Half Pendant of Aquatic Endurance · {object:177790} Strange Lockbox (no name in this language: may be words)
+	-- {item:15882} Half Pendant of Aquatic Endurance · {object:177790} Strange Lockbox
 	["{item:15882}: the {object:177790}"] = "{item:15882}: o {object:177790}",
 
 	-- Step 55: Westfall Lighthouse
@@ -415,6 +415,7 @@ return {
 	["{npc:1646}: for {npc:1719}, at the {area:717}'s gate"] = "{npc:1646}: para {npc:1719}, no portão de {area:717}",
 
 	-- No longer in the guide (its English changed or it went away): reuse or delete.
+	-- ["Back toward town, swim east from the bridge into {area:68}; the chest lies on the lake bed beside a sunken boat. Murloc Flesheaters and Tidecallers line the south shore around it: any of them can carry a {item:1467}."] = "De volta em direção à cidade, nade para leste a partir da ponte até {area:68}; o baú fica no fundo do lago, ao lado de um barco afundado. Carniceiros e Chamarés Murloc ocupam a margem sul em volta dele: qualquer um deles pode carregar {item:1467}.",
 	-- ["Elder Mountain Boars and {npc:270693}"] = "Javalis Montanheses Anciões e {npc:270693}",
 	-- ["South along the west shore. A {object:665289} lies on the loch bed east of {area:144} (it moves between several spots): open it for the {item:278051}, which starts the quest."] = "Ao sul pela margem oeste. {object:665289} está no fundo do lago a leste de {area:144} (ele muda entre vários pontos): abra-o para pegar {item:278051}, que inicia a missão.",
 	-- ["Through the South Gate tunnel and west along the road to {zone:1455}."] = "Pelo túnel do Portão Sul e para oeste pela estrada até {zone:1455}.",

@@ -443,8 +443,8 @@ fn our_route(data: &forge_guide::data::Data, offers: bool) -> forge_addontest::d
 		let mut diag = forge_guide::diag::Diagnostics::new();
 		let extras = forge_guide::project::read_extras(root(), data);
 		let index = forge_guide::project::experimental_index(&compiled.guides, &extras, data, &mut diag);
-		// Every zone has its way in for each side it is for (Riverglades both, Shen'dralas both, Mount Hyjal the
-		// Alliance).
+		// Every zone has its way in for each side it is for (the Riverglades and Mount Hyjal, the Alliance; the
+		// Horde's Riverglades and Shen'dralas are guides of the route since 0.4.0).
 		forge_guide::project::experimental_offered_everywhere(&compiled.guides, &extras, &mut diag);
 		assert!(!diag.has_errors(), "{:?}", diag.sorted());
 		index
@@ -460,8 +460,7 @@ fn exp_installed() -> String {
 	let dir = addons_dir().join(EXP);
 	let toc = std::fs::read_to_string(dir.join(format!("{EXP}.toc"))).unwrap();
 	let meta: Vec<String> = toc.lines().filter_map(|l| l.strip_prefix("## ")?.split_once(':')).map(|(k, v)| format!("[{}] = {}", lua_string(k.trim()), lua_string(v.trim()))).collect();
-	let files: Vec<String> =
-		toc.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('#')).map(|f| lua_string(&dir.join(f).to_string_lossy())).collect();
+	let files: Vec<String> = toc.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('#')).map(|f| lua_string(&dir.join(f).to_string_lossy())).collect();
 	format!(
 		"stub.addonMeta.Polestar = {{ Version = \"1.0.0\" }}\nstub.addons = {{ {{ name = \"Polestar\", loaded = true }}, {{ name = {n}, reason = \"DEMAND_LOADED\" }} }}\nstub.addonMeta[{n}] = {{ {} }}\nstub.packs[{n}] = {{ {} }}\n",
 		meta.join(", "),
@@ -551,26 +550,13 @@ fn the_real_route_compiled_with_the_offers_and_without_them_has_the_same_default
 			}
 		}
 	}
-	assert_eq!(offered.len(), 5, "the five offers: {offered:?}");
-	for (race, faction, offers) in [
-		(
-			"Orc",
-			"Horde",
-			json!(["forever/horde/30-40/06-badlands -> polestar-experimental/riverglades-horde-1", "forever/horde/40-50/02-feralas -> polestar-experimental/shendralas"]),
-		),
-		(
-			"Human",
-			"Alliance",
-			json!([
-				"forever/alliance/30-40/06-badlands -> polestar-experimental/riverglades-alliance-1",
-				"forever/alliance/40-50/02-badlands -> polestar-experimental/shendralas",
-				"forever/alliance/50-60/04-western-plaguelands -> polestar-experimental/hyjal-1"
-			]),
-		),
-	] {
+	assert_eq!(offered.len(), 1, "the one offer (Mount Hyjal): {offered:?}");
+	// Since 0.4.0 the Riverglades and Shen'dralas are in both factions' routes: the Horde has no offer, the Alliance
+	// only Mount Hyjal.
+	for (race, faction, offers) in [("Orc", "Horde", json!([])), ("Human", "Alliance", json!(["forever/alliance/50-60/04-western-plaguelands -> polestar-experimental/hyjal-1"]))] {
 		let (a, b) = (route_of(&with, race, faction), route_of(&without, race, faction));
 		assert!(a["route"].as_object().unwrap().len() > 20, "{race}: the guides are in");
-		assert_eq!(a["offers"], offers, "{race}: the route choices that offer an experimental guide");
+		assert_eq!(lines(&a["offers"]), lines(&offers), "{race}: the route choices that offer an experimental guide");
 		assert_eq!(lines(&b["offers"]), Vec::<String>::new());
 		assert_eq!(a["route"], b["route"], "{race}: the default route is the same without the offers");
 		// With "ask" (the default) the offering guides ask at their end, and no other guide asks anew.

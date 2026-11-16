@@ -18,6 +18,7 @@ N.RegisterTravelData({
 	build = "1.15.9.70576",
 	-- id, continent, wx, wy, uiMapID, x, y (Era frame), faction mask (1 Alliance, 2 Horde), name[, the one class that flies from it]
 	-- (then "l", after the class or nil: x, y on the live frame of a map Forever added, which has no Era frame)
+	-- (a class's node then its flight master's npc id, after "l" or nil: Nearby leaves them to that class)
 	taxi = {
 		{2,0,-8840.6,489.7,1453,66.3,62.67,1,"Stormwind, Elwynn"},
 		{4,0,-10628.9,1036.7,1436,56.57,52.67,1,"Sentinel Hill, Westfall"},
@@ -64,8 +65,8 @@ N.RegisterTravelData({
 		{56,0,-10457,-3279.2,1435,46.05,54.68,2,"Stonard, Swamp of Sorrows"},
 		{58,1,3374.7,997,1440,12.19,33.77,2,"Zoram'gar Outpost, Ashenvale"},
 		{61,1,2302.4,-2524.6,1440,73.26,61.67,2,"Splintertree Post, Ashenvale"},
-		{62,1,7793.6,-2403.5,1450,44.28,45.34,1,"Nighthaven, Moonglade","DRUID"},
-		{63,1,7787.7,-2404.1,1450,44.31,45.72,2,"Nighthaven, Moonglade","DRUID"},
+		{62,1,7793.6,-2403.5,1450,44.28,45.34,1,"Nighthaven, Moonglade","DRUID",nil,11800},
+		{63,1,7787.7,-2404.1,1450,44.31,45.72,2,"Nighthaven, Moonglade","DRUID",nil,11798},
 		{64,1,2722,-3880.6,1447,11.9,77.48,1,"Talrendis Point, Azshara"},
 		{65,1,6205.9,-1949.6,1448,62.46,24.19,1,"Talonbranch Glade, Felwood"},
 		{66,0,931.3,-1430.1,1422,42.95,84.95,1,"Chillwind Camp, Western Plaguelands"},
@@ -394,7 +395,7 @@ N.RegisterTravelData({
 		{a={"Orgrimmar",1,1354,-4642.7,1411,50.69,12.89,"e",1637,54.3},ab=78,b={"Grom'gol",0,-12441.2,215.2,1434,31.43,29.91,"e",117,32.1},ba=105,faction=2,id="zeppelin-orgrimmar-gromgol",kind="zeppelin",waitA=162,waitB=162},
 		{a={"Undercity",0,2054.7,241.6,1420,61.78,59.18,"e",1497},ab=96,b={"Grom'gol",0,-12417.8,208.2,1434,31.54,29.36,"e",117,32.1},ba=117,faction=2,id="zeppelin-undercity-gromgol",kind="zeppelin",waitA=177,waitB=177},
 		{a={"Valanaar Skydocks",2991,1842.7,573.9,2521,65.75,83.96,"l",16628,{wx=1855.2,wy=574,z=644.5}},ab=131,b={"Dalaran",0,544.8,424.2,1416,12.83,51.17,"e",279},ba=108,faction=1,id="airship-zephras-dalaran",kind="airship",waitA=189,waitB=189},
-		{a={"Valanaar Skydocks",2991,1952.1,1003.9,2521,58.02,81.01,"l",16628,{wx=1957.3,wy=1003.1,z=663}},ab=147,b={"Mulgore",1,-802,366.5,1412,34.33,26.05,"l",215},ba=84,faction=2,id="airship-zephras-mulgore",kind="airship",waitA=170,waitB=170},
+		{a={"Valanaar Skydocks",2991,1953.2,1003.3,2521,58.03,80.98,"l",16628,{wx=1957.3,wy=1003.1,z=663}},ab=147,b={"Mulgore",1,-802,366.5,1412,34.33,26.05,"l",215},ba=84,faction=2,id="airship-zephras-mulgore",kind="airship",waitA=170,waitB=170},
 		{a={"Stormwind",0,-8346.5,514,1453,69.58,30.27,"l",1519,91.8},ab=74,b={"Ironforge",0,-4840.3,-1330.5,1455,78.02,51.37,"e",1537,501.9},ba=74,faction=1,id="tram-stormwind-ironforge",kind="tram",waitA=68,waitB=68},
 	},
 	-- walk-in portals, one way a -> b: id, destination name and area, ends as transports (with z), seconds (the loading screen)
