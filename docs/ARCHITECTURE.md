@@ -27,7 +27,7 @@ one into the other. The addons:
 |---|---|---|---|---|
 | `Polestar` (`addon/Polestar/`) | The addon: engine, navigation, quests, gear, maps, quality of life, Lookup, Dungeons, Rares and every window | hand-written, plus a few generated data files | yes | yes |
 | `Polestar_Guides` (`addon/Polestar_Guides/`, with `Polestar_Guides_Alliance` and `Polestar_Guides_Horde`) | Polestar's own pack (pack id `guides`): the factionless guides, and each faction's in a part loaded on demand, the player's faction's with the pack (PACK_FORMAT, "Format 8") | `compile`, from `guides/` | yes (generated) | yes |
-| `Polestar_Experimental` (`addon/Polestar_Experimental/`) | Polestar's experimental pack (pack id `polestar-experimental`): guides for Forever's new zones in testing (alpha); loaded on demand, off until the player chooses one of its guides at a route choice or switches it on (Community guides), never suggested; the experimental index of the guides our route choices offer is in Polestar_Guides (PACK_FORMAT, "Polestar's own extra packs") | `forge guide compile experimental` and `forge release pack`, from `experimental/` | yes (generated) | yes |
+| `Polestar_Experimental` (`addon/Polestar_Experimental/`) | Polestar's experimental pack (pack id `polestar-experimental`): guides for Forever's new zones in testing (alpha), for now Mount Hyjal (Alliance); loaded at login unless the player switches it off (`behavior.experimentalGuides`, Options > Guide > Show experimental guides, on by default; before 0.4.0 it was off until switched on under Community guides), listed with our guides with an Experimental chip, never suggested, picked or put in a route; the experimental index of the guides our route choices offer is in Polestar_Guides (PACK_FORMAT, "Polestar's own extra packs") | `forge guide compile experimental` and `forge release pack`, from `experimental/` | yes (generated) | yes |
 | community addons | Addons by other authors (`X-Polestar-Pack` in their TOC; `docs/PACKS.md`, `docs/PACK_FORMAT.md`) | the same compiler, from their own repositories | in their own repositories | by their authors |
 | `Polestar_ItemDB` (`addon/Polestar_ItemDB/`) | Item stats and Forever reward choices for the gear advice; loaded on demand | `forge data itemdb` (`Items.lua`), then `forge data gear` (`Forever.lua`) | yes (generated) | yes |
 | `Polestar_<locale>` (`addon/Polestar_deDE/` … `zhTW/`) | The language folder of one client language: Polestar's interface strings (`Interface.lua`, for `Polestar.L`; translators and `forge i18n sync`), our guides' texts (`Texts.lua`, for `Polestar.GuideTexts`), the quest, NPC, object and item names (`Names.lua`, for `Polestar.Names`) and the walking maps' subzone names (`Subzones.lua`, `Polestar.Names`' kind `subzone`, for the arrow's floor by subzone); loaded on demand by `Core/Locale.lua`, only the client's own, never in English. It replaced `Polestar_Guides_<locale>` and `Polestar_Names_<locale>` in 0.3.0 | `forge guide compile` (`Texts.lua`), `forge data names` (`Names.lua`, from the client's tables, the names the client showed players (`data/i18n/names-observed`), DingDB (pinned) and pfQuest) and `forge data subzones` (`Subzones.lua`, from the client's WMOAreaTable and AreaTable at the client build the data is built from); each writes the one TOC alike (`forge_guide::toc::language_toc`) and leaves the others' files alone | yes (generated) | yes |
@@ -39,6 +39,8 @@ one into the other. The addons:
 | `Polestar_SkinAPI` (`addon/Polestar_SkinAPI/`) | The Skin API's checks for a skin or colour scheme from another addon (its fields, colours, legibility, variants, preset: `docs/skins/reference.md`); loaded on demand by `Theme.RegisterSkin` / `Theme.RegisterScheme` the first time another addon registers one, so a player who uses no other addon's skin never loads it (Polestar's own skins and schemes need none of it) | hand-written | yes | yes |
 | `Polestar_Looks` (`addon/Polestar_Looks/`) | The game looks (WoW Forever, Blizzard, Classic: their kits, art tables and painters, `GameSkins.lua`, `GameArt.lua`; their sizes and type ladder, and their own waypoint arrow and map pin medallion in the client's art, given as a skin's `media` is, `Parts.lua`) and Hearth's painters (`Hearth.lua`); loaded on demand (`Theme.LoadLooks`) the first time one of them, or a skin built on one, is painted, so a player on the house look never loads them. Until then the core's `Theme.Kit` is nil and its `Theme.Kit*` stand-ins draw nothing; the part replaces them as it loads. Their palettes and fonts, and Hearth's sizes, stay in the core | hand-written; `GameArt.lua` by `media game-art` | yes | yes |
 | `Polestar_TabStyles` (`addon/Polestar_TabStyles/`) | The guide window's tab styles past the strip above the step bar (`guideWindow.tabStyle`): the title switcher, the top edge's and the left side's icon tabs (`TabStyles.lua`) and the switcher's menu rows (`Menu.lua`: headings, notes, the mark of the one in use, a close glyph; `W.MenuRows`); loaded on demand (`UI/GuideFrameTabStyles.lua`) the first time one of them is drawn, so a player on the strip never loads them. Without it the tabs stay above the step bar and the chat says so once | hand-written | yes | yes |
+| `Polestar_Options` (`addon/Polestar_Options/`) | The settings window, its Look pages and previews, the Profiles page and profile strings, Move frames; loaded on demand the first time the settings open (`UI/OptionsLoader.lua` is its door in the core) | hand-written | yes | yes |
+| `Polestar_Skin_<Name>` (`addon/Polestar_Skin_Vellum/` … `Polestar_Skin_Sheen/`) | The nine skins that ship (Vellum, Lumen, Beacon, Aurora, Hairline, Umbra, Waymark, Lanterns, Sheen), each an addon on the Skin API (`## X-Polestar-Skin`), loaded only when picked; `Polestar_Skin_Example` never ships (docs/SKINS-API.md) | hand-written | yes | yes |
 | `Polestar_Recorder` (`addon/Polestar_Recorder/`) | The optional standalone recorder of play sessions, for authoring | hand-written | yes | yes, as its own zip |
 
 A guide goes from a `.guide` file to the game in four steps. An author
@@ -262,12 +264,18 @@ guide a pack update left as it was keeps everything as is, though its shape
 as planned for the character differs), `Own.noteAdded` notes what the update
 added (steps none of whose quest goals the old guide had there, goals it did
 not have or had only further on, and goals of a carried quest an earlier
-release had optional only: `required` in LegacySteps.lua), and the first
+release had optional only: `required` in LegacySteps.lua; a changed step
+whose goals no earlier release in LegacySteps.lua lists adds nothing in its
+stretch, as nothing tells what it had: read as all new, it hid quests never
+taken, #2350; a feeder step counts as added unless the save's guide had it
+planned in too), and the first
 placement with the quest log in passes what of it lies behind the player's
 place (`Own.passAdded`: the first step that holds for content the old guide
 had, by the step's own rule, `Own.holds`: a vendor check-off beside other
 work never holds it), as `gone` steps and goals that no longer apply; nothing shows as
-skipped. A quest the player carries whose remaining work is among them (its
+skipped, and what of it the player has done is not passed: it shows done (a
+step passes whole while work of it is open). An accept passed takes its
+quest's later goals with it (orphaned). A quest the player carries whose remaining work is among them (its
 hand-in ahead or not: a hand-in is no work, #1595) is
 noted `behind`: the guide window lists it under the step as "Still to do"
 (`Engine.GetBehind`; a click points the arrow, a right-click skips or
@@ -1251,6 +1259,7 @@ Compat.ItemLink(itemID)                -> link | nil (nil while not cached)
 Compat.RequestItem(itemID)             -> bool   (cached; else requested: GET_ITEM_INFO_RECEIVED follows)
 Compat.SpellLink(spellID)              -> link | nil
 Compat.RequestSpell(spellID)           -> bool   (cached; else requested: SPELL_DATA_LOAD_RESULT follows)
+Compat.CreatureCached(npcID)           -> bool | nil (in the creature cache; else asked of the server via its unit link's tooltip, no event; nil: cannot tell)
 Compat.GetBindLocation()               -> string | nil
 Compat.IsOnTaxi()                      -> bool
 Compat.GetCurrentTaxiNode()            -> name of the open taxi map's node | nil
@@ -1406,7 +1415,11 @@ goals carry its `goto` points instead, in order, with `spread = true` and no
 interact bound to a quest objective that players' recordings place
 (`data/recorded/quests.json`) takes its places from the trusted recorded spots
 (an area of a spot's own size, no `n` where no spawn of the target lies in it;
-GUIDE_FORMAT, "Spawn areas", Recorded). `x`/`y` stay the
+GUIDE_FORMAT, "Spawn areas", Recorded). That pass is forge's (forge-guide
+resolve.rs `recorded_areas`) only: the node tests' JS compile
+(`tools/lib/dsl`) has none and keeps the data's places, so a node test of a
+goal's places reads them without the recordings; the forge-judge seeds (the
+reported gate) compile with forge and check what ships. `x`/`y` stay the
 default point. `z` (optional, 0.2.4) is the height of the NPC or object the
 goal's `x`/`y` stands for (the compiler's, from `spawnz.json`: GUIDE_FORMAT,
 "Heights"); a spot and a smart target's candidate may carry their own `z`
@@ -1816,7 +1829,8 @@ Polestar.Engine.StepHiddenFor(step, who?) -> bool  -- no step of its own for who
   about N% of this guide's quest XP follows on from X", "Open X" opens it in
   a new tab; taken or dismissed, gone for that guide for the session).
 - **Out-levelled guides.** When the player's level exceeds the active guide's
-  `maxLevel` by 2 or more, the Engine fires `GUIDE_OUTLEVELED(guideId,
+  top (`maxLevel`, or their side's `factionLevels` one: `Guides.Levels`) by
+  `Engine.OUTGROWN` (3) or more, the Engine fires `GUIDE_OUTLEVELED(guideId,
   suggestedId)` once per guide per session, once the guide is placed (a
   catch-up may pass it whole first); the UI offers the jump. While the
   guides between the active one and the level-best suggestion still hand in
@@ -2008,8 +2022,11 @@ Polestar.Engine.StepHiddenFor(step, who?) -> bool  -- no step of its own for who
   already (an open goal for the same objective in a listed along step,
   background goals included, `Own.hereShown`, or a pinned quest: Along the
   way lists them; a later along step not listed yet counts like any step),
-  not an objective the live step works itself, with mobs at most
-  `HERE_ABOVE` levels over the player, whatever is left (no size cap: the
+  not an objective the live step works itself, with mobs (a spot's `lvl`,
+  else the goal's) at most `HERE_MOBS_ABOVE` (1) level over the player
+  (Fitz's rule: never send a solo player at mobs 2 or more levels above
+  them; a quest carried for later is not offered back at a camp 2 over as
+  the route passes it), whatever is left (no size cap: the
   player is there already). One objective is one line however many steps
   hold it (`Own.hereGroups`, by `Own.hereKey`: the quest's objective `oi`,
   else the item collected or the mob killed; Fitz, 0.3.6: Raptor Horns read
@@ -2082,7 +2099,8 @@ Polestar.Engine.StepHiddenFor(step, who?) -> bool  -- no step of its own for who
   group question in the step, no `optional` accept, a `group` (elite,
   dungeon) one only after the player said "do", the quest not skipped,
   closed, dropped by an `abandon` of the guide, below its `minLevel` or more
-  than `HERE_ABOVE` (2) levels over the character (`qlvl`), the log keeping
+  than `HERE_ABOVE` (2) levels over the character (`qlvl`: the quest's own
+  level alone makes no camp dangerous, so it keeps the wider margin), the log keeping
   `LOG_SPARE` (2) slots free (`Own.logRoom`, of `Compat.GetLogCap`: Forever's
   client answers 0 to `GetMaxNumQuestsCanAccept`, and its log holds 40), and
   a timed quest (`limit`) only in the route's next `AHEAD` (5) steps and when
@@ -2165,6 +2183,47 @@ Polestar.Engine.StepHiddenFor(step, who?) -> bool  -- no step of its own for who
   the option asks for them there (only the kinds the character gathers, in
   200 yd cells; `GATHER_CHANGED` after a skill opens or closes a kind), and
   `Gather.Nearest` measures only the cells within the radius, allocation-free.
+  Sell and repair before heading out (0.4.0, #2344, an idea of Caliber's;
+  `behavior.whileHereVendors`, on by default, Options' "Sell and repair
+  reminders"): when the route heads out (a live step with an open `fly` or
+  `hearth` goal, whose arrow may lead to the flight master in town; else the
+  waypoint `VENDOR_OUT` (250) yards past the merchant or on another
+  continent) and the bags are nearly full
+  (fewer free slots, QoL's `Space.Count` of the bags that take any item, than
+  `behavior.whileHereSellSlots`, 4 by default, 0 to 16, or than the distinct
+  items the open `collect` goals of the live step and the route's next
+  `AHEAD` steps want that the bags hold none of) or the gear is worn (an
+  equipped piece, `GetInventoryItemDurability`, under
+  `behavior.whileHereRepairPercent`, 30% by default, 0 to 90, 0: never), the
+  nearest friendly merchant or repairer on the way is a line of its own, kind
+  "sell" or "repair": "Sell before heading out: 3 free slots", "Repair before
+  heading out: gear at 22%", under it the NPC and their title; with both
+  needed, the repairer's line says both ("Repair and sell before heading out:
+  gear at 22%, 3 free slots") and no sell line comes beside it. The places are
+  Nav/Nearby.lua's (`Nearby.PlacesOn`: the Codex's vendors without the
+  trainers, its repairers, the character's side or both, outside instances;
+  the Codex loads only once a reminder is needed and never in combat,
+  `PLAYER_REGEN_ENABLED` asks again); the nearest within `HERE_FAR` in a
+  straight line, picked again each `HERE_REPICK` yards, is weighed as a
+  hand-in (`Own.hereIn`: `behavior.whileHereTurninSeconds` out of the way, any
+  detour in the town the player rests in; the walk check), after the quest
+  lines and before a flight master's and a gathering spot's, with the lines'
+  blocks, dismiss and expiry. Once per visit and kind: once its line shows, or
+  the player opens a merchant's window (`MERCHANT_SHOW`; the repair kind only
+  at a merchant who repairs, `CanMerchantRepair`), that kind waits until the
+  player has been `VENDOR_AWAY` (400) yards from there
+  (`Own.hereVendorSpent`), so a dismiss holds for the visit; none comes while
+  a merchant's window is open, and none when the route's own next steps sell
+  (an open `vendor` goal). A click leads the arrow to the NPC ("Sell at Brog
+  Hamfist"; the waypoint's step is `VENDOR_STEP`, -4, its goal index the
+  kind's: 1 repair, 2 sell); sold or repaired, the line goes and the arrow
+  returns to the guide. The needs are read with each build, which
+  `BAG_UPDATE_DELAYED` asks for when the selling need flips or a line says the
+  free slots, and `UPDATE_INVENTORY_DURABILITY` when the repair need flips (a
+  shown repair line takes the new share without one); the poll allocates
+  nothing. Their glyphs (`icon-sell`, `icon-repair`, tools/media/ui.js) draw
+  the game's own signs for them, the merchant's tied coin bag and the
+  repairer's anvil, with a coin and a hammer.
   The arrival poll measures at most `HERE_MAX` of them (`Own.hereList`): all
   when that many fit, else the nearest (`Own.herePick`, again each
   `HERE_REPICK` yards the player moves). It (`Own.hereTick`, allocation-free:
@@ -2423,6 +2482,17 @@ Polestar.Engine.StepHiddenFor(step, who?) -> bool  -- no step of its own for who
   instead. Passed while the player looks at another step (Prev, Next,
   Goto), it waits for their return to the live step (`Own.skipQueue`), so no
   quest is passed over unsaid. Placement at load never fires it.
+- **Quests past by their chain** (#2461). A quest counts as done (Engine's
+  `questDone`: its accept, objectives and hand-in, and as a prerequisite) when
+  it is handed in, or when a later quest of its chain is in the log or done
+  (`Own.chainPast`): the loaded quest database's follow-ups of it
+  (`QuestDB.FollowUps`, transitively) that this character can take (faction,
+  race, class) and that need it, in `preAll` or as a one-of `pre` naming no
+  other quest this character can take. So a chain taken early (Betrayed in
+  Orgrimmar, carried on to Ag'tor before the guide's step) never holds the
+  route. Without the database loaded nothing is inferred (it is never loaded
+  for this). The follow-up lists are kept per quest (`Own.laterOf`), the
+  answer once per quest per evaluation.
 - **Quests the player skipped** (`Engine.SkipQuest`, a quest's line
   right-clicked in the guide window: Skip this quest): saved per character
   by quest id (`skippedQuests`), so in every guide. Until the quest is done,
@@ -2942,13 +3012,16 @@ Polestar.Engine.GuideFocus(id) -> x, y | nil       -- live-frame percent of wher
   unconditional option.
 - **UI** (`UI/RouteChoice.lua`, frame `PolestarRouteChoice`): one card per
   option. Each card opens on the zone's art (`UI.ZoneArt`, below) framed on
-  `focusX/focusY` (where the route starts), lightly desaturated, fading into
-  the card with the zone's name on it. Polestar ships no zone art; without the
-  API or art for the map, a stretch of the night band stands in. Straight
-  under the art, at the same y on every card, the stat row: levels (in text),
-  travel time and quest count. Then the state chip, the pitch, at most 3 pros
-  and 2 cons one line each (the full lists in the card's tooltip), on a grid
-  every card shares so rules and lists line up; the recommended card has the
+  `focusX/focusY` (where the route starts), lightly desaturated, inset in its
+  own hairline, with the zone's name on it and the ∞ mark after the name for
+  a zone that is mostly Forever's own (`newInForever`). Polestar ships no zone
+  art; without the API or art for the map, a stretch of the night band stands
+  in. Under the art one line of facts: levels (in text), travel time and
+  quest count. Then the chips (the state, "New in Forever"), the pitch, and
+  3 pros and 1 con one line each (the full lists in the card's tooltip), on a
+  grid every card shares so every row lines up; the header says where the
+  routes meet again (`joinsAt`) or which route comes back to another (an
+  option whose `thenId` is another option). The recommended card has the
   accent ring and the primary button; "From now on, take the recommended zone"
   sets `behavior.routeChoice`; "Decide later" and the header ✕ close. It
   waits out combat. The guide window's completed state and the out-levelled
@@ -3209,7 +3282,11 @@ holds at its opening, see "Not yet available"):
   quest taken in another guide is no sign of where the player is in this
   one (Fitz, 0.3.6: Tincho at 28.7, carrying Dangerous! from the 22-24
   Hillsbrad visit, was put past Orgrimmar, training and the Undercity in
-  Hillsbrad 29-32, at every load). And a soft step behind it passes only
+  Hillsbrad 29-32, at every load), nor on a quest an earlier release's route
+  offered in another leveling guide (`ns.LegacyMovedIn` in LegacySteps.lua,
+  resident, from `tools/legacy-steps.js`: 0.4.0 offers Dangerous! on Hillsbrad
+  30-40's first Tarren Mill stop, and Tincho's old-route progress put him there
+  again). And a soft step behind it passes only
   when the quest work it leads to (the next quest goal for the character
   after it they can do, not waiting for a level or a prerequisite) is done or
   under way, or left out by the catch-up (`leadsToDone`): progress on a quest
@@ -3241,7 +3318,7 @@ same rules (`"log"`): left out while not done, kept once it only has to be
 handed in. Left out (`Own.leftOut[guideId]`, for the session; each
 placement works it out again), an accept no longer applies, with its turn-in
 and objectives; taking the quest by hand brings it back. In a guide the
-character is past (`maxLevel` + 2, as the out-levelled banner counts) going
+character is past (`maxLevel` + 2) going
 back is a detour: every grey or green accept not taken yet is left out,
 anywhere in the guide, unless at least `Own.CHAIN_WORTH` (3) accepts from
 yellow up need it down the chain (`Own.catchUpPast`); a quest in the log
@@ -3397,7 +3474,10 @@ Polestar.Theme.Color(name) -> r, g, b, a
    -- world map overlays: game art, the same in every scheme, outside the legibility guard);
    -- "discord" (Discord's Blurple, on its own mark only, outside the legibility guard)
 Polestar.Theme.Wash(role) -> r, g, b, a     -- ink at the role's alpha: "border","divider","hover",
-   -- "selected","progress","track","toggle","box","thumb","swatch","chip","watermark","mover"
+   -- "selected","progress","track","toggle" (the off switch's edge),"box","thumb","swatch","chip","watermark","mover"
+Polestar.Theme.SwitchColors(on, hover, enabled) -> { track, edge, knob, contact = { r, g, b }, shadow = { r, g, b, a } }
+   -- the settings switch's colours for one state (W.Toggle, W.Switch); disabled: hueless; contact: the track where
+   -- the knob's shadow meets the knob (what an on knob is read against; tests hold it and the off knob to 3:1)
 Polestar.Theme.Hex(name) -> "ffrrggbb"     -- for |c escapes
 Polestar.Theme.TipColor(name) -> r, g, b   -- name's colour for a line on the game's tooltip: as it is where it reads
    -- at 4.5:1 on the tooltip's dark ground (Theme.TIP_GROUND), else (a light look's ink) moved toward the look's
@@ -3417,7 +3497,15 @@ Polestar.Theme.ShowsRim() -> bool         -- ui.rim
 Polestar.Theme.SUBJECTS                   -- the subject/status colours a player may set (ui.colors.<name>)
 Polestar.Theme.Skin(frame, kind)          -- "window","panel","inset","button","editbox","checkbox","dropdown","scrollbar","tab","close"
 Polestar.Theme.Media(name) -> texturePath -- e.g. "icon-accept", "check", "white", "glow"
-Polestar.Theme.OnChanged(fn)              -- fn() on any scheme/colour/font change
+Polestar.Theme.SharpMedia(family, region, height) -> texturePath   -- "disc", "switch-edge", "switch-fill", "switch-focus"
+   -- (Media/UI <family>-16/-32/-64): the smallest at or above `height` (region units) on screen, so the client, which
+   -- makes no mipmaps for addon textures, never shrinks one by two or more
+Polestar.Theme.PixelsPerUnit(region) -> n -- physical pixels per unit of the region's coordinate space
+Polestar.Widgets.Capsule(parent, w, h, art?, mode?) -> frame   -- a capsule from one disc's halves and middle column
+   -- (no join, any width or alpha; :SetColor, :SetCapsule(w, h), :SetSpan(w)); mode "whole": the art at its own
+   -- shape over the frame, "span": whole while square (a knob). W.Pill is the same.
+Polestar.Theme.OnChanged(fn, full)        -- fn() on any scheme/colour/font change; full: after a full refresh only, not a dragged slider's live repaint
+Polestar.Theme.LiveChanged() -> { [token] = true } | nil   -- while listeners hear a live repaint: the palette tokens it changed
 Polestar.Theme.IsEllesmere() -> bool   -- a UI suite's look is followed (EllesmereUI, or ErgoBars: the same contract)
 Polestar.Theme.SkinProvider() -> "EllesmereUI" | "ErgoBars" | nil   -- whose; named in the scheme, accent note and Integrations
 Polestar.Theme.SkinId() -> id             -- ui.skin as drawn: a registered skin that has not failed, else "polestar"
@@ -3430,7 +3518,7 @@ Polestar.Theme.SkinVariants(id), SkinVariant(id), SkinToken(name), GuideParts(),
 Polestar.Theme.InstalledSkins(), LoadSkinAddon(id), LoadInstalledSkins()   -- skin addons that declare ## X-Polestar-Skin
 Polestar.Theme.SkinArrowStyle(), SkinMapIcons(), SkinMedia(name)   -- read by Nav/Arrow.lua, Nav/Pins.lua
 Polestar.Theme.SkinHook(surface, ...), SkinHookValue(surface, ...) -> ran, answer, SkinHooks(surface)   -- a module hands its frames to the skin in use
-Polestar.Theme.DrawSkinCard(frame, id, variant?), DrawSchemeCard(frame, id)   -- the Theme page's picker cards (Polestar_Options/Theme/SkinPicker.lua)
+Polestar.Theme.DrawSkinCard(frame, id, variant?, fit?), DrawSchemeCard(frame, id)   -- the Theme page's picker cards (Polestar_Options/Theme/SkinPicker.lua); fit: the whole window shrunk to a small frame (Install's look thumbnails), never the crop at the least legible scale
 Polestar.Theme.PaletteFor(id)
 Polestar.Theme.Metric(key, house) -> n   -- a size in the skin in use; `house` in the house style
 Polestar.Theme.House(key) -> token | nil   -- the house look's own (Theme/House.lua); nil in every other look
@@ -3726,6 +3814,19 @@ path when EllesmereUI is not installed; EllesmereUI wins when both are.
 Integrations section carry that name. Every surface paints
 from tokens (`W.Color`, `W.Painter`, `Theme.Skin`, `Theme.Band`), so a scheme or
 colour change repaints live without a reload.
+
+When a repaint runs: a plain look change is a full refresh (`Theme.Refresh`):
+what shows is painted at once, and a coloured region, painter or greyed-out
+setting row that a hidden frame above it keeps out of sight (another settings
+page, a closed window) is painted when that frame shows next, from its own
+OnShow (`Theme/Widgets.lua`: `staleColor`, `stalePaint`, `W.RefreshShown`); an
+object hidden itself is painted at once, its painter may be what shows it.
+Strings take a new font only when a font input moved. A slider or the colour
+wheel dragged writes each value live (`ns.Live`): the next frame repaints the
+colours that changed on what shows (`Theme.LiveChanged()`, the listeners
+registered with `Theme.OnChanged(fn, true)` left out), and the drag's end
+settles it with one full refresh (`ns.SettleLive`; the colour wheel's 0.25 s
+after its last value).
 
 ## Nav
 
@@ -6866,8 +6967,10 @@ flight timer and the instance tracker are set under Quality of Life.
   observations within 10 world yards share one icon at an original point;
   the other physical mailboxes keep their own pins. Codex spawn frame tags
   are retained for coordinate projection and navigation. Optional escaped
-  `t<title>` NPC and `m<faction>` mailbox tails extend the packed records;
-  older readers skip these comma-free fields, and older packs stay readable.
+  `t<title>` NPC, `m<faction>` mailbox and `i<instance>` object tails (the
+  instance an object lies in: the pick-up guides leave out a prerequisite that
+  uses one) extend the packed records; older readers skip these comma-free
+  fields, and older packs stay readable.
   Reads run in batches of 100 outside combat, the first time the world map
   opens with the layer on (at once when its minimap icons are on), never at
   login, so the Codex stays unloaded until then; filters reuse the records
@@ -7040,9 +7143,14 @@ the row shows the item, its tooltip the chance too. A row's count ("3/8") is
 its first goal's `progress` of kind `count`; it is plain text, repainted on
 every refresh outside the signature, so it follows kills and loot in combat.
 The face is plain textures and a `PlayerModel`, so it changes in combat: the
-creature's model by id (`SetCreature`, portrait zoom) over a crosshair, which
-stays visible while the client has not loaded the model; without an id, a
-close mob's own portrait (`SetPortraitTexture`). The crosshair is green, and
+creature's model by id (`SetCreature`, portrait zoom) over a crosshair. `SetCreature`
+draws only a creature in the client's cache and is not retried by the client,
+so the row calls it once `Compat.CreatureCached` says the client has it; until
+then (the faces repaint each second while one waits, for 30 s; after that only
+when one is close) the model stays hidden and a close mob's own portrait
+(`SetPortraitTexture`) shows, else the crosshair alone; the same without an
+id. The model is kept while hidden (`SetKeepModelOnHide`), as a hidden model
+otherwise drops what it drew. The crosshair is green, and
 the row gets a faint green wash, while a living mob of that name is close (the
 target or a nameplate unit; secret values are passed over; `UNIT_HEALTH`
 catches one dying), else danger for a mob and textDim for an NPC. A left-click
@@ -7766,7 +7874,11 @@ the quest list's rewards, choice versus fixed as the list files them; XP from
 `--local-extras`, DungeonJournal's audited shareability; bosses in kill order
 with the quests tied to them (an encounter's boss carries its DungeonEncounter
 id, `encounter`, for its name in every language); entrances from the Codex, else the client's Map
-table (the corpse point, placed on its zone); and the page's `attunement`
+table (the corpse point, placed on its zone); the zone (`zone`, `zoneName`):
+the entrance's map, else, with no entrance, the zone map of the open-world
+areas the client's AreaTable names after the instance (Forever's Blackmaw
+Hold: area 1216 under Azshara; The Shaper's Terrace: 16985 under Un'Goro
+Crater), null when it names none (Alcaz Prison); and the page's `attunement`
 list (below). A quest Forever hands in at one talk, never in the log
 (`quests.json` `direct`: Pozzik's Indurium Ore), carries `direct` (#2241). No
 loot tables. The page also carries the instance's Map id
@@ -7783,7 +7895,7 @@ guides.
 
 The pick-up guide is built in game (`addon/Polestar/Dungeons/Pickup.lua`):
 `Dungeons.PickupPlan(key, offer)` takes the page's quests that apply to the character
-(faction, race and class masks through `Lookup.QuestBlock`, the page's class
+(faction, race and class masks and a profession the character has not learned, through `Lookup.QuestBlock`, the page's class
 list), not done, not in the log (those are `carried`), not handed in at one
 talk (`direct`: the hand-in guide hands it in, #2241), not closed for good (a
 quest of the page's `closedBy` done or in the log: a breadcrumb whose quest is
@@ -7908,7 +8020,9 @@ NPC gives), per NPC a `talks` line is at (a talk goal on that line, before
 the turn-in place of its quest), per other follow-up giver (after the
 turn-ins it waits on) and per errand (a step titled with its quest, after the
 stop that gives it, before its turn-in),
-ordered by `Dungeons.OrderStops` with no fixed end (`CharState().dungeonHandin[key]`);
+ordered by `Dungeons.OrderStops` with no fixed end (`CharState().dungeonHandin[key]`) from where the
+player stands, or, inside the dungeon where the client gives no position, from its entrance (where the
+run ends: the givers nearest the way out first);
 the last step lists the rest as notes ("Not finished yet: …", "Turned in
 inside the dungeon: …"). Nothing routable: nil, "nothing", and
 `Dungeons.HandinText(plan)` says why in one line. `Dungeons.HandIn` puts the
@@ -9064,13 +9178,16 @@ Reading flow: `docs/DESIGN.md` ("Intent" and "The Guide Window").
   over one line per guide,
   `Title (min–max)`, in folders (a guide's `folder` when set, else leveling by
   faction and band, other guides by category); search also matches `folder`
-  and `keywords`. The faction filter (`ui.pickerFaction`, default this
-  character's) on the player's own faction lists only the guides this
-  character can follow (`Guides.GuideMatches`: no other race's or class's
-  guides), except the other races' starting zones of that faction
-  (`Guides.OtherStart`), which go in an "Other starting zones" folder right
-  after the player's levels 1–30; the other faction and All list every guide
-  in its usual folder. Right: the
+  and `keywords`. There is no faction filter (#2462): the menu lists only the
+  guides this character can follow (`Guides.GuideMatches`: never the other
+  faction's, nor another race's or class's), except the other races' starting
+  zones of their own faction (`Guides.OtherStart`), which go in an "Other
+  starting zones" folder right after the player's levels 1–30. Home's
+  suggestions, Recent, Favourites, search (`Core/Search.lua`) and Lookup's
+  curated guides keep to the character's side too (`Guides.OtherFaction`). A
+  guide of the other faction opened anyway (an import, an old saved tab)
+  shows the banner "This guide is for <faction> characters", never
+  dismissed, and the arrow points nowhere in it (`Engine.OtherFaction`). Right: the
   selected guide's zone art, facts (led by a guide's `reward` tiles and
   `why`, "Guide data"), progress, pitch, pros and cons, a favourite
   star, "Load guide" and "Open in new tab". Selecting never loads; the buttons,
@@ -9189,7 +9306,12 @@ Reading flow: `docs/DESIGN.md` ("Intent" and "The Guide Window").
   step of the filter's side (state glyph, the quest in its difficulty colour
   or what drops it, its state, giver and zone or chance and instance; a click
   sets the arrow there); the other side's entries carry no state. Map: the entrance and
-  the quest givers on its zone painting. Blocks, rows, tiles, chips and cards
+  the quest givers on its zone painting. A dungeon whose entrance is not known
+  paints its page's `zone` (the Codex takes it from the client's AreaTable: an
+  open-world area of the instance's name, Forever's Blackmaw Hold in Azshara)
+  whole on its card, header and Map tab, names it in the facts, and the Map tab
+  says where it lies; one with no zone either wears its loading screen
+  (`Dungeons.Art`, through `ZoneArt.Picture`). Blocks, rows, tiles, chips and cards
   are pooled; quest states refresh on QUEST_ACCEPTED, QUEST_REMOVED,
   QUEST_TURNED_IN and PLAYER_LEVEL_UP, the Attunement tab also on
   BAG_UPDATE_DELAYED and UPDATE_FACTION. `UI.DungeonsSection` exposes
@@ -9219,6 +9341,12 @@ Reading flow: `docs/DESIGN.md` ("Intent" and "The Guide Window").
   shows past the painting's edges. Only the base and overlay tiles the band
   shows get a texture, from per-band pools. Used by the route choice cards
   and the menu; the night band stands in without the art.
+  `UI.ZoneArt.Picture(art, { file, l, r, t, b })` fills the band with a
+  picture instead (a dungeon's loading screen, the crop square on screen, the
+  band showing the picture's full width at its scale); the next `Paint`
+  replaces it. `tests/zone-art-coverage.test.js` checks every shipped guide's
+  zone, every recorded dungeon door's zone and the fixed paintings against
+  the maps the client paints, and that every dungeon has a loading screen.
 - **Community guides in the menu.** Our categories (Leveling, Professions, …)
   list only our guides; All, Favourites, Current, Recent and search cover every
   shown guide. A "Community guides" heading in the sidebar (a `W.ShellNav` heading
@@ -9557,7 +9685,10 @@ Each call fires `GUIDE_VISIBILITY`.
   toggle; its look on Settings > Buttons): a `PolestarLauncher` on `UIParent` in the minimap button's
   look, and works as it does: click hides or shows all of Polestar
   (`Polestar.ToggleHidden`, dimmed while hidden), right-click opens `Maps.ShowMenu`, a drag
-  (`StartMoving`; with `ui.lockHud` only a Shift-drag, `ns.DragLocked`) saves
+  (`ns.DragWindow`, Core/Init.lua, as every Polestar window and the HUD's
+  frames: it follows the pointer from the first pixel, and the release's
+  click after a move does nothing; with `ui.lockHud` only a Shift-drag,
+  `ns.DragLocked`) saves
   its centre in `ui.launcherPos` (from the screen's bottom-left; unset: beside
   the window's default corner, `TOPRIGHT` -440, -256). It refreshes on
   `GUIDE_VISIBILITY` and its settings and hides while `RulesHide()` holds, so
@@ -10101,7 +10232,7 @@ What `compile` writes into a pack's folder: Core, "Guide data (compiled Lua)".
 | `export <file.guide>` | lints the file's pack (the nearest `pack.json` above it) and prints its one guide as an import string (`tools/lib/pack/importstring.js`; PACK_FORMAT.md, "Import strings"); refuses a file with errors, of several guides, of Polestar's own, over 60 steps or 50,000 characters. `play` and `dev --play` give the same string (`POST /api/import`, the page's Copy import string) |
 | `doctor` | Node, Lua, reference data, AddOns folder, `pack.json` |
 | `find` | quests, NPCs, objects, items, inns, flight points and our guides as guide lines (`--json`); `--kind inn\|flight` without a text lists every inn or flight point (from `travel.json`) |
-| `playtest` | every guide to the end per class (`tools/lib/playtest.js`, also behind `tests/guides.test.js`); a guide starts with the prerequisites of its accepts that the guides chaining into it turn in already done, and those they leave for it only to hand in in the log, as for a player arriving on the route. Plays run on a pool of long-lived lua5.1 processes (`tools/lib/luapool.js`, `tests/lua/pool.lua`; `POLESTAR_PLAY_WORKERS`, default 8): each play in a fresh environment, the addon's and the pack's files parsed once per process. `--honest` (`tools/lib/playtest-honest.js`, no Lua) plays each `next` chain (the main route; a catch-up alone) from the compiled lines and the data only, carrying the log, bags, flight paths and hearth, with nothing free: R1 travel (continent and zone changes, flight paths, hearth), R2 accept (giver at the place, item starts), R3 items (a source near the goal, quest-only drops), R4 NPCs (giver or ender, step titles, several givers), R5 turn-in (objectives credited, the required steps of `data/local/kb/forever-kb.sqlite` when present); `--format json` for agents; exit 1 on any fail |
+| `playtest` | every guide to the end per class (`tools/lib/playtest.js`, also behind `tests/guides.test.js`); a guide starts with the prerequisites of its accepts that the guides chaining into it turn in already done, and those they leave for it only to hand in in the log, as for a player arriving on the route. Plays run on a pool of long-lived lua5.1 processes (`tools/lib/luapool.js`, `tests/lua/pool.lua`; `POLESTAR_PLAY_WORKERS`, default 8): each play in a fresh environment, the addon's and the pack's files parsed once per process. `--honest` (`tools/lib/playtest-honest.js`, no Lua) plays each `next` chain (the main route; a catch-up alone; each side's own option out of a guide both sides play) from the compiled lines and the data only, carrying the log, bags, flight paths and hearth, with nothing free: R1 travel (continent and zone changes, flight paths, hearth), R2 accept (giver at the place, item starts), R3 items (a source near the goal, quest-only drops), R4 NPCs (giver or ender, step titles, several givers), R5 turn-in (objectives credited, the required steps of `data/local/kb/forever-kb.sqlite` when present); `--format json` for agents; exit 1 on any fail |
 | `forge guide check <dir>` (was `guidecheck`) | every chain of `.guide` files under `<dir>` (one folder, in file-name order; catch-ups left out) read as the player does, line by line, against the reference data (`rust/crates/forge-guide/src/guidecheck.rs`). It reads the parsed and resolved lines and the data they touch into facts, derives the failures from them by the rules once written as answer set programming (they are stratified, so plain Rust), and gives each failure the cheapest of the repairs it may take (equally cheap ones: a fixed choice). Rules: `itemStart` (an item-started accept before anything gives its item), `useBefore`, `unsourced` (no source in the data or the guide), `bagBefore` (a quest-only drop bagged before its quest is held), `giver`/`ender` (an NPC who does not give or take the quest, or none named when several do), `objective` (a turn-in with a part never worked since the accept), `noAccept`, `travel` (a new zone with no line that moves the player; a capital and its zone are one place), `continent` (no boat, zeppelin, portal or hearth). `--fix` runs the repairs (`guidecheck_repair.rs`; `travel` and `continent` are left to the writer's travel pass in `forge build`): names the NPC, adds the item's source (its best dropper's or object's spawn nearest the route's point, or a vendor), gates a rare start on `when has`, adds a missing goal or accept, copies a later collect before a use, and an order pass (a stable topological sort: every line after the nearest line that gives what it needs, moving no more than 150 lines; a step caught in a cycle is split per goal; a step whose sticky `zone` changed says it again). `--json` |
 | `play`, `dev` | the playground with the pack built into a temp folder; `dev` watches and builds into AddOns |
 | `install`, `pack` | builds and installs the pack; writes `<pack>/dist/<folder>-<version>.zip` |
@@ -10175,8 +10306,9 @@ was already built without it.
   verdicts call the same person, one vote per fact. Only facts go in, without
   who saw them: per NPC or object the items its loot windows held (NPC loot
   from a gathering skill left out), with the people who saw each, a chance
-  (the median of each person's own share of kills or loot windows) only when
-  `minVoters` people (or a vouched one) with 10 of their own back it, and
+  (the median of each person's own share of their loot windows of the
+  source; for a quest drop, of the windows its objective was open for) only
+  when `minVoters` people (or a vouched one) with 10 of their own back it, and
   `trusted` when `minVoters` people saw it, a vouched one did, or such a
   chance backs it; per NPC each item its merchant window listed, with its
   people and `trusted`; per quest the reward list its quest frames showed (a
@@ -10498,7 +10630,7 @@ was already built without it.
 ```
 quests.json   { "<id>": { id, title, level, minLevel, races, classes, start: { npc: [], object: [], item: [] },
                           end: { npc: [], object: [] }, pre: [ids], excl: [ids], next, objectives: [
-                          { type: "kill"|"item"|"object"|"event"|"talk", id, count, text } ], objectiveText, zone, xp,
+                          { type: "kill"|"item"|"object"|"event"|"talk", id, count, text, useItem? } ], objectiveText, zone, xp,
                           rewards?: { items: [ids], choices: [ids], money }, source: [] } }   (rewards: recorded only;
               count: the objective text's, else pfQuest's, else CMaNGOS classic-db quest_template's for the same id or the
               quest's one objective of that kind, else null; rust/crates/forge-data/src/merge.rs)
