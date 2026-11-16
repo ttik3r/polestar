@@ -106,7 +106,8 @@ ns.UI.GuideFrame.Part(function(GF)
 		end
 		local restLine
 		if not (type(stats) == "table" and stats.maxed) then
-			local pace = GF.PaceText(stats)
+			-- The guide's pace is the XP tracker's too: not while it is off.
+			local pace = (not Q or not Q.On or Q.On("xpTracker")) and GF.PaceText(stats) or nil
 			if pace then parts[#parts + 1] = pace end
 			-- Boosted Rest and the sleeping bag (QoL/Rest.lua): empty while its
 			-- setting is off or there is nothing to say.

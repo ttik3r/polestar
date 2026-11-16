@@ -48,6 +48,10 @@ local function frame() local u = P.UI; return u and u.GuideFrame end
 
 -- Settings: a value by path (Polestar.Get).
 function Core.setting(path) return P.Get and P.Get(path) end
+-- A guide-window toggle (guideWindow.<key>, on unless set false) and a
+-- size scale (guideWindow.<key>, 1 when unset).
+function Core.on(key) return Core.setting("guideWindow." .. key) ~= false end
+function Core.scale(key) return tonumber(Core.setting("guideWindow." .. key)) or 1 end
 function Core.compact() return Core.setting("ui.compact") and true or false end
 -- Polestar's own strings (its locale table), English when it has none.
 function Core.tr(s) local L = P.L; return (L and L[s]) or s end
@@ -354,7 +358,7 @@ local function header(parts)
 	nav.Lookup:Hide()
 	-- The step count at the title's size, beside it.
 	local path, size, flags = probe("goal")
-	nav.Steps.Count:SetFont(path, size, flags)
+	nav.Steps.Count:SetFont(path, math.floor(size * Core.scale("barTextSize") + 0.5), flags)
 	local cw = math.max(40, math.ceil(nav.Steps.Count:GetUnboundedStringWidth()) + 1)
 	nav.Steps.Count:SetWidth(cw)
 	nav.Steps:SetWidth(24 + cw + 24)
@@ -364,7 +368,7 @@ local function header(parts)
 	nav.Title:SetJustifyH("LEFT")
 	nav.Title:SetWordWrap(false)
 	local text = nav.Title:GetText()
-	nav.Title:SetShown(text ~= nil and text ~= "")
+	if text == nil or text == "" then nav.Title:Hide() end
 end
 on("guideLayout", function(parts) header(parts) end)
 -- The render shows or hides Skip, Report, Nearby and All steps again and puts Skip
@@ -376,7 +380,7 @@ on("guideRender", function(view, parts)
 end)
 
 -- With the foot bar off, room under the window's last part.
-on("guideLayout", function() return Core.setting("guideWindow.progress") == false and 8 or 0 end)
+on("guideLayout", function() return 8 end)
 
 ---------------------------------------------------------------------------
 -- The cards above the window, top down, by how far each is from the step
@@ -613,8 +617,10 @@ local slots = {}
 
 -- The window's own ground on a card of Atlas's, transparent with it.
 local function dress(card, window)
-	if card.psBare ~= window.psBare or card.psBgAlpha ~= window.psBgAlpha or card.psBgColor ~= window.psBgColor then
+	if card.psBare ~= window.psBare or card.psBgAlpha ~= window.psBgAlpha or card.psBgColor ~= window.psBgColor
+		or card.psNoBorder ~= window.psNoBorder then
 		card.psBare, card.psBgAlpha, card.psBgColor = window.psBare, window.psBgAlpha, window.psBgColor
+		card.psNoBorder = window.psNoBorder
 		Theme.Repaint(card)
 	end
 end
@@ -1656,7 +1662,7 @@ local function stepHeader(person, width)
 	end
 	local _, goalSize, flags = probe("goal")
 	local path = semibold() or own._header.font[1]
-	person.Name:SetFont(path, goalSize + TITLE_UP, flags)
+	person.Name:SetFont(path, math.floor((goalSize + TITLE_UP) * Core.scale("titleSize") + 0.5), flags)
 	Theme.Font(person.Where, "goal")
 	person.Where:SetTextColor(Theme.Color("textMuted"))
 	person.Name:SetWordWrap(false)
@@ -1704,7 +1710,7 @@ local function underline(person)
 	own.under:SetPoint("BOTTOMRIGHT", person, "BOTTOMRIGHT", -12, 0)
 	own.under:SetHeight(pixel(person))
 	own.under:SetVertexColor(r, g, b, 0.35)
-	own.under:Show()
+	own.under:SetShown(Core.on("rules"))
 end
 on("guideRender", function(view, parts) underline(parts.person) end)
 
@@ -1882,13 +1888,15 @@ on("guideLayout", function(parts)
 end)
 
 -- The top bar fills as the guide goes: a soft wash in the accent, a 2px
--- accent edge along its foot. The transparent window has no bar to fill.
+-- accent edge along its foot, in place of Polestar's bar under the window
+-- (GF.Shows "progressFoot"); the progress bar setting turns it off. The
+-- transparent window has no bar to fill.
 on("guideProgress", function(foot, frac)
 	local parts = Theme.GuideParts and Theme.GuideParts()
 	local nav = parts and parts.nav
 	if not (nav and parts.window and isUnder(foot, parts.window)) then return end
 	local own = store(nav)
-	if parts.window.psBare then
+	if parts.window.psBare or not Core.on("progress") then
 		if own.fill then own.fill:Hide(); own.edge:Hide() end
 		return
 	end
@@ -1936,11 +1944,10 @@ on("guideInset", function(name)
 	if name == "upnext" then return UP_X end
 end)
 
--- Done goals stay in place; the goals do not scroll on their own; on the
--- rail Up next has no heading to open it by.
+-- Done goals stay in place; on the rail Up next has no heading to open it by.
 on("guideShows", function(what, shown)
 	if what == "done" then return true end
-	if what == "goalScroll" then return false end
+	if what == "progressFoot" then return false end
 	if what == "upnextHead" then return not onRail() end
 	return shown
 end)
@@ -2310,7 +2317,7 @@ local function tipLook(tip, on)
 		own.rule = tip:CreateTexture(nil, "ARTWORK")
 		own.rule:SetTexture(Theme.Media("white"))
 	end
-	own.rule:SetShown(on)
+	own.rule:SetShown(on and Core.on("rules"))
 	local icon = tip.Toggle and tip.Toggle.Icon
 	if not on then
 		if own.pager then own.pager:Hide() end
@@ -2488,7 +2495,6 @@ local function spec(hooks)
 		defaults = {
 			["guideWindow.tabs"] = true,
 			["guideWindow.tabStyle"] = "switcher",
-			["guideWindow.progress"] = false,
 			["guideWindow.targetBar"] = false,
 			["guideWindow.reportButton"] = false,
 			["guideWindow.allStepsButton"] = true,

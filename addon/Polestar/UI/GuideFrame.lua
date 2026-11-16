@@ -1495,7 +1495,9 @@ GF.Part(function(GF)
 	-- goals area scrolls past the window's cap, default on), "classCardLater"
 	-- (the class quest card on the chain's later steps, default on),
 	-- "bannerClose" (a banner notice's ×, default on; the notice's kind follows
-	-- `default`).
+	-- `default`), "progressFoot" (the progress bar under the window while the
+	-- progress setting is on, default on: off for a skin that shows progress
+	-- its own way, guideProgress).
 	function GF.Shows(name, default, ...)
 		local ran, v = GF.HookValue("guideShows", name, default, ...)
 		if ran and type(v) == "boolean" then return v end

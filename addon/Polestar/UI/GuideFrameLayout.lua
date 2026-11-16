@@ -542,6 +542,7 @@ ns.UI.GuideFrame.Part(function(GF)
 		local ran, extra = GF.HookValue("guideLayout", GF.SkinParts(), width, y)
 		if ran and type(extra) == "number" and extra > 0 then y = y + extra end
 		local showFoot = (state == "steps" or state == "complete" or state == "skippedout") and GF.On("progress")
+			and GF.Shows("progressFoot", true)
 		foot:SetShown(showFoot)
 		local stripH = showStrip and TAB_H or 0
 		fit.outer = stripH + NAV_H + (showFoot and PROG_H or 0)
