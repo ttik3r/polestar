@@ -909,7 +909,7 @@ local function alongRows(along)
 		if type(facts) == "table" and (facts.quest or facts.text) then
 			own._orig = own._orig or text
 			-- The finished quests carried: the card's heading says they are still to do.
-			local carried = facts.count and (facts.count == 1 and Core.tr("1 quest to hand in") or string.format(Core.tr("%d quests to hand in"), facts.count))
+			local carried = facts.count and (facts.count == 1 and Core.tr("1 quest to hand in off-guide") or string.format(Core.tr("%d quests to hand in off-guide"), facts.count))
 			r.Text:SetText(facts.quest or carried or facts.text)
 			if facts.zone then
 				factsMeta = facts.yards and (facts.zone .. "  \194\183  " .. (Core.distanceText(facts.yards) or "")) or facts.zone
