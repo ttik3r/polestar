@@ -911,7 +911,7 @@ local function alongRows(along)
 			-- The finished quests carried: the card's heading says they are still to do.
 			local carried = facts.count and (facts.count == 1 and Core.tr("1 quest to hand in off-guide") or string.format(Core.tr("%d quests to hand in off-guide"), facts.count))
 			-- A click lists them (QuestRoom "carried"): said on the row, not only on hover.
-			if carried then carried = carried .. "  |c" .. Theme.Hex("textMuted") .. Core.tr("Click to view") .. "|r" end
+			if carried then carried = carried .. "\n|c" .. Theme.Hex("textMuted") .. Core.tr("Click to view") .. "|r" end
 			r.Text:SetText(facts.quest or carried or facts.text)
 			if facts.zone then
 				factsMeta = facts.yards and (facts.zone .. "  \194\183  " .. (Core.distanceText(facts.yards) or "")) or facts.zone
