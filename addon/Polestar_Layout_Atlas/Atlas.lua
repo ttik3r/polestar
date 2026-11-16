@@ -313,7 +313,24 @@ local function navBack(nav)
 	Theme.Font(nav.Title, "small")
 end
 onLeave(function(parts) navBack(parts.nav) end)
-onLeave(function(parts) if parts.window then parts.window.psBelow = nil end end)
+-- Where the Journey's card joins the window's foot (layoutBottom).
+local function seam(window, b, joined)
+	local function edge(f, set, i) local e = rawget(f, set); return e and e[i] end
+	local function skinEdge(f, i)
+		local sk = rawget(f, "psSkin")
+		return type(sk) == "table" and type(sk.edge) == "table" and sk.edge[i] or nil
+	end
+	for _, t in pairs({ edge(window, "psBorder", 2), skinEdge(window, 3) }) do t:SetAlpha(joined and 0 or 1) end
+	if b then
+		for _, t in pairs({ edge(b, "psBorder", 1), skinEdge(b, 1), skinEdge(b, 2) }) do t:SetAlpha(0) end
+	end
+end
+
+onLeave(function(parts)
+	if not parts.window then return end
+	parts.window.psBelow = nil
+	seam(parts.window, nil, false)
+end)
 
 -- Right to left from the menu: Report and Nearby where the player shows
 -- them, Skip (its glyph alone), then the step count.
@@ -1568,8 +1585,10 @@ local function layoutBottom(parts, journey, foot)
 		b:SetPoint("TOPLEFT", window, "BOTTOMLEFT", 0, 0)
 		b:SetPoint("TOPRIGHT", window, "BOTTOMRIGHT", 0, 0)
 		b:SetHeight(1)
+		-- The window's own kit (and its psGuide ground), so the Journey
+		-- reads as the window going on, not a panel under it.
 		b.psGuide = true
-		Theme.Skin(b, "guide")
+		Theme.Skin(b, "window")
 		own.bottom = b
 	end
 	local b = own.bottom
@@ -1589,8 +1608,13 @@ local function layoutBottom(parts, journey, foot)
 	else
 		b:Hide()
 	end
+	-- One surface: no line where the window meets it. Theme.Border's edges
+	-- (1 top, 2 bottom) and the house look's (psSkin.edge: 1 the light line
+	-- inside the top, 2 the shade over it, 3 the shade under the bottom).
+	local joined = b:IsShown()
+	seam(window, b, joined)
 	-- Its height for a host that shows the window whole (GF.Below).
-	window.psBelow = b:IsShown() and b:GetHeight() or 0
+	window.psBelow = joined and b:GetHeight() or 0
 end
 
 on("guideLayout", function(parts)
