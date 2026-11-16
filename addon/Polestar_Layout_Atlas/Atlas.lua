@@ -713,11 +713,12 @@ local function infoIcon(owner, label, tip)
 end
 
 -- While you're here: on its card, its label in caps as the other cards'.
--- Its panel and edge are Polestar's own textures (no hook hands them over),
--- out of sight while Atlas holds the part.
+-- Its panel, edge and the house look's hairline are Polestar's own (no hook
+-- hands them over), out of sight while Atlas holds the part: the hairline,
+-- inset in the card, drew a second box inside it.
 local function hereLook(here, on)
 	local own = store(here)
-	for _, t in ipairs({ here.Panel, here.Edge }) do
+	for _, t in ipairs({ here.Panel, here.Edge, rawget(here, "psHairline") }) do
 		if t and t.SetAlpha then t:SetAlpha(on and 0 or 1) end
 	end
 	if not here.Label then return end
