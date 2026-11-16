@@ -1679,7 +1679,7 @@ local function stepHeader(person, width)
 	person.Name:SetWordWrap(false)
 	if person.Icon then person.Icon:SetAlpha(0) end
 	person.Level:Hide()
-	local pad = (not compact() and has("guideInset")) and 11 or 14
+	local pad = has("guideInset") and 11 or 14
 	local whereW = 0
 	if person.Where:IsShown() then
 		whereW = math.min(person.Where:GetUnboundedStringWidth() + 1, math.floor(width * 0.45))
@@ -1780,7 +1780,7 @@ local function spotsOff(row, goal, own)
 		row.Sub:SetShown(left ~= nil)
 	end
 	own._alt = nil
-	if row.Alt and row.Alt:IsShown() and not compact() and has("guideInset") then
+	if row.Alt and row.Alt:IsShown() and has("guideInset") then
 		row.Alt:Hide()
 		own._alt = true
 	end
@@ -1940,14 +1940,15 @@ end)
 -- ahead).
 -- The card and Up next are set in from it (guideInset); each Up next row is
 -- its first goal on one line with its zone on the right (guideUpRow). The
--- "after" line is not shown: the rail shows the next step already. Out of
--- compact mode only, and only where Polestar sets parts in (guideInset).
+-- "after" line is not shown: the rail shows the next step already. Only
+-- where Polestar sets parts in (guideInset). In compact mode Polestar leaves
+-- out the steps before and Up next, so the rail is the current step's node.
 ---------------------------------------------------------------------------
 
 local CARD_X, UP_X, RAIL = 22, 13, 15 -- the card's and Up next's insets, the rail's x
 local FADE = { 0.9, 0.65, 0.4 } -- the steps ahead, fainter further on
 
-local function onRail() return not compact() and has("guideInset") end
+local function onRail() return has("guideInset") end
 
 on("guideInset", function(name)
 	if not onRail() then return nil end
@@ -2424,9 +2425,9 @@ onLeave(function(parts, live)
 end)
 
 ---------------------------------------------------------------------------
--- Compact mode: dense. Polestar's own compact mode drops Up next, the tabs
--- and the Journey; Atlas keeps the tip there (its strip at the card's foot)
--- and leaves the XP row out too.
+-- Compact mode: the current step only. Polestar's own compact mode drops Up
+-- next, the steps before, the tabs and the Journey; Atlas keeps the rail's
+-- one node, the tip (its strip at the card's foot) and the XP row.
 ---------------------------------------------------------------------------
 
 on("guideShows", function(what, shown)
@@ -2435,7 +2436,7 @@ on("guideShows", function(what, shown)
 end)
 
 on("guidePlace", function(name, part)
-	if compact() and (name == "xp" or name == "upnext") then
+	if compact() and name == "upnext" then
 		part:Hide()
 		return true
 	end
