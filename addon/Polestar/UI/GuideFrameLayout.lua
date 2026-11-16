@@ -57,7 +57,12 @@ ns.UI.GuideFrame.Part(function(GF)
 		-- The class-quest card (UI/ClassCard.lua) above the person and the goals:
 		-- the live window's alone.
 		local CC = GF.live and UI.ClassCard or nil
-		if CC then y = CC.Layout(width) end
+		if CC then
+			y = CC.Layout(width)
+			-- A skin may place the card itself (guidePlace "classCard").
+			local f = CC.Frame and CC.Frame()
+			if y > 0 and f and claimed("classCard", f, width, y) then y = 0 end
+		end
 		-- A profession guide's skill-range heading over the step (fillCard).
 		local sec = card.Section
 		if sec:IsShown() then
