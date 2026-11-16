@@ -234,7 +234,7 @@ emit({ area = area ~= nil, sub = railSub, rail = railAlt, compactAlt = row.Alt:I
 	assert.equal(out.area, true);
 	assert.ok(!/spots/.test(out.sub) && /Ask the guard first/.test(out.sub), `sub: ${out.sub}`);
 	assert.equal(out.rail, false, 'the next-spot button is off on the rail');
-	assert.equal(out.compactAlt, true, 'compact mode keeps it');
+	assert.equal(out.compactAlt, false, 'compact mode keeps the rail, so no next-spot button either');
 	assert.ok(!/spots/.test(String(out.compactSub)), `compact sub: ${out.compactSub}`);
 });
 
@@ -517,5 +517,34 @@ emit({ aimed = aimed, plain = plain, compactTex = person.Mark:GetTexture() ~= ni
 	const [r, g, b] = out.aimed.c;
 	assert.ok(r > 0.9 && g > 0.7 && b < 0.6, `yellow: ${out.aimed.c}`);
 	assert.equal(out.plain.w, 16, 'not aimed: the plain halo');
-	assert.equal(out.compactTex, true, 'compact mode draws the bar');
+	assert.equal(out.compactTex, false, 'compact mode keeps the rail: the edge round its node, not the bar');
+});
+
+// The class-quest card is a part a layout may place itself (guidePlace
+// "classCard"): Atlas lifts it above the window. A card of 60 px stands in
+// for UI/ClassCard.lua's (its Layout and Frame), so the claim is checked
+// without a class chain on screen.
+test('under Atlas the class card is handed to the layout, not stacked in the window', () => {
+	const [out] = runAddon({
+		stubs: ['stub_world.lua'],
+		addons: ['Polestar', 'Polestar_Skin_Atlas', 'Polestar_Layout_Atlas'],
+		script: `${GUIDE}
+local T, GF, UI = Polestar.Theme, Polestar.UI.GuideFrame, Polestar.UI
+Polestar.Set("ui.shown", true)
+T.SetLayout("atlas")
+local CC = UI.ClassCard
+local f = CreateFrame("Frame", nil, PolestarGuideFrame)
+f:Show()
+CC.Layout = function() return 60 end
+CC.Frame = function() return f end
+local seen
+local before = GF.HookValue
+GF.HookValue = function(hook, name, ...)
+	if hook == "guidePlace" and name == "classCard" then seen = true end
+	return before(hook, name, ...)
+end
+GF.Layout()
+emit({ seen = seen == true })`,
+	}).emitted;
+	assert.equal(out.seen, true, 'guidePlace "classCard" runs');
 });

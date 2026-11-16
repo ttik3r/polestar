@@ -641,6 +641,9 @@ function CC.Colours(goal)
 	return classQuest(goal, shown.class)
 end
 
+-- The card's frame, once built (a skin places it: guidePlace "classCard").
+function CC.Frame() return F end
+
 -- Place the card at the top of the guide window's card, `width` wide. -> its height (0 hidden)
 function CC.Layout(width, c)
 	local F = c or F
