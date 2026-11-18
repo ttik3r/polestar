@@ -5030,5 +5030,9 @@ L["Landed. Freedoom Arcade is saved and paused: type %s to continue."] = "Geland
 -- L["The size of Polestar's text, apart from the window scale. Changes at once. Right-click to reset."] = "Die Größe von Polestars Text, unabhängig von der Fenstergröße. Wirkt sofort. Rechtsklick zum Zurücksetzen."
 -- L["No junk to make room with. Ctrl+Alt-click an item to mark it as junk."] = "Kein Plunder, um Platz zu schaffen. Strg+Alt-Klick auf einen Gegenstand markiert ihn als Plunder."
 -- L["While paused, quests are not accepted or turned in for you, and no reward is picked, until Polestar resumes."] = "Während der Pause werden keine Quests für dich angenommen oder abgegeben und keine Belohnung gewählt, bis Polestar weiterläuft."
+
+-- UI/Grouped.lua: the new settings page's switch
+L["New settings page"] = "Neue Einstellungsseite"
+L["A preview of the settings in groups, with tabs, a filter and a preview beside the rows. The same settings; switch it off for the current page."] = "Eine Vorschau der Einstellungen in Gruppen, mit Tabs, einem Filter und einer Vorschau neben den Zeilen. Dieselben Einstellungen; schalte es aus für die aktuelle Seite."
 -- L["Target bar colour"] = "Farbe der Zielleiste"
 -- L["Progress colour"] = "Fortschrittsfarbe"
