@@ -4,7 +4,8 @@
 -- (W.NavParts), its icon rail and fly-out (W.ShellNavRail, W.ShellFlyout),
 -- the folder tabs (W.FolderTabs), a card's Legend header and its pill switch
 -- (W.LegendHeader, W.PillSwitch), the header's "Search first"
--- (W.SearchFirst) and its ··· menu (W.HeaderMenu). They join core's kit
+-- (W.SearchFirst), its ··· menu (W.HeaderMenu) and a reference row for a
+-- spec (W.Ref). They join core's kit
 -- (Polestar/Theme/Widgets.lua) under the same names; core's sidebar
 -- (W.ShellNav) calls them only for rows this window gives it.
 
@@ -1025,4 +1026,14 @@ do
 		end)
 		return b
 	end
+end
+
+-- A reference row for a spec (UI.Options.Ref, "References" in the settings
+-- window's UI/Options.lua): kind and key (what RegisterOptions checks), `ref`,
+-- and any fields given (its own label, extras, disabled). Here, beside the
+-- registry, so every module's settings rows can make one.
+function W.Ref(kind, key, fields)
+	local c = { kind = kind, key = key, ref = true }
+	for k, v in pairs(fields or {}) do c[k] = v end
+	return c
 end
