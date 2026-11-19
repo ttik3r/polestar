@@ -143,7 +143,7 @@ end
 
 -- Clicks on the rows of five tabs (PER_KIND of each kind): a switch twice (on and back), a dropdown opened and a
 -- choice picked then put back, sliders dragged and released, colour picked live and closed.
-local TABS = { { "theme", "Colour" }, { "theme", "Frames" }, { "guide", "Window" }, { "qualityoflife", "Quests" }, { "trackers", "Essentials" } }
+local TABS = { { "theme", "Colour" }, { "theme", "Frames" }, { "guidewindow", "Window" }, { "qualityoflife", "Quests" }, { "trackers", "Essentials" } }
 local function kindOf(row)
 	if rawget(row, "Slider") then return "slider" end
 	if rawget(row, "Track") and rawget(row, "Knob") then return "toggle" end
