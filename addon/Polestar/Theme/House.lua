@@ -302,6 +302,13 @@ local HOUSE_PAINT = {
 		fill(f):SetVertexColor(r, g, b, 0.25)
 		hideBorder(f)
 	end,
+	-- A window's pane (W.Pane: a detail side, a list's ground, a row card):
+	-- the flat colour of its token (f.psPane, "panel" unless named), as
+	-- W.Fill drew it. A game look draws its inset or card there instead.
+	pane = function(f)
+		fill(f):SetVertexColor(Theme.Color(f.psPane or "panel"))
+		hideBorder(f)
+	end,
 	button = function(f)
 		fill(f):SetVertexColor(Theme.Color("panelAlt"))
 		Theme.Border(f, Theme.Color("border"))

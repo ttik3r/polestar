@@ -272,7 +272,7 @@ function RV.Build(parent, shell)
 	detail = d
 	d:SetPoint("TOPLEFT", list, "TOPRIGHT", 0, 0)
 	d:SetPoint("BOTTOMRIGHT", root, "BOTTOMRIGHT", 0, 0)
-	W.Fill(d, "panel")
+	W.Pane(d, "panel")
 	local rule = W.Divider(d, true)
 	rule:SetPoint("TOPLEFT", d, "TOPLEFT", 0, 0)
 	rule:SetPoint("BOTTOMLEFT", d, "BOTTOMLEFT", 0, 0)

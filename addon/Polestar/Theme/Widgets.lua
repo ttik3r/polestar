@@ -339,6 +339,16 @@ function W.Divider(parent, vertical, alpha)
 end
 
 -- A flat fill in a palette colour.
+-- A window's pane (a detail side, a list's ground, a row card) in the
+-- look's paint (Theme.Skin "pane"): the flat colour of `token` in the house
+-- looks, as W.Fill draws it; a game look's inset (kind nil) or card (kind
+-- "tile"). A pane W.Fill painted stayed Polestar's navy in every look.
+function W.Pane(frame, token, kind)
+	frame.psPane, frame.psPaneKind = token, kind
+	Theme.Skin(frame, "pane")
+	return frame
+end
+
 function W.Fill(parent, color, layer, sub)
 	local t = parent:CreateTexture(nil, layer or "BACKGROUND", nil, sub or -6)
 	t:SetTexture(WHITE)

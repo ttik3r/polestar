@@ -121,7 +121,7 @@ local function row(i)
 	if r then return r end
 	r = CreateFrame("Button", nil, scroll.Child)
 	r:SetHeight(ROW_H)
-	W.Fill(r, "panel")
+	W.Pane(r, "panel", "tile")
 	W.Hover(r)
 	r.Selected = r:CreateTexture(nil, "BACKGROUND", nil, 1)
 	r.Selected:SetTexture(Theme.Media("white"))

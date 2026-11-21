@@ -34,7 +34,9 @@ Theme.API_VERSION = 2
 -- The surfaces a skin may paint: the kinds of Theme.Skin (a window marked
 -- psGuide is the guide window, psLight a toast).
 local PAINT_KINDS = { window = true, guide = true, toast = true, panel = true, sidebar = true, inset = true, button = true,
-	dropdown = true, tile = true, editbox = true, checkbox = true, tab = true, close = true, scrollbar = true }
+	dropdown = true, tile = true, editbox = true, checkbox = true, tab = true, close = true, scrollbar = true,
+	-- A window's pane (W.Pane: a detail side, a list's ground, a row card).
+	pane = true }
 -- The art modules paint themselves and hand their frames to a skin's hook
 -- (Theme.SkinHook), after Polestar's own look is on:
 --   the guide window (Skin API 2): its title (guideTitle), a goal row once

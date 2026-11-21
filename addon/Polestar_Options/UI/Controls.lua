@@ -565,7 +565,7 @@ local function cardFor(row, ch)
 	card = CreateFrame("Button", nil, row)
 	local cw, ca = row.psCardW or CARD_W, row.psCardArt or CARD_ART
 	card:SetSize(cw, ca + CARD_NAME)
-	W.Fill(card, "panelAlt", "BACKGROUND", -7)
+	W.Pane(card, "panelAlt", "tile")
 	hoverTexture(card)
 	card.Art = CreateFrame("Frame", nil, card)
 	card.Art:SetPoint("TOPLEFT", card, "TOPLEFT", 1, -1)

@@ -1229,6 +1229,16 @@ local function paints(name)
 		panel = function(f) panel(f, kit) end,
 		sidebar = function(f) inset(f, kit, kit.source == "file" and 6 or nil) end,
 		inset = function(f) inset(f, kit) end,
+		-- A window's pane (W.Pane): the inset a sidebar wears, or a row's
+		-- card (f.psPaneKind "tile"), in place of the house look's flat colour.
+		pane = function(f)
+			if f.psPaneKind ~= "tile" then return inset(f, kit) end
+			card(f, kit)
+			-- The pane's own hover (W.Hover, a card's hoverTexture) stays the
+			-- one: the card art's wash would light it twice.
+			local d = rawget(f, "psSkin")
+			if d and d.hover then d.hover:SetAlpha(0) end
+		end,
 		button = function(f)
 			if f.psTextButton then return textButton(f, kit) end
 			card(f, kit)

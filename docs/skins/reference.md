@@ -983,6 +983,7 @@ A skin may paint any kind itself through `paint.<kind>`:
 | `panel` | menus, popups, raised panels, the fallback for an unknown kind | `psBare`, `psMenu` (a menu or popup over other frames: the dropdown menus, a setting's cog, Quick settings, the settings search's list; paint its ground in `menuBg` so nothing under it shows through) |
 | `sidebar` | the settings' and guide menu's sidebar | |
 | `inset` | wells inside a window | |
+| `pane` | a window's pane: the Lookup, Rares, Talents and guide picker detail sides, the Alts rows (`psPaneKind` `"tile"`); its token in `psPane` | |
 | `button` | buttons, cards, rows that act as buttons | `psTextButton` (a text button, as opposed to a card or row) |
 | `tile` | action tiles | |
 | `dropdown` | dropdown controls | |
