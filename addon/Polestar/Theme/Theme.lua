@@ -1307,9 +1307,10 @@ end
 
 -- A part's art on texture `t`: a file, or an atlas of the client's
 -- ("atlas:<name>": the game's looks' own parts).
-function Theme.SetArt(t, art)
+-- `filter` (optional): the texture filter, "TRILINEAR" for art drawn turned or scaled down.
+function Theme.SetArt(t, art, filter)
 	if type(art) == "string" and art:sub(1, 6) == "atlas:" then return t:SetAtlas(art:sub(7)) end
-	t:SetTexture(art)
+	t:SetTexture(art, nil, nil, filter)
 	t:SetTexCoord(0, 1, 0, 1)
 end
 

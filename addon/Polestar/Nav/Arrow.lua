@@ -237,44 +237,44 @@ local function buildDial(parent)
 	d.dial = dial
 
 	local glow = dial:CreateTexture(nil, "BACKGROUND")
-	glow:SetTexture(MEDIA .. "arrow-glow")
+	glow:SetTexture(MEDIA .. "arrow-glow", nil, nil, "TRILINEAR")
 	glow:SetSize(DIAL * 1.25, DIAL * 1.25)
 	glow:SetPoint("CENTER")
 	glow:SetBlendMode("ADD")
 	d.glow = glow
 
 	local body = dial:CreateTexture(nil, "ARTWORK")
-	body:SetTexture(MEDIA .. "arrow")
+	body:SetTexture(MEDIA .. "arrow", nil, nil, "TRILINEAR")
 	body:SetAllPoints()
 	d.body = body
 
 	local facet = dial:CreateTexture(nil, "ARTWORK", nil, 1)
-	facet:SetTexture(MEDIA .. "arrow-facet")
+	facet:SetTexture(MEDIA .. "arrow-facet", nil, nil, "TRILINEAR")
 	facet:SetAllPoints()
 	d.facet = facet
 
 	local sheet = dial:CreateTexture(nil, "ARTWORK")
-	sheet:SetTexture(MEDIA .. "arrow3d")
+	sheet:SetTexture(MEDIA .. "arrow3d", nil, nil, "TRILINEAR")
 	sheet:SetSize(SPRITE, SPRITE)
 	sheet:SetPoint("CENTER")
 	d.sheet = sheet
 
 	-- The frame on the heading's other side, over the nearest at its share (dialRotate).
 	local sheet2 = dial:CreateTexture(nil, "ARTWORK", nil, 1)
-	sheet2:SetTexture(MEDIA .. "arrow3d")
+	sheet2:SetTexture(MEDIA .. "arrow3d", nil, nil, "TRILINEAR")
 	sheet2:SetSize(SPRITE, SPRITE)
 	sheet2:SetPoint("CENTER")
 	sheet2:SetVertexColor(1, 1, 1, 0)
 	d.sheet2 = sheet2
 
 	local sheetSpec = dial:CreateTexture(nil, "ARTWORK", nil, 2)
-	sheetSpec:SetTexture(MEDIA .. "arrow3d-spec")
+	sheetSpec:SetTexture(MEDIA .. "arrow3d-spec", nil, nil, "TRILINEAR")
 	sheetSpec:SetSize(SPRITE, SPRITE)
 	sheetSpec:SetPoint("CENTER")
 	sheetSpec:SetBlendMode("ADD")
 	d.sheetSpec = sheetSpec
 	local sheetSpec2 = dial:CreateTexture(nil, "ARTWORK", nil, 2)
-	sheetSpec2:SetTexture(MEDIA .. "arrow3d-spec")
+	sheetSpec2:SetTexture(MEDIA .. "arrow3d-spec", nil, nil, "TRILINEAR")
 	sheetSpec2:SetSize(SPRITE, SPRITE)
 	sheetSpec2:SetPoint("CENTER")
 	sheetSpec2:SetBlendMode("ADD")
@@ -297,11 +297,11 @@ local function buildDial(parent)
 	-- The skins' darts and arrival (Media/UI: dart, dart-edge, dart-gold,
 	-- skin-ring, skin-check, circle).
 	local dart = dial:CreateTexture(nil, "ARTWORK")
-	dart:SetTexture(UI_DIR .. "dart")
+	dart:SetTexture(UI_DIR .. "dart", nil, nil, "TRILINEAR")
 	dart:SetSize(DART, DART)
 	dart:SetPoint("CENTER")
 	local dartEdge = dial:CreateTexture(nil, "ARTWORK", nil, 1)
-	dartEdge:SetTexture(UI_DIR .. "dart-edge")
+	dartEdge:SetTexture(UI_DIR .. "dart-edge", nil, nil, "TRILINEAR")
 	dartEdge:SetAllPoints(dart)
 	local skinDisc = dial:CreateTexture(nil, "BACKGROUND")
 	skinDisc:SetTexture(UI_DIR .. "circle")
@@ -470,14 +470,14 @@ local function dialTint(d, r, g, b, lk)
 		local k = tex == skinDart and skinDartScale or 1
 		if d.dartTex ~= tex or d.dartScale ~= k then
 			d.dartTex, d.dartScale = tex, k
-			ns.Theme.SetArt(d.dart, tex)
+			ns.Theme.SetArt(d.dart, tex, "TRILINEAR")
 			d.dart:SetSize(DART * k, DART * k)
 		end
 		if baked then d.dart:SetVertexColor(1, 1, 1, 1) else d.dart:SetVertexColor(r, g, b, 1) end
 		local edge = skinDartEdge or (UI_DIR .. "dart-edge")
 		if d.dartEdgeTex ~= edge then
 			d.dartEdgeTex = edge
-			d.dartEdge:SetTexture(edge)
+			d.dartEdge:SetTexture(edge, nil, nil, "TRILINEAR")
 		end
 		local e = skinDartEdgeTint or EDGE[s == "halo" and (d.near and "haloNear" or "halo") or "hearth"]
 		d.dartEdge:SetVertexColor(e[1], e[2], e[3], 1)
