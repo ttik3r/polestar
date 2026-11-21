@@ -407,7 +407,8 @@ fn the_preview_in_the_narrow_preview_panel_draws_each_part_as_wide_as_the_stage(
 			local f = Polestar.UI.ThemePreview(UIParent)
 			f:Layout(376, 1300)
 			local _, _, _, sx = f.Stage:GetPoint(1)
-			local inner = { sx + 20, sx + f.Stage:GetWidth() - 20 }
+			-- Inside its box's pad (14 a side), each row a box as wide as the stage.
+			local inner = { sx + 14, sx + f.Stage:GetWidth() - 14 }
 			local parts = {}
 			for _, p in ipairs(f.Parts) do
 				local fr = p.kind == "guide" and f.Scene or p.frame

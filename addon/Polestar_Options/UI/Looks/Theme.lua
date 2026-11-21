@@ -286,43 +286,50 @@ function lightParts(f, G, heads, toast, card)
 end
 
 -- Theme v2, a band (UI.Preview.Band): the three surfaces the theme styles on
--- one stage, a framed panel across the band: the guide window (a copy drawn
+-- one stage across the band, each in a framed box of its own: the guide window (a copy drawn
 -- by its own code, UI.GuideWindowScene: its head and its goals, cut under
 -- them and faded into the stage), the heads-up card (on the window's scale,
 -- as it sits on the window) and the rare alert, drawn by their own code at
 -- their real size, each centred on its row's middle line, the space between
--- them even, a caption under each on one line. A band too narrow for the
--- three across at STAGE_FIT of their size or more takes the window on a row
--- of its own and the two cards under it (then each on its own row). Each row
--- is drawn as large as the stage's width holds it, never over its real size:
--- one part wider than the rest (the rare alert in the new page's narrow
--- Preview panel) shrinks its own row, not the others. Past that, all smaller
--- alike, never overlapping, and nothing says so.
-local GAP, MAX_GAP, ROWS_ROOM, SIDE = 32, 72, 12, 16 -- between two (least, most); the window's ground under its goals; the window's own room a side
-local STAGE_PAD, ROW_GAP, CAP_GAP, CAP_H, STAGE_FIT, CUT_FADE = 20, 20, 10, 15, 0.8, 20
+-- the boxes of a row sharing its width, a caption at the foot of each box on
+-- one line. A band too narrow for the three across at STAGE_FIT of their size
+-- or more takes the window on a row of its own and the two cards under it
+-- (then each on its own row, the window's box as tall as the two under it).
+-- Each row is drawn as large as the stage's width holds it, never over its
+-- real size: one part wider than the rest (the rare alert in the new page's
+-- narrow Preview panel) shrinks its own row, not the others. Past that, all
+-- smaller alike, never overlapping, and nothing says so.
+local ROWS_ROOM, SIDE = 12, 16 -- the window's ground under its goals; the window's own room a side
+local BOX_PAD, BOX_GAP, CAP_GAP, CAP_H, STAGE_FIT, CUT_FADE = 14, 12, 8, 15, 0.8, 20 -- in a box, between boxes
 local ARRANGEMENTS = { { { 1, 2, 3 } }, { { 1 }, { 2, 3 } }, { { 1 }, { 2 }, { 3 } } }
 local function buildPreview(view)
 	local UI = ns.UI
 	local TS = UI.Toasts
 	local P = UI.Preview
 	local f = P.Band(view, { watch = { "ui.", "guideWindow.", "toasts." }, fitNote = false })
-	-- The stage: the panel colour laid on the band's ground (opaque, so the
-	-- window's cut fades into exactly it) inside a hairline, under the three.
+	-- The stage holds a box for each part: the panel colour laid on the
+	-- band's ground (opaque, so the window's cut fades into exactly it)
+	-- inside a hairline.
 	local stage = CreateFrame("Frame", nil, f)
 	stage:SetFrameLevel(f:GetFrameLevel())
-	stage.Fill = stage:CreateTexture(nil, "BACKGROUND", nil, -6)
-	stage.Fill:SetTexture(Theme.Media("white"))
-	stage.Fill:SetAllPoints(stage)
 	local function stageColor()
 		local r, g, b, a = Theme.Color("panel")
 		local br, bg, bb = Theme.Color("bg")
 		a = a or 1
 		return r * a + br * (1 - a), g * a + bg * (1 - a), b * a + bb * (1 - a)
 	end
-	W.Painter(stage, function(s)
+	local function paintBox(s)
 		s.Fill:SetVertexColor(stageColor())
 		Theme.Border(s, Theme.Wash("border"))
-	end)
+	end
+	local function newBox()
+		local b = CreateFrame("Frame", nil, stage)
+		b.Fill = b:CreateTexture(nil, "BACKGROUND", nil, -6)
+		b.Fill:SetTexture(Theme.Media("white"))
+		b.Fill:SetAllPoints(b)
+		W.Painter(b, paintBox)
+		return b
+	end
 	stage:Hide()
 	f.Stage = stage
 	local G = UI.GuideWindowScene and UI.GuideWindowScene(f)
@@ -339,11 +346,13 @@ local function buildPreview(view)
 	if heads then parts[#parts + 1] = { kind = "headsup", frame = heads, label = f:Label(L["Heads-up card"]) } end
 	if toast then parts[#parts + 1] = { kind = "rare", frame = toast, label = f:Label(L["Rare alert"]) } end
 	f.Parts = parts
-	-- The stage over the band's ground, the parts over the stage, each
-	-- caption on it.
+	-- The stage over the band's ground, the boxes on it, the parts over
+	-- their boxes, each caption in its box.
 	stage:SetFrameLevel(f:GetFrameLevel() + 1)
 	for _, p in ipairs(parts) do
-		p.label:SetParent(stage)
+		p.box = newBox()
+		p.box:SetFrameLevel(stage:GetFrameLevel() + 1)
+		p.label:SetParent(p.box)
 		local fr = p.kind == "guide" and G or p.frame
 		if fr:GetFrameLevel() <= stage:GetFrameLevel() then fr:SetFrameLevel(stage:GetFrameLevel() + 2) end
 	end
@@ -351,11 +360,14 @@ local function buildPreview(view)
 	if #parts == 0 then return f end
 	local snap = P.Snap
 	-- Rows of parts (indexes into `parts`, those it has), across `room` ->
-	-- the stage's natural width and height, each row's width and tallest
-	-- part at its own fit (the most of its real size the room holds), and
-	-- the least of those fits.
+	-- the stage's natural width and height, each row's width (its boxes at
+	-- their least) and tallest part at its own fit (the most of its real size
+	-- the room holds, its boxes' pads and gaps kept whole), and the least of
+	-- those fits. The window alone on the first of three rows takes a box as
+	-- tall as the two under it.
+	local BOX_ROOM = BOX_PAD * 2 + CAP_GAP + CAP_H -- a box's height over its part's
 	local function measure(rows, room)
-		local wide, high, sized, least = 0, STAGE_PAD * 2, {}, 1
+		local wide, sized, least = 0, {}, 1
 		for i, row in ipairs(rows) do
 			local w, tall = 0, 0
 			for _, at in ipairs(row) do
@@ -363,14 +375,20 @@ local function buildPreview(view)
 				w = w + p.w
 				tall = max(tall, p.h)
 			end
-			local gaps = (#row - 1) * GAP
-			local fit = min(1, max(0.05, (room - STAGE_PAD * 2 - gaps) / max(1, w)))
+			local over = #row * BOX_PAD * 2 + (#row - 1) * BOX_GAP
+			local fit = min(1, max(0.05, (room - over) / max(1, w)))
 			least = min(least, fit)
-			sized[i] = { list = row, fit = fit, w = w * fit + gaps, tall = tall * fit }
-			wide = max(wide, w * fit + gaps)
-			high = high + tall * fit + CAP_GAP + CAP_H + (i > 1 and ROW_GAP or 0)
+			sized[i] = { list = row, fit = fit, w = w * fit + over, tall = tall * fit }
+			wide = max(wide, w * fit + over)
 		end
-		return wide + STAGE_PAD * 2, high, sized, least
+		if #sized > 2 and #sized[1].list == 1 and parts[sized[1].list[1]].kind == "guide" then
+			local under = 0
+			for i = 2, #sized do under = under + sized[i].tall + BOX_ROOM + BOX_GAP end
+			sized[1].tall = max(sized[1].tall, under - BOX_GAP - BOX_ROOM)
+		end
+		local high = 0
+		for i, row in ipairs(sized) do high = high + row.tall + BOX_ROOM + (i > 1 and BOX_GAP or 0) end
+		return wide, high, sized, least
 	end
 	function f:Content(width, tall)
 		local t = self:TrueScale()
@@ -417,18 +435,23 @@ local function buildPreview(view)
 			stage:SetPoint("TOPLEFT", self, "TOPLEFT", snap(self, left), -snap(self, top))
 			stage:SetSize(snap(self, wide * k), snap(self, high * k))
 			stage:Show()
-			local y = top + STAGE_PAD * k
+			local y = top
 			for _, row in ipairs(sized) do
 				local n, rf = #row.list, row.fit
-				local parts_w = row.w - (n - 1) * GAP
-				local gap = n > 1 and min(MAX_GAP, max(GAP, (wide - parts_w) / (n + 1))) or 0
-				local x = left + (wide - parts_w - (n - 1) * gap) / 2 * k
-				local mid = y + row.tall / 2 * k
+				local extra = (wide - row.w) / n -- each box's share of the room over
+				local bx = left
+				local mid = y + (BOX_PAD + row.tall / 2) * k
 				-- The row's own scale: its fit within the band's.
 				local rk = rf * k
 				for _, at in ipairs(row.list) do
 					local p = parts[at]
 					local g = p.k * rk
+					local pw = p.w * rf
+					local bw = pw + BOX_PAD * 2 + extra
+					p.box:ClearAllPoints()
+					p.box:SetPoint("TOPLEFT", self, "TOPLEFT", snap(self, bx), -snap(self, y))
+					p.box:SetSize(snap(self, bw * k), snap(self, (row.tall + BOX_ROOM) * k))
+					local x = bx + (bw - pw) / 2 * k
 					local ptop = mid - p.h / 2 * rk
 					if p.kind == "guide" then
 						-- Its box the window and the room it keeps a side, as
@@ -444,11 +467,11 @@ local function buildPreview(view)
 						p.frame:SetPoint("TOPLEFT", self, "TOPLEFT", snap(p.frame, x / g), snap(p.frame, -ptop / g))
 					end
 					p.label:ClearAllPoints()
-					p.label:SetPoint("TOP", self, "TOPLEFT", snap(self, x + p.w * rf / 2 * k), -snap(self, y + (row.tall + CAP_GAP) * k))
-					p.label:SetWidth(max(1, (p.w * rf + gap) * k))
-					x = x + (p.w * rf + gap) * k
+					p.label:SetPoint("TOP", self, "TOPLEFT", snap(self, bx + bw / 2 * k), -snap(self, y + (BOX_PAD + row.tall + CAP_GAP) * k))
+					p.label:SetWidth(max(1, (bw - BOX_PAD * 2) * k))
+					bx = bx + (bw + BOX_GAP) * k
 				end
-				y = y + (row.tall + CAP_GAP + CAP_H + ROW_GAP) * k
+				y = y + (row.tall + BOX_ROOM + BOX_GAP) * k
 			end
 		end
 	end
